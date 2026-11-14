@@ -1,3 +1,8 @@
+# Joplix 2026.11.68
+
+- Declares compatibility with Nextcloud 35 (supported range is now 32 to 35).
+- The install and uninstall scripts print English messages and list the detected instances when more than one Nextcloud is found.
+
 # Joplix 2026.11.67
 
 - The integrated updater and the one-step installer now use the GitHub repository `kane9287/joplix-xsync` instead of Codeberg. A stored Codeberg update address is replaced by the GitHub address automatically.

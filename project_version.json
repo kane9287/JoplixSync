@@ -1,11 +1,11 @@
 {
   "name": "Joplix",
-  "version": "2026.11.67",
+  "version": "2026.11.68",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-13",
   "channel": "beta",
-  "base_version": "2026.11.66",
+  "base_version": "2026.11.67",
   "build_date": "2026-11-13",
   "release_date": "2026-11-13",
   "summary": "Complete English UI; updater and installer now use the GitHub repository kane9287/joplix-xsync.",

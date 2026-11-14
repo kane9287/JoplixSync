@@ -1,3 +1,7 @@
+# Joplix 2026.11.75
+
+- "Link to note": the result rows were squashed into each other when the list had more matches than fit; each row now shows its full title and notebook, and the list scrolls.
+
 # Joplix 2026.11.74
 
 - Links to other notes (`[Title](:/id)`, as Joplin's "Copy Markdown link" creates them) no longer appear under Attachments as "application/octet-stream · File missing", and they no longer count as attachments in the note list or search.

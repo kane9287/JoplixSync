@@ -30,7 +30,7 @@ function formatJoplixDateTime(value){
 function jpOverlay(){return document.getElementById('jp-settings-overlay');}
 function jpForceOpenSettings(){
   const o=jpOverlay();
-  if(!o){alert('Einstellungsbereich wurde nicht gefunden.');return;}
+  if(!o){alert(t('Einstellungsbereich wurde nicht gefunden.'));return;}
   const p=document.getElementById('jp-setting-joplin-path');
   if(p&&!p.value)p.value='/JoplinV2';
   o.classList.add('open');
@@ -93,15 +93,15 @@ async function jpApplySettingsFromUi(forceReindex){
   const pathChanged=local.joplin_path!==old;
   if(pathChanged||forceReindex){
     try{localStorage.removeItem('joplix.lastGoodIndex');localStorage.removeItem('joplix.lastLocation');}catch(e){}
-    jpStatusText('Einstellungen übernommen. Index wird mit '+local.joplin_path+' neu aufgebaut...','warning');
+    jpStatusText(L('Einstellungen übernommen. Index wird mit '+local.joplin_path+' neu aufgebaut...','Settings applied. Rebuilding index with '+local.joplin_path+'...'),'warning');
     try{
       const r=await jpApi('/api/index/rebuild',{method:'POST'});
       if(window.JoplixAfterRebuild)window.JoplixAfterRebuild(r.index||r);
       else location.reload();
-      jpStatusText('Einstellungen übernommen, Index aktualisiert','ok');
-    }catch(e){jpStatusText('Einstellungen gespeichert, aber Index-Neuaufbau fehlgeschlagen: '+e.message,'error');}
+      jpStatusText(t('Einstellungen übernommen, Index aktualisiert'),'ok');
+    }catch(e){jpStatusText(t('Einstellungen gespeichert, aber Index-Neuaufbau fehlgeschlagen: ')+e.message,'error');}
   } else {
-    jpStatusText('Einstellungen übernommen','ok');
+    jpStatusText(t('Einstellungen übernommen'),'ok');
   }
 }
 function jpActivateSettingsTab(tab){
@@ -120,7 +120,7 @@ document.addEventListener('click',function(ev){
   const rebuild=ev.target&&ev.target.closest?ev.target.closest('#jp-settings-rebuild'):null;
   if(rebuild){ev.preventDefault();ev.stopPropagation();jpApplySettingsFromUi(true);return;}
   const remember=ev.target&&ev.target.closest?ev.target.closest('#jp-setting-remember-toggle'):null;
-  if(remember){ev.preventDefault();ev.stopPropagation();const local=jpLocalSettings();local.remember_last_location=(local.remember_last_location||'yes')==='yes'?'no':'yes';remember.classList.toggle('active',local.remember_last_location==='yes');remember.setAttribute('aria-checked',local.remember_last_location==='yes'?'true':'false');jpSetLocalSettings(local);jpApi('/api/settings',{method:'POST',body:local}).then(()=>jpStatusText('Einstellungen übernommen','ok')).catch(e=>jpStatusText('Einstellungen konnten nicht gespeichert werden: '+e.message,'error'));return;}
+  if(remember){ev.preventDefault();ev.stopPropagation();const local=jpLocalSettings();local.remember_last_location=(local.remember_last_location||'yes')==='yes'?'no':'yes';remember.classList.toggle('active',local.remember_last_location==='yes');remember.setAttribute('aria-checked',local.remember_last_location==='yes'?'true':'false');jpSetLocalSettings(local);jpApi('/api/settings',{method:'POST',body:local}).then(()=>jpStatusText(t('Einstellungen übernommen'),'ok')).catch(e=>jpStatusText(t('Einstellungen konnten nicht gespeichert werden: ')+e.message,'error'));return;}
 },true);
 document.addEventListener('change',function(ev){
   if(ev.target&&ev.target.id==='jp-setting-sort'){jpApplySettingsFromUi(false);}
@@ -213,7 +213,7 @@ function notebookTitleWithCount(n){const c=visibleNoteCountForNotebook(n.id);ret
 function normalizeSearchText(v){return String(v||'').toLocaleLowerCase();}
 function noteMatchesQuery(n,q){if(!q)return true;const hay=[n.title,n.search_text,n.notebook_title,(n.tag_titles||[]).join(' '),(n.resource_titles||[]).join(' ')].map(normalizeSearchText).join(' ');return q.split(/\s+/).filter(Boolean).every(part=>hay.includes(part));}
 function showNotebookNotes(){if(!state.index)return; if(state.notebookId)selectNotebook(state.notebookId); else renderNotes([]);}
-function runFullTextSearch(raw){const q=normalizeSearchText(raw).trim();if(!q){showNotebookNotes();status(state.index?'Index aktuell':'Index wird geladen...','ok');return;}const notes=((state.index&&state.index.notes)||[]).filter(n=>noteMatchesQuery(n,q)).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent='Volltextsuche: '+raw;status(notes.length+' Treffer für „'+raw+'“','ok');}
+function runFullTextSearch(raw){const q=normalizeSearchText(raw).trim();if(!q){showNotebookNotes();status(state.index?t('Index aktuell'):t('Index wird geladen...'),'ok');return;}const notes=((state.index&&state.index.notes)||[]).filter(n=>noteMatchesQuery(n,q)).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent=t('Volltextsuche: ')+raw;status(L(notes.length+' Treffer für „'+raw+'“',notes.length+' results for “'+raw+'”'),'ok');}
 function rememberIndex(idx){if(idx&&!isEmptyIndex(idx))storage.set('lastGoodIndex',idx);}
 function rememberedIndex(){return storage.get('lastGoodIndex',null);}
 function localLocation(){return storage.get('lastLocation',{notebook_id:'',note_id:''});}
@@ -271,7 +271,7 @@ function jpRenderMarkdown(md){
   }
   closeList();
   if(inCode)html+='<pre><code>'+jpEscapeHtml(code.join('\n'))+'</code></pre>';
-  return html||'<p class="jp-muted">Keine Notizinhalte.</p>';
+  return html||'<p class="jp-muted">'+t('Keine Notizinhalte.')+'</p>';
 }
 function renderDisplayMode(){const d=$('jp-note-display'),ta=$('jp-body');if(!d||!ta)return;d.innerHTML=jpRenderMarkdown(ta.value||'');d.querySelectorAll('.jp-md-checkbox').forEach(cb=>cb.addEventListener('change',onDisplayCheckboxChange));updateSaveButton();}
 function setNoteMode(mode){state.displayMode=mode==='edit'?'edit':'view';const app=$('joplix-app');if(app){app.classList.toggle('jp-edit-mode',state.displayMode==='edit');app.classList.toggle('jp-view-mode',state.displayMode!=='edit');}if(state.displayMode!=='edit')renderDisplayMode();}
@@ -281,7 +281,7 @@ function noteSnapshot(){return {title:($('jp-title')?$('jp-title').value:''),bod
 function sameSnapshot(a,b){return !!a&&!!b&&String(a.title||'')===String(b.title||'')&&String(a.body||'')===String(b.body||'');}
 function setOriginalFromEditor(){state.originalNote=noteSnapshot();state.dirty=false;updateSaveButton();}
 function markDirty(){state.dirty=!sameSnapshot(state.originalNote,noteSnapshot());updateSaveButton();}
-function updateSaveButton(){const buttons=[$('jp-save-note'),$('jp-save-note-top')].filter(Boolean);const active=!!state.dirty&&!state.saving;buttons.forEach(btn=>{btn.disabled=!active;btn.classList.toggle('is-dirty',active);btn.title=active?'Änderungen speichern':'Keine Änderungen zum Speichern';});const app=$('joplix-app');if(app)app.classList.toggle('jp-note-dirty',active);}
+function updateSaveButton(){const buttons=[$('jp-save-note'),$('jp-save-note-top')].filter(Boolean);const active=!!state.dirty&&!state.saving;buttons.forEach(btn=>{btn.disabled=!active;btn.classList.toggle('is-dirty',active);btn.title=active?t('Änderungen speichern'):t('Keine Änderungen zum Speichern');});const app=$('joplix-app');if(app)app.classList.toggle('jp-note-dirty',active);}
 function setSavingUi(active){
   const app=$('joplix-app');
   if(app)app.classList.toggle('jp-saving',!!active);
@@ -289,7 +289,7 @@ function setSavingUi(active){
   if(!meta)return;
   if(active){
     if(!meta.dataset.beforeSaving)meta.dataset.beforeSaving=meta.textContent||'';
-    meta.innerHTML='<span class="jp-saving-spinner" aria-hidden="true"></span><span>Aenderungen werden gespeichert...</span>';
+    meta.innerHTML='<span class="jp-saving-spinner" aria-hidden="true"></span><span>'+t('Aenderungen werden gespeichert...')+'</span>';
   }else if(meta.dataset.beforeSaving){
     meta.textContent=meta.dataset.beforeSaving;
     delete meta.dataset.beforeSaving;
@@ -319,7 +319,7 @@ function rememberNote(n){
 function noteMemoryGet(id){return id&&state.noteMemCache?state.noteMemCache[id]:null;}
 function noteMemorySet(n){if(!n||!n.id)return n;state.noteMemCache[n.id]=n;const keys=Object.keys(state.noteMemCache);while(keys.length>50){delete state.noteMemCache[keys.shift()];}return n;}
 function apiNote(id){
-  if(!id)return Promise.reject(new Error('Keine Notiz-ID'));
+  if(!id)return Promise.reject(new Error(t('Keine Notiz-ID')));
   if(state.noteFetches[id])return state.noteFetches[id];
   const generation=state.noteGenerations[id]||0;
   state.noteFetches[id]=api('/api/notes/'+id).then(n=>{
@@ -338,15 +338,15 @@ function showNoteLoading(id,title=''){
   state.noteId=id||state.noteId||'';
   ensureNoteSelected(state.noteId);
   const meta=findNoteMeta(id);
-  if($('jp-title'))$('jp-title').value=title||meta.title||'Notiz wird geladen...';
-  if($('jp-meta'))$('jp-meta').innerHTML='<span class="jp-note-loading-dot"></span> Notizinhalt wird geladen...';
+  if($('jp-title'))$('jp-title').value=title||meta.title||t('Notiz wird geladen...');
+  if($('jp-meta'))$('jp-meta').innerHTML='<span class="jp-note-loading-dot"></span> '+t('Notizinhalt wird geladen...');
   if($('jp-body')){
     $('jp-body').value='';renderDisplayMode();
-    $('jp-body').placeholder='Notiz wird geladen. Der Inhalt wird gleich angezeigt.';
+    $('jp-body').placeholder=t('Notiz wird geladen. Der Inhalt wird gleich angezeigt.');
     $('jp-body').classList.add('jp-note-loading');
   }
   if($('jp-tags'))$('jp-tags').innerHTML='';
-  if($('jp-resources'))$('jp-resources').innerHTML='<div class="jp-note-loading-card">Notiz wird geladen...</div>';
+  if($('jp-resources'))$('jp-resources').innerHTML='<div class="jp-note-loading-card">'+t('Notiz wird geladen...')+'</div>';
   updateNotePath();
   updateSaveButton();
 }
@@ -354,8 +354,8 @@ function renderNoteToEditor(n,fromCache=false){
   state.note=n;state.noteId=n.id;state.noteLoading=false;
   ensureNoteSelected(n.id);
   if($('jp-title'))$('jp-title').value=n.title||'';
-  if($('jp-body')){$('jp-body').classList.remove('jp-note-loading');$('jp-body').placeholder='Notizinhalt';$('jp-body').value=n.body||'';renderDisplayMode();setNoteMode('view');}
-  if($('jp-meta'))$('jp-meta').textContent=(fromCache?'Aus lokalem Schnellcache, wird aktualisiert... ':'')+'Aktualisiert: '+formatJoplixDateTime(n.updated_time)+' | Notizbuch: '+(n.notebook_title||'');
+  if($('jp-body')){$('jp-body').classList.remove('jp-note-loading');$('jp-body').placeholder=t('Notizinhalt');$('jp-body').value=n.body||'';renderDisplayMode();setNoteMode('view');}
+  if($('jp-meta'))$('jp-meta').textContent=(fromCache?t('Aus lokalem Schnellcache, wird aktualisiert... '):'')+t('Aktualisiert: ')+formatJoplixDateTime(n.updated_time)+t(' | Notizbuch: ')+(n.notebook_title||'');
   renderTags(n.tags||[]);
   renderResources(n.resources||[]);
   updateNotePath();
@@ -412,34 +412,34 @@ async function load(){
     usedCached=true;
     state.index=cached;
     renderIndex(cached);
-    status('Lokaler Index sofort geladen. Änderungen werden im Hintergrund geprüft...','ok');
+    status(t('Lokaler Index sofort geladen. Änderungen werden im Hintergrund geprüft...'),'ok');
     restoreLocation(cached);
   }
   let idx=await api('/api/index').catch(e=>null);
   if(idx&&!isEmptyIndex(idx)&&(!hasFullTextIndex(idx)||!hasCurrentCountIndex(idx))){
-    if(!usedCached)status(!hasFullTextIndex(idx)?'Alter Index ohne Volltextsuche erkannt, Neuaufbau läuft...':'Alter Index mit fehlerhaften Zählerständen erkannt, Neuaufbau läuft...','warning');
-    const rebuilt=await api('/api/index/rebuild',{method:'POST'}).catch(e=>{status('Index-Neuaufbau fehlgeschlagen: '+e.message,'error');return null;});
+    if(!usedCached)status(!hasFullTextIndex(idx)?t('Alter Index ohne Volltextsuche erkannt, Neuaufbau läuft...'):t('Alter Index mit fehlerhaften Zählerständen erkannt, Neuaufbau läuft...'),'warning');
+    const rebuilt=await api('/api/index/rebuild',{method:'POST'}).catch(e=>{status(t('Index-Neuaufbau fehlgeschlagen: ')+e.message,'error');return null;});
     idx=rebuilt?(rebuilt.index||rebuilt):idx;
   }
   if(!idx||isEmptyIndex(idx)){
-    if(!usedCached)status('Index leer oder nicht vorhanden, erster Neuaufbau läuft...','warning');
-    const rebuilt=await api('/api/index/rebuild',{method:'POST'}).catch(e=>{status('Index-Neuaufbau fehlgeschlagen: '+e.message,'error');return null;});
+    if(!usedCached)status(t('Index leer oder nicht vorhanden, erster Neuaufbau läuft...'),'warning');
+    const rebuilt=await api('/api/index/rebuild',{method:'POST'}).catch(e=>{status(t('Index-Neuaufbau fehlgeschlagen: ')+e.message,'error');return null;});
     idx=rebuilt?(rebuilt.index||rebuilt):idx;
   }
   if(idx&&!isEmptyIndex(idx)){
     if(usedCached){
-      applyIndexPreservingFocus(idx,'Server-Index geladen. Änderungen werden im Hintergrund geprüft...');
+      applyIndexPreservingFocus(idx,t('Server-Index geladen. Änderungen werden im Hintergrund geprüft...'));
     } else {
       state.index=idx;
       rememberIndex(idx);
       renderIndex(idx);
-      status('Index aktuell','ok');
+      status(t('Index aktuell'),'ok');
       restoreLocation(idx);
     }
     scheduleBackgroundRefresh(900);
   } else if(!cached){
     renderIndex({tree:[],notes:[],notebooks:[]});
-    status('Kein Index vorhanden. Bitte Joplix-Ordner in den Einstellungen prüfen.','error');
+    status(t('Kein Index vorhanden. Bitte Joplix-Ordner in den Einstellungen prüfen.'),'error');
   } else {
     scheduleBackgroundRefresh(900);
   }
@@ -454,11 +454,11 @@ function restoreLocation(idx){
 }
 function fillSettings(){/* Einstellungen in 1.0.6 voruebergehend deaktiviert */}
 function renderIndex(idx){rememberIndex(idx);renderTree(idx.tree||[]);renderNotes([]);}
-function renderTree(nodes){const root=$('jp-tree');root.innerHTML='';const walk=(n,l)=>{const row=document.createElement('div');row.className='jp-tree-row';row.dataset.id=n.id;row.style.paddingLeft=(4+l*18)+'px';const b=document.createElement('button');b.className='jp-tree-item';b.dataset.id=n.id;b.onclick=()=>selectNotebook(n.id);const icon=document.createElement('span');icon.className='jp-folder-icon';icon.setAttribute('aria-hidden','true');const label=document.createElement('span');label.className='jp-tree-label';label.textContent=notebookTitleWithCount(n);b.appendChild(icon);b.appendChild(label);const menu=document.createElement('button');menu.className='jp-tree-menu';menu.textContent='⋯';menu.title='Aktionen';menu.onclick=(ev)=>{ev.stopPropagation();showNotebookMenu(n,row,menu);};row.appendChild(b);row.appendChild(menu);root.appendChild(row);(n.children||[]).forEach(c=>walk(c,l+1));};nodes.forEach(n=>walk(n,0));}
+function renderTree(nodes){const root=$('jp-tree');root.innerHTML='';const walk=(n,l)=>{const row=document.createElement('div');row.className='jp-tree-row';row.dataset.id=n.id;row.style.paddingLeft=(4+l*18)+'px';const b=document.createElement('button');b.className='jp-tree-item';b.dataset.id=n.id;b.onclick=()=>selectNotebook(n.id);const icon=document.createElement('span');icon.className='jp-folder-icon';icon.setAttribute('aria-hidden','true');const label=document.createElement('span');label.className='jp-tree-label';label.textContent=notebookTitleWithCount(n);b.appendChild(icon);b.appendChild(label);const menu=document.createElement('button');menu.className='jp-tree-menu';menu.textContent='⋯';menu.title=t('Aktionen');menu.onclick=(ev)=>{ev.stopPropagation();showNotebookMenu(n,row,menu);};row.appendChild(b);row.appendChild(menu);root.appendChild(row);(n.children||[]).forEach(c=>walk(c,l+1));};nodes.forEach(n=>walk(n,0));}
 function selectNotebook(id,opts={}){state.notebookId=id;document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));const notes=(state.index.notes||[]).filter(n=>n.notebook_id===id).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent=breadcrumb(id);if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);if(!opts.skipSave)saveLastLocation();}
-function breadcrumb(id){const names=[];let guard=0;while(id&&guard<20){const nb=(state.index.notebooks||[]).find(n=>n.id===id);if(!nb)break;names.unshift(nb.title);id=nb.parent_id;guard++;}return names.join(' › ')||'Notizbuch';}
+function breadcrumb(id){const names=[];let guard=0;while(id&&guard<20){const nb=(state.index.notebooks||[]).find(n=>n.id===id);if(!nb)break;names.unshift(nb.title);id=nb.parent_id;guard++;}return names.join(' › ')||t('Notizbuch');}
 function sorter(){return (a,b)=>state.sort==='title_asc'?a.title.localeCompare(b.title):(state.sort==='updated_asc'?String(a.updated_time).localeCompare(String(b.updated_time)):String(b.updated_time).localeCompare(String(a.updated_time)));}
-function renderNotes(notes){const box=$('jp-notes');box.innerHTML='';if(!notes.length){box.innerHTML='<p>Keine Notizen gefunden.</p>';return;}notes.forEach(n=>{const b=document.createElement('button');b.className='jp-note-item';b.dataset.id=n.id;b.innerHTML='<strong></strong><span></span><small></small>';b.querySelector('strong').textContent=n.title;b.querySelector('span').textContent=formatJoplixDateTime(n.updated_time);b.querySelector('small').textContent=(n.resource_count?('📎 '+n.resource_count+' '):'')+(n.tag_count?('🏷 '+n.tag_count):'');b.onclick=()=>openNote(n.id);b.addEventListener('contextmenu',ev=>showNoteContextMenu(ev,n));box.appendChild(b);});}
+function renderNotes(notes){const box=$('jp-notes');box.innerHTML='';if(!notes.length){box.innerHTML='<p>'+t('Keine Notizen gefunden.')+'</p>';return;}notes.forEach(n=>{const b=document.createElement('button');b.className='jp-note-item';b.dataset.id=n.id;b.innerHTML='<strong></strong><span></span><small></small>';b.querySelector('strong').textContent=n.title;b.querySelector('span').textContent=formatJoplixDateTime(n.updated_time);b.querySelector('small').textContent=(n.resource_count?('📎 '+n.resource_count+' '):'')+(n.tag_count?('🏷 '+n.tag_count):'');b.onclick=()=>openNote(n.id);b.addEventListener('contextmenu',ev=>showNoteContextMenu(ev,n));box.appendChild(b);});}
 async function handleDirtyBeforeNoteChange(targetId){
   // Wenn der Benutzer unmittelbar nach "Speichern" zu einer anderen Notiz wechselt,
   // wartet der Wechsel zuerst auf denselben laufenden Speichervorgang. Dadurch wird
@@ -468,13 +468,13 @@ async function handleDirtyBeforeNoteChange(targetId){
     ensureNoteSelected(targetId);
     setSavingUi(true);
     try{await state.savePromise;}
-    catch(e){alert('Speichern fehlgeschlagen: '+(e&&e.message?e.message:e));state.pendingNoteId='';ensureNoteSelected(state.noteId);return false;}
+    catch(e){alert(t('Speichern fehlgeschlagen: ')+(e&&e.message?e.message:e));state.pendingNoteId='';ensureNoteSelected(state.noteId);return false;}
     finally{setSavingUi(false);}
     state.pendingNoteId='';
   }
   if(!state.dirty||!state.noteId||state.noteId===targetId)return true;
   const fromId=state.noteId;
-  const saveFirst=confirm('Diese Notiz hat ungespeicherte Änderungen.\n\nOK = Änderungen speichern und wechseln.\nAbbrechen = weitere Auswahl.');
+  const saveFirst=confirm(t('Diese Notiz hat ungespeicherte Änderungen.\n\nOK = Änderungen speichern und wechseln.\nAbbrechen = weitere Auswahl.'));
   if(saveFirst){
     try{
       state.pendingNoteId=targetId;
@@ -484,12 +484,12 @@ async function handleDirtyBeforeNoteChange(targetId){
       return !state.dirty;
     }catch(e){
       state.pendingNoteId='';
-      alert('Speichern vor dem Wechsel fehlgeschlagen: '+(e&&e.message?e.message:e));
+      alert(t('Speichern vor dem Wechsel fehlgeschlagen: ')+(e&&e.message?e.message:e));
       ensureNoteSelected(fromId);
       return false;
     }
   }
-  const discard=confirm('Änderungen verwerfen und trotzdem zu einer anderen Notiz wechseln?');
+  const discard=confirm(t('Änderungen verwerfen und trotzdem zu einer anderen Notiz wechseln?'));
   if(discard){state.dirty=false;updateSaveButton();return true;}
   ensureNoteSelected(fromId);
   return false;
@@ -503,7 +503,7 @@ async function openNote(id,opts={}){
   if(mem){renderNoteToEditor(mem,false);if(!opts.silent)saveLastLocation();if(!opts.forceRefresh)return;}
   else if(cached&&(opts.preferCache||opts.silent||state.noteId!==id)){renderNoteToEditor(cached,true);}
   else if(!(state.note&&state.noteId===id)){showNoteLoading(id,meta.title||'');}
-  else {state.noteLoading=true;if($('jp-meta'))$('jp-meta').textContent='Notiz wird aktualisiert...';}
+  else {state.noteLoading=true;if($('jp-meta'))$('jp-meta').textContent=t('Notiz wird aktualisiert...');}
   try{
     const n=await apiNote(id);
     if(state.loadingNoteId!==id)return;
@@ -512,29 +512,29 @@ async function openNote(id,opts={}){
     if(!opts.silent)saveLastLocation();
   }catch(e){
     state.noteLoading=false;
-    if(cached||mem){const cn=mem||cached;if($('jp-meta'))$('jp-meta').textContent='Schnellcache: '+formatJoplixDateTime(cn.updated_time)+' | Aktualisierung fehlgeschlagen: '+e.message;status('Notiz aus Schnellcache angezeigt. Aktualisierung fehlgeschlagen: '+e.message,'warning');return;}
-    showNoteLoading(id,meta.title||'Notiz');
-    if($('jp-meta'))$('jp-meta').textContent='Notiz konnte nicht geladen werden: '+e.message;
+    if(cached||mem){const cn=mem||cached;if($('jp-meta'))$('jp-meta').textContent=t('Schnellcache: ')+formatJoplixDateTime(cn.updated_time)+t(' | Aktualisierung fehlgeschlagen: ')+e.message;status(t('Notiz aus Schnellcache angezeigt. Aktualisierung fehlgeschlagen: ')+e.message,'warning');return;}
+    showNoteLoading(id,meta.title||t('Notiz'));
+    if($('jp-meta'))$('jp-meta').textContent=t('Notiz konnte nicht geladen werden: ')+e.message;
     throw e;
   }
 }
-function clearNote(){state.note=null;state.noteId='';state.originalNote=null;state.dirty=false;state.noteLoading=false;$('jp-title').value='';$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder='Bitte rechts eine Notiz auswählen.';$('jp-meta').textContent='Keine Notiz geöffnet';$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();updateSaveButton();}
+function clearNote(){state.note=null;state.noteId='';state.originalNote=null;state.dirty=false;state.noteLoading=false;$('jp-title').value='';$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Bitte rechts eine Notiz auswählen.');$('jp-meta').textContent=t('Keine Notiz geöffnet');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();updateSaveButton();}
 function renderTags(tags){
   const box=$('jp-tags');box.innerHTML='';
-  normalizeLocalTags(tags).forEach(t=>{
+  normalizeLocalTags(tags).forEach(tag=>{
     const chip=document.createElement('span');chip.className='jp-tag-chip';
-    const label=document.createElement('span');label.className='jp-tag-label';label.textContent=t.title;chip.appendChild(label);
-    const remove=document.createElement('button');remove.type='button';remove.className='jp-tag-remove';remove.textContent='×';remove.title='Tag von dieser Notiz entfernen';remove.setAttribute('aria-label','Tag '+t.title+' entfernen');
-    remove.onclick=ev=>{ev.preventDefault();ev.stopPropagation();removeTag(t);};
+    const label=document.createElement('span');label.className='jp-tag-label';label.textContent=tag.title;chip.appendChild(label);
+    const remove=document.createElement('button');remove.type='button';remove.className='jp-tag-remove';remove.textContent='×';remove.title=t('Tag von dieser Notiz entfernen');remove.setAttribute('aria-label',L('Tag '+tag.title+' entfernen','Remove tag '+tag.title));
+    remove.onclick=ev=>{ev.preventDefault();ev.stopPropagation();removeTag(tag);};
     chip.appendChild(remove);box.appendChild(chip);
   });
-  const add=document.createElement('button');add.textContent='+ Tag';add.onclick=addTag;box.appendChild(add);
+  const add=document.createElement('button');add.textContent=t('+ Tag');add.onclick=addTag;box.appendChild(add);
 }
 function resourceIsPdf(r){return !!(r&&((r.is_pdf===true)||String(r.mime||'').toLowerCase()==='application/pdf'||String(r.file_extension||'').toLowerCase()==='pdf'||String(r.title||'').toLowerCase().endsWith('.pdf')));}
 function resourceIsOffice(r){const ext=String(r&&r.file_extension||'').toLowerCase();const title=String(r&&r.title||'').toLowerCase();return !!(r&&((r.is_office===true)||['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp'].includes(ext)||['.doc','.docx','.xls','.xlsx','.ppt','.pptx','.odt','.ods','.odp'].some(e=>title.endsWith(e))));}
 function resourceIsExternallyOpenable(r){return resourceIsPdf(r)||resourceIsOffice(r)||(r&&r.is_openable===true);}
 function resourceFileName(r,p){let name=String((p&&p.title)||r.title||r.id||'resource').trim()||'resource';const ext=String((p&&p.file_extension)||r.file_extension||'').trim().replace(/^\./,'');if(ext&&!name.toLowerCase().endsWith('.'+ext.toLowerCase()))name+='.'+ext;return name.replace(/[\\/:*?"<>|]+/g,'_');}
-function dataUrlToBlobUrl(dataUrl,mime){const parts=String(dataUrl||'').split(',');if(parts.length<2)throw new Error('Ressource konnte nicht gelesen werden.');const bin=atob(parts[1]);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return URL.createObjectURL(new Blob([bytes],{type:mime||'application/octet-stream'}));}
+function dataUrlToBlobUrl(dataUrl,mime){const parts=String(dataUrl||'').split(',');if(parts.length<2)throw new Error(t('Ressource konnte nicht gelesen werden.'));const bin=atob(parts[1]);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return URL.createObjectURL(new Blob([bytes],{type:mime||'application/octet-stream'}));}
 function formatBytes(n){n=Number(n||0);if(!n)return '';const u=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):Math.round(n))+' '+u[i];}
 async function openResourceExternal(r){const p=await api('/api/resources/'+r.id+'/data');if(p.error)throw new Error(p.error);const mime=p.mime||r.mime||'application/octet-stream';const objectUrl=dataUrlToBlobUrl(p.data_url,mime);const filename=resourceFileName(r,p);const a=document.createElement('a');a.href=objectUrl;a.target='_blank';a.rel='noopener';a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);}
 function stopOfficePolling(resourceId){if(state.officePollers[resourceId]){clearInterval(state.officePollers[resourceId]);delete state.officePollers[resourceId];}}
@@ -551,17 +551,17 @@ async function pollOfficeEdit(resourceId,statusEl,options={}){
       const result=await api('/api/resources/'+resourceId+'/office/status');
       if(!result.active){
         stopOfficePolling(resourceId);
-        if(!options.silentInactive)officeStatusText(statusEl,result.error||'Bearbeitungssitzung beendet.','warning');
+        if(!options.silentInactive)officeStatusText(statusEl,result.error||t('Bearbeitungssitzung beendet.'),'warning');
         return result;
       }
       if(result.updated||result.already_applied){
         sync.lastHash=String(result.sha256||sync.lastHash||'');
-        officeStatusText(statusEl,'Änderungen wurden in die Joplix-Ressource übernommen und können synchronisiert werden.','ok');
+        officeStatusText(statusEl,t('Änderungen wurden in die Joplix-Ressource übernommen und können synchronisiert werden.'),'ok');
         scheduleBackgroundRefresh(350);
       }
       return result;
     }catch(e){
-      officeStatusText(statusEl,'Übernahme fehlgeschlagen: '+e.message,'error');
+      officeStatusText(statusEl,t('Übernahme fehlgeschlagen: ')+e.message,'error');
       throw e;
     }finally{
       sync.inFlight=null;
@@ -572,7 +572,7 @@ async function pollOfficeEdit(resourceId,statusEl,options={}){
 async function finalizeOfficeEdit(resourceId,statusEl){
   const sync=officeSyncState(resourceId);
   if(sync.inFlight)await sync.inFlight;
-  officeStatusText(statusEl,'Office wurde geschlossen. Die endgültige Office-Speicherung wird abgewartet...','busy');
+  officeStatusText(statusEl,t('Office wurde geschlossen. Die endgültige Office-Speicherung wird abgewartet...'),'busy');
   // EuroOffice/Document Server may write the final file several seconds after
   // its browser window has already closed. Keep checking the working copy until
   // it stayed unchanged for three checks and a minimum grace period elapsed.
@@ -593,7 +593,7 @@ async function finalizeOfficeEdit(resourceId,statusEl){
     await new Promise(resolve=>setTimeout(resolve,2000));
   }
   if(statusEl.classList.contains('error'))return lastResult;
-  officeStatusText(statusEl,'Office wurde geschlossen. Die endgültige Datei wurde in die Joplix-Ressource übernommen.','ok');
+  officeStatusText(statusEl,t('Office wurde geschlossen. Die endgültige Datei wurde in die Joplix-Ressource übernommen.'),'ok');
   scheduleBackgroundRefresh(350);
   return lastResult;
 }
@@ -648,7 +648,7 @@ function triggerNextcloudDefaultFileAction(editorWindow,fileId,fileName,statusEl
       const row=findNextcloudFileRow(doc,fileId,fileName);
       if(row&&activateNextcloudFileRow(row,fileName)){
         clearInterval(timer);
-        officeStatusText(statusEl,'Nextcloud-Dateiaktion wurde gestartet. Gespeicherte Änderungen werden automatisch zurück in Joplix übernommen.','busy');
+        officeStatusText(statusEl,t('Nextcloud-Dateiaktion wurde gestartet. Gespeicherte Änderungen werden automatisch zurück in Joplix übernommen.'),'busy');
         return;
       }
     }catch(e){
@@ -657,7 +657,7 @@ function triggerNextcloudDefaultFileAction(editorWindow,fileId,fileName,statusEl
     }
     if(attempts>=40){
       clearInterval(timer);
-      officeStatusText(statusEl,'Die Arbeitskopie wurde geöffnet. Falls der Office-Editor nicht automatisch startet, bitte einmal auf den Dateinamen klicken.','warning');
+      officeStatusText(statusEl,t('Die Arbeitskopie wurde geöffnet. Falls der Office-Editor nicht automatisch startet, bitte einmal auf den Dateinamen klicken.'),'warning');
     }
   },500);
 }
@@ -666,18 +666,18 @@ async function startOfficeEdit(r,statusEl){
   const popupFeatures='popup=yes,width='+Math.max(900,Math.min(1500,Math.floor((window.screen&&screen.availWidth||1400)*0.88)))+',height='+Math.max(700,Math.min(1000,Math.floor((window.screen&&screen.availHeight||900)*0.88)))+',left=40,top=30,resizable=yes,scrollbars=yes';
   const windowName=openMode==='window'?('joplix-office-'+r.id):'_blank';
   const editorWindow=window.open('about:blank',windowName,openMode==='window'?popupFeatures:'noopener');
-  if(!editorWindow){officeStatusText(statusEl,'Das Office-Fenster wurde vom Browser blockiert. Bitte Pop-ups für diese Nextcloud-Adresse erlauben.','error');throw new Error('Office-Fenster wurde vom Browser blockiert.');}
-  try{editorWindow.document.title='Joplix – Office wird vorbereitet';editorWindow.document.body.innerHTML='<p style="font-family:system-ui;padding:24px">Nextcloud Office wird vorbereitet…</p>';}catch(e){}
-  officeStatusText(statusEl,'Arbeitskopie wird für Nextcloud Office vorbereitet...','busy');
+  if(!editorWindow){officeStatusText(statusEl,t('Das Office-Fenster wurde vom Browser blockiert. Bitte Pop-ups für diese Nextcloud-Adresse erlauben.'),'error');throw new Error(t('Office-Fenster wurde vom Browser blockiert.'));}
+  try{editorWindow.document.title=t('Joplix – Office wird vorbereitet');editorWindow.document.body.innerHTML='<p style="font-family:system-ui;padding:24px">'+t('Nextcloud Office wird vorbereitet…')+'</p>';}catch(e){}
+  officeStatusText(statusEl,t('Arbeitskopie wird für Nextcloud Office vorbereitet...'),'busy');
   try{
     const result=await api('/api/resources/'+r.id+'/office/start',{method:'POST',body:{}});
     const rawFileId=String(result.file_id||'');
     const fileId=encodeURIComponent(rawFileId);
     const fileName=String(result.file_name||resourceFileName(r,result));
-    if(!fileId)throw new Error('Die Nextcloud-Datei-ID der Arbeitskopie fehlt.');
+    if(!fileId)throw new Error(t('Die Nextcloud-Datei-ID der Arbeitskopie fehlt.'));
     const officeUrl=OC.generateUrl(String(result.editor_path||('/apps/eurooffice/'+fileId)));
     editorWindow.location.replace(officeUrl);
-    officeStatusText(statusEl,(openMode==='window'?'Bearbeitung wurde in einem eigenen Fenster angefordert. ':'Bearbeitung läuft in einem neuen Tab. ')+'EuroOffice wird direkt geöffnet. Gespeicherte Änderungen werden automatisch zurück in Joplix übernommen.','busy');
+    officeStatusText(statusEl,(openMode==='window'?t('Bearbeitung wurde in einem eigenen Fenster angefordert. '):t('Bearbeitung läuft in einem neuen Tab. '))+t('EuroOffice wird direkt geöffnet. Gespeicherte Änderungen werden automatisch zurück in Joplix übernommen.'),'busy');
     stopOfficePolling(r.id);
     state.officeSyncs[r.id]={inFlight:null,closed:false,lastHash:''};
     state.officePollers[r.id]=setInterval(()=>pollOfficeEdit(r.id,statusEl).catch(()=>{}),3000);
@@ -688,19 +688,19 @@ async function startOfficeEdit(r,statusEl){
       stopOfficePolling(r.id);
       const sync=officeSyncState(r.id);
       sync.closed=true;
-      officeStatusText(statusEl,'Office wurde geschlossen. Letzte gespeicherte Änderungen werden geprüft...','busy');
+      officeStatusText(statusEl,t('Office wurde geschlossen. Letzte gespeicherte Änderungen werden geprüft...'),'busy');
       try{
         await finalizeOfficeEdit(r.id,statusEl);
       }catch(e){
-        officeStatusText(statusEl,'Abschließende Übernahme fehlgeschlagen: '+e.message,'error');
+        officeStatusText(statusEl,t('Abschließende Übernahme fehlgeschlagen: ')+e.message,'error');
       }
     },1000);
   }catch(e){try{editorWindow.close();}catch(ignore){}officeStatusText(statusEl,e.message,'error');throw e;}
 }
 function resourceKind(r){const ext=String(r.file_extension||'').toLowerCase();const mime=String(r.mime||'').toLowerCase();if(resourceIsOffice(r))return 'office';if(resourceIsPdf(r))return 'pdf';if(r.is_image||mime.startsWith('image/'))return 'image';if(mime.startsWith('audio/')||['mp3','ogg','wav','m4a','flac'].includes(ext))return 'audio';if(mime.startsWith('video/')||['mp4','webm','mov','mkv','avi'].includes(ext))return 'video';if(['zip','7z','rar','tar','gz','bz2'].includes(ext))return 'archive';return 'file';}
-function resourcePrimaryLabel(kind){return {office:'Bearbeiten',pdf:'Öffnen',image:'Öffnen',audio:'Abspielen',video:'Abspielen'}[kind]||'';}
-function renderResources(rs){const box=$('jp-resources');box.innerHTML='';if(!rs||!rs.length)return;const head=document.createElement('div');head.className='jp-resources-head';head.textContent='Anhänge';box.appendChild(head);rs.forEach(async r=>{const kind=resourceKind(r);const card=document.createElement('div');card.className='jp-resource jp-resource-'+kind;const title=document.createElement('strong');title.textContent=r.title||r.id;const meta=document.createElement('span');meta.textContent=[r.mime||'',r.file_extension?('.'+r.file_extension):'',r.exists?'':'Datei fehlt'].filter(Boolean).join(' ');card.appendChild(title);card.appendChild(meta);box.appendChild(card);if(!r.exists)return;
- if(kind==='image'){try{const p=await api('/api/resources/'+r.id+'/data');if(p.data_url){const img=document.createElement('img');img.src=p.data_url;img.alt=r.title||'Bild';card.appendChild(img);}}catch(e){}}
+function resourcePrimaryLabel(kind){return t({office:'Bearbeiten',pdf:'Öffnen',image:'Öffnen',audio:'Abspielen',video:'Abspielen'}[kind]||'');}
+function renderResources(rs){const box=$('jp-resources');box.innerHTML='';if(!rs||!rs.length)return;const head=document.createElement('div');head.className='jp-resources-head';head.textContent=t('Anhänge');box.appendChild(head);rs.forEach(async r=>{const kind=resourceKind(r);const card=document.createElement('div');card.className='jp-resource jp-resource-'+kind;const title=document.createElement('strong');title.textContent=r.title||r.id;const meta=document.createElement('span');meta.textContent=[r.mime||'',r.file_extension?('.'+r.file_extension):'',r.exists?'':t('Datei fehlt')].filter(Boolean).join(' ');card.appendChild(title);card.appendChild(meta);box.appendChild(card);if(!r.exists)return;
+ if(kind==='image'){try{const p=await api('/api/resources/'+r.id+'/data');if(p.data_url){const img=document.createElement('img');img.src=p.data_url;img.alt=r.title||t('Bild');card.appendChild(img);}}catch(e){}}
  const actions=document.createElement('div');actions.className='jp-resource-actions';const primary=resourcePrimaryLabel(kind);if(primary){const primaryBtn=document.createElement('button');primaryBtn.type='button';primaryBtn.className='jp-resource-action jp-resource-action-primary';primaryBtn.textContent=primary;actions.appendChild(primaryBtn);if(kind==='office'){const status=document.createElement('div');status.className='jp-resource-edit-status';card.appendChild(actions);card.appendChild(status);primaryBtn.onclick=async()=>{primaryBtn.disabled=true;try{await startOfficeEdit(r,status);}catch(e){alert(e.message);}finally{primaryBtn.disabled=false;}};}else{primaryBtn.onclick=async()=>{try{await openResourceExternal(r);}catch(e){alert(e.message);}};card.appendChild(actions);}}
  const downloadBtn=document.createElement('button');downloadBtn.type='button';downloadBtn.className='jp-resource-action jp-resource-action-secondary';downloadBtn.textContent='Download';downloadBtn.onclick=async()=>{try{await openResourceExternal(r);}catch(e){alert(e.message);}};actions.appendChild(downloadBtn);if(!actions.parentNode)card.appendChild(actions);
  });}
@@ -834,7 +834,7 @@ async function saveNote(options={}){
     return state.savePromise;
   }
   state.savePromise=(async()=>{
-    if(!state.notebookId&&!state.note){alert('Bitte Notizbuch auswaehlen.');return false;}
+    if(!state.notebookId&&!state.note){alert(t('Bitte Notizbuch auswaehlen.'));return false;}
     do{
       state.saveAgain=false;
       if(!state.dirty){updateSaveButton();break;}
@@ -903,13 +903,13 @@ async function saveNote(options={}){
   try{return await state.savePromise;}
   finally{state.savePromise=null;state.saving=false;state.saveAgain=false;setSavingUi(false);updateSaveButton();}
 }
-async function newNote(){if(!(await handleDirtyBeforeNoteChange('__new__')))return;state.note=null;state.noteId='';setNoteMode('edit');$('jp-title').value='Neue Notiz';$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder='Notizinhalt';$('jp-meta').textContent='Neue Notiz in diesem Notizbuch';$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();state.originalNote={title:'',body:''};resetEditorHistory('');state.dirty=true;updateSaveButton();}
-async function deleteNote(){if(!state.note||!confirm('Notiz wirklich löschen?'))return;await api('/api/notes/'+state.note.id,{method:'DELETE'});await rebuildAndRestore(true);clearNote();}
+async function newNote(){if(!(await handleDirtyBeforeNoteChange('__new__')))return;state.note=null;state.noteId='';setNoteMode('edit');$('jp-title').value=t('Neue Notiz');$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Notizinhalt');$('jp-meta').textContent=t('Neue Notiz in diesem Notizbuch');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();state.originalNote={title:'',body:''};resetEditorHistory('');state.dirty=true;updateSaveButton();}
+async function deleteNote(){if(!state.note||!confirm(t('Notiz wirklich löschen?')))return;await api('/api/notes/'+state.note.id,{method:'DELETE'});await rebuildAndRestore(true);clearNote();}
 async function newNotebook(parent){const en=resolvedLanguage()==='en';const title=prompt(parent?(en?'Sub-notebook name:':'Name des Unter-Notizbuchs:'):(en?'Notebook name:':'Name des Notizbuchs:'));if(!title)return;await api('/api/notebooks',{method:'POST',body:{title,parent_id:parent||''}});await rebuildAndRestore();}
-async function renameNotebook(){if(!state.notebookId){alert('Bitte Notizbuch auswählen.');return;}const nb=(state.index.notebooks||[]).find(n=>n.id===state.notebookId);const title=prompt('Neuer Name',nb?nb.title:'');if(!title)return;await api('/api/notebooks/'+state.notebookId,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
+async function renameNotebook(){if(!state.notebookId){alert(t('Bitte Notizbuch auswählen.'));return;}const nb=(state.index.notebooks||[]).find(n=>n.id===state.notebookId);const title=prompt(t('Neuer Name'),nb?nb.title:'');if(!title)return;await api('/api/notebooks/'+state.notebookId,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
 function mimeFromFilename(name){const ext=String(name||'').toLowerCase().split('.').pop();const map={pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',doc:'application/msword',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',ppt:'application/vnd.ms-powerpoint',odt:'application/vnd.oasis.opendocument.text',ods:'application/vnd.oasis.opendocument.spreadsheet',odp:'application/vnd.oasis.opendocument.presentation'};return map[ext]||'application/octet-stream';}
 async function uploadResource(file){
-  if(!state.note){alert('Bitte zuerst eine Notiz öffnen.');return;}
+  if(!state.note){alert(t('Bitte zuerst eine Notiz öffnen.'));return;}
   const noteId=state.note.id;
   const data=await new Promise((resolve,reject)=>{
     const reader=new FileReader();
@@ -917,9 +917,9 @@ async function uploadResource(file){
     reader.onerror=reject;
     reader.readAsDataURL(file);
   });
-  if(state.note?.id!==noteId||state.noteLoading)throw new Error('Die ursprüngliche Notiz ist nicht mehr geöffnet.');
+  if(state.note?.id!==noteId||state.noteLoading)throw new Error(t('Die ursprüngliche Notiz ist nicht mehr geöffnet.'));
   const resource=await api('/api/resources',{method:'POST',body:{filename:file.name,mime:file.type||mimeFromFilename(file.name),data_base64:data}});
-  if(state.note?.id!==noteId||state.noteLoading)throw new Error('Anhang hochgeladen. Der Link konnte der ursprünglichen Notiz nicht hinzugefügt werden: '+resource.markdown);
+  if(state.note?.id!==noteId||state.noteLoading)throw new Error(t('Anhang hochgeladen. Der Link konnte der ursprünglichen Notiz nicht hinzugefügt werden: ')+resource.markdown);
   $('jp-body').value+='\n\n'+resource.markdown;
   markDirty();
   await saveNote();
@@ -969,26 +969,26 @@ async function removeTag(tag){
   const currentTags=normalizeLocalTags(state.note.tags||[]);
   const remaining=currentTags.filter(t=>t.id!==String(tag.id));
   applyTagsLocally(noteId,remaining);
-  status('Tag wird entfernt...','warning');
+  status(t('Tag wird entfernt...'),'warning');
   try{
     await api('/api/notes/'+encodeURIComponent(noteId)+'/tags/'+encodeURIComponent(tag.id),{method:'DELETE'});
-    status('Tag entfernt','ok');
+    status(t('Tag entfernt'),'ok');
     scheduleBackgroundRefresh(450);
   }catch(e){
     applyTagsLocally(noteId,currentTags);
-    status('Tag konnte nicht entfernt werden: '+e.message,'error');
-    alert('Tag konnte nicht entfernt werden: '+e.message);
+    status(t('Tag konnte nicht entfernt werden: ')+e.message,'error');
+    alert(t('Tag konnte nicht entfernt werden: ')+e.message);
   }
 }
 async function addTag(){
-  if(!state.note){alert('Bitte zuerst eine Notiz öffnen.');return;}
-  const entered=prompt('Neuer Tag');
+  if(!state.note){alert(t('Bitte zuerst eine Notiz öffnen.'));return;}
+  const entered=prompt(t('Neuer Tag'));
   const title=String(entered||'').trim();
   if(!title)return;
   const noteId=state.note.id;
   const currentTags=normalizeLocalTags(state.note.tags||[]);
   if(currentTags.some(t=>t.title.toLocaleLowerCase()===title.toLocaleLowerCase())){
-    alert('Dieser Tag ist der Notiz bereits zugeordnet.');
+    alert(t('Dieser Tag ist der Notiz bereits zugeordnet.'));
     return;
   }
 
@@ -996,37 +996,37 @@ async function addTag(){
   // ID wird nach der Serverantwort durch die echte Joplin-ID ersetzt.
   const temporaryTag={id:'pending-'+Date.now()+'-'+Math.random().toString(16).slice(2),title};
   applyTagsLocally(noteId,[...currentTags,temporaryTag]);
-  status('Tag wird gespeichert...','warning');
+  status(t('Tag wird gespeichert...'),'warning');
 
   try{
     const saved=await api('/api/notes/'+noteId+'/tags/create',{method:'POST',body:{title}});
     const realTag={id:String(saved.id||''),title:String(saved.title||title).trim()||title};
-    if(!realTag.id)throw new Error('Der gespeicherte Tag hat keine gültige ID erhalten.');
+    if(!realTag.id)throw new Error(t('Der gespeicherte Tag hat keine gültige ID erhalten.'));
     const latest=normalizeLocalTags((state.noteId===noteId&&state.note?state.note.tags:currentTags)||[])
       .filter(t=>t.id!==temporaryTag.id&&t.id!==realTag.id);
     applyTagsLocally(noteId,[...latest,realTag]);
-    status('Tag gespeichert','ok');
+    status(t('Tag gespeichert'),'ok');
     scheduleBackgroundRefresh(450);
   }catch(e){
     const rollback=normalizeLocalTags((state.noteId===noteId&&state.note?state.note.tags:currentTags)||[])
       .filter(t=>t.id!==temporaryTag.id);
     applyTagsLocally(noteId,rollback.length?rollback:currentTags);
-    status('Tag konnte nicht gespeichert werden: '+e.message,'error');
-    alert('Tag konnte nicht gespeichert werden: '+e.message);
+    status(t('Tag konnte nicht gespeichert werden: ')+e.message,'error');
+    alert(t('Tag konnte nicht gespeichert werden: ')+e.message);
   }
 }
 function closeNoteContextMenu(){const m=$('jp-note-context-menu');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');m.innerHTML='';}}
-function showNoteContextMenu(ev,note){ev.preventDefault();ev.stopPropagation();closeNoteContextMenu();const m=$('jp-note-context-menu');if(!m)return;m.dataset.noteId=note.id;m.innerHTML='<button data-act="move">Verschieben in Notizbuch</button><button data-act="tags">Tags</button><button data-act="delete" class="danger">Löschen</button>';m.style.left=Math.min(ev.clientX,window.innerWidth-240)+'px';m.style.top=Math.min(ev.clientY,window.innerHeight-150)+'px';m.classList.add('open');m.setAttribute('aria-hidden','false');m.querySelector('[data-act="delete"]').onclick=()=>{closeNoteContextMenu();deleteNoteById(note.id,note.title);};m.querySelector('[data-act="move"]').onclick=()=>{closeNoteContextMenu();moveNoteByPrompt(note.id);};m.querySelector('[data-act="tags"]').onclick=()=>{closeNoteContextMenu();editTagsByPrompt(note.id);};setTimeout(()=>document.addEventListener('click',closeNoteContextMenu,{once:true}),0);}
+function showNoteContextMenu(ev,note){ev.preventDefault();ev.stopPropagation();closeNoteContextMenu();const m=$('jp-note-context-menu');if(!m)return;m.dataset.noteId=note.id;m.innerHTML='<button data-act="move">'+t('Verschieben in Notizbuch')+'</button><button data-act="tags">Tags</button><button data-act="delete" class="danger">'+t('Löschen')+'</button>';m.style.left=Math.min(ev.clientX,window.innerWidth-240)+'px';m.style.top=Math.min(ev.clientY,window.innerHeight-150)+'px';m.classList.add('open');m.setAttribute('aria-hidden','false');m.querySelector('[data-act="delete"]').onclick=()=>{closeNoteContextMenu();deleteNoteById(note.id,note.title);};m.querySelector('[data-act="move"]').onclick=()=>{closeNoteContextMenu();moveNoteByPrompt(note.id);};m.querySelector('[data-act="tags"]').onclick=()=>{closeNoteContextMenu();editTagsByPrompt(note.id);};setTimeout(()=>document.addEventListener('click',closeNoteContextMenu,{once:true}),0);}
 function flatNotebooks(){return (state.index&&state.index.notebooks?state.index.notebooks:[]).slice().sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));}
-async function deleteNoteById(id,title){if(!confirm('Notiz wirklich löschen?\n\n'+(title||id)))return;await api('/api/notes/'+id,{method:'DELETE'});if(state.noteId===id)clearNote();await rebuildAndRestore(true);}
-async function moveNoteByPrompt(id){const books=flatNotebooks();if(!books.length){alert('Keine Notizbücher gefunden.');return;}const msg=books.map((b,i)=>(i+1)+'. '+b.title).join('\n');const ans=prompt('Ziel-Notizbuch auswählen:\n\n'+msg+'\n\nBitte Nummer eingeben:');if(!ans)return;const idx=parseInt(ans,10)-1;if(idx<0||idx>=books.length){alert('Ungültige Auswahl.');return;}await api('/api/notes/'+id+'/move',{method:'POST',body:{target_notebook_id:books[idx].id}});await rebuildAndRestore(true);if(state.noteId===id)await openNote(id).catch(()=>{});}
+async function deleteNoteById(id,title){if(!confirm(t('Notiz wirklich löschen?')+'\n\n'+(title||id)))return;await api('/api/notes/'+id,{method:'DELETE'});if(state.noteId===id)clearNote();await rebuildAndRestore(true);}
+async function moveNoteByPrompt(id){const books=flatNotebooks();if(!books.length){alert(t('Keine Notizbücher gefunden.'));return;}const msg=books.map((b,i)=>(i+1)+'. '+b.title).join('\n');const ans=prompt(t('Ziel-Notizbuch auswählen:')+'\n\n'+msg+'\n\n'+t('Bitte Nummer eingeben:'));if(!ans)return;const idx=parseInt(ans,10)-1;if(idx<0||idx>=books.length){alert(t('Ungültige Auswahl.'));return;}await api('/api/notes/'+id+'/move',{method:'POST',body:{target_notebook_id:books[idx].id}});await rebuildAndRestore(true);if(state.noteId===id)await openNote(id).catch(()=>{});}
 async function editTagsByPrompt(id){
   const note=state.noteId===id&&state.note?state.note:await api('/api/notes/'+id);
   const allRaw=await api('/api/tags').catch(()=>[]);
   const all=normalizeLocalTags(allRaw);
   const currentTags=normalizeLocalTags(note.tags||[]);
   const current=currentTags.map(t=>t.title).join(', ');
-  const input=prompt('Tags bearbeiten. Mehrere Tags mit Komma trennen. Entfernte Namen werden von dieser Notiz gelöst.\n\nVorhandene Tags:\n'+(all.map(t=>t.title).join(', ')||'Keine')+'\n\nTags für diese Notiz:',current);
+  const input=prompt(t('Tags bearbeiten. Mehrere Tags mit Komma trennen. Entfernte Namen werden von dieser Notiz gelöst.')+'\n\n'+t('Vorhandene Tags:')+'\n'+(all.map(x=>x.title).join(', ')||t('Keine'))+'\n\n'+t('Tags für diese Notiz:'),current);
   if(input===null)return;
   const names=[...new Set(input.split(',').map(s=>s.trim()).filter(Boolean))];
   const selected=[];
@@ -1042,20 +1042,20 @@ async function editTagsByPrompt(id){
   const removed=currentTags.filter(tag=>!selectedIds.has(tag.id));
   const added=selected.filter(tag=>!currentTags.some(x=>x.id===tag.id));
   applyTagsLocally(id,selected);
-  status('Tags werden gespeichert...','warning');
+  status(t('Tags werden gespeichert...'),'warning');
   try{
     if(added.length)await api('/api/notes/'+id+'/tags',{method:'POST',body:{tag_ids:added.map(t=>t.id)}});
     for(const tag of removed)await api('/api/notes/'+encodeURIComponent(id)+'/tags/'+encodeURIComponent(tag.id),{method:'DELETE'});
-    status('Tags gespeichert','ok');
+    status(t('Tags gespeichert'),'ok');
     scheduleBackgroundRefresh(450);
   }catch(e){
     applyTagsLocally(id,currentTags);
-    status('Tags konnten nicht gespeichert werden: '+e.message,'error');
-    alert('Tags konnten nicht gespeichert werden: '+e.message);
+    status(t('Tags konnten nicht gespeichert werden: ')+e.message,'error');
+    alert(t('Tags konnten nicht gespeichert werden: ')+e.message);
   }
 }
-async function rebuildAndRestore(clear=false){status('Index wird neu aufgebaut...','warning');const r=await api('/api/index/rebuild',{method:'POST'});const idx=r.index||r;if(clear){state.index=idx;rememberIndex(idx);renderTree(idx.tree||[]);if(state.notebookId)selectNotebook(state.notebookId);else restoreLocation(idx);status('Index aktualisiert','ok');}else{applyIndexPreservingFocus(idx,'Index aktualisiert');}if(!clear&&state.noteId&&!state.dirty)openNote(state.noteId,{silent:true,preferCache:true}).catch(()=>{});if($('jp-search')&&$('jp-search').value.trim())runFullTextSearch($('jp-search').value);}
-window.JoplixAfterRebuild=function(idx){applyIndexPreservingFocus(idx,'Index aktualisiert');if($('jp-search')&&$('jp-search').value.trim())runFullTextSearch($('jp-search').value);};
+async function rebuildAndRestore(clear=false){status(t('Index wird neu aufgebaut...'),'warning');const r=await api('/api/index/rebuild',{method:'POST'});const idx=r.index||r;if(clear){state.index=idx;rememberIndex(idx);renderTree(idx.tree||[]);if(state.notebookId)selectNotebook(state.notebookId);else restoreLocation(idx);status(t('Index aktualisiert'),'ok');}else{applyIndexPreservingFocus(idx,t('Index aktualisiert'));}if(!clear&&state.noteId&&!state.dirty)openNote(state.noteId,{silent:true,preferCache:true}).catch(()=>{});if($('jp-search')&&$('jp-search').value.trim())runFullTextSearch($('jp-search').value);}
+window.JoplixAfterRebuild=function(idx){applyIndexPreservingFocus(idx,t('Index aktualisiert'));if($('jp-search')&&$('jp-search').value.trim())runFullTextSearch($('jp-search').value);};
 function scheduleBackgroundRefresh(delay=1200){setTimeout(()=>backgroundRefresh().catch(()=>{}),delay);}
 async function backgroundRefresh(){
   if(state.backgroundBusy)return;
@@ -1063,13 +1063,13 @@ async function backgroundRefresh(){
   try{
     const st=await api('/api/index/status');
     if(!st.current){
-      status('Änderungen erkannt. Index wird im Hintergrund aktualisiert...','warning');
+      status(t('Änderungen erkannt. Index wird im Hintergrund aktualisiert...'),'warning');
       const r=await api('/api/index/rebuild',{method:'POST'});
-      applyIndexPreservingFocus(r.index||r,state.dirty?'Index aktualisiert. Geöffnete Notiz wegen ungespeicherter Änderungen nicht überschrieben.':'Index im Hintergrund aktualisiert');
+      applyIndexPreservingFocus(r.index||r,state.dirty?t('Index aktualisiert. Geöffnete Notiz wegen ungespeicherter Änderungen nicht überschrieben.'):t('Index im Hintergrund aktualisiert'));
     } else {
-      status('Index aktuell','ok');
+      status(t('Index aktuell'),'ok');
     }
-  }catch(e){status('Index-Prüfung fehlgeschlagen: '+e.message,'error');}
+  }catch(e){status(t('Index-Prüfung fehlgeschlagen: ')+e.message,'error');}
   finally{state.backgroundBusy=false;}
 }
 async function saveLastLocation(){const loc={notebook_id:state.notebookId||'',note_id:state.noteId||''};storage.set('lastLocation',loc);api('/api/state/last-location',{method:'POST',body:loc}).catch(()=>{});}
@@ -1082,15 +1082,15 @@ async function persistSettings(extra={}){
   local.joplin_path=normalizePath(local.joplin_path||'/JoplinV2');
   storage.set('settings',local);
   state.settings=Object.assign(state.settings||{},local);
-  await api('/api/settings',{method:'POST',body:local}).catch(e=>{status('Einstellungen konnten nicht gespeichert werden: '+e.message,'error');throw e;});
+  await api('/api/settings',{method:'POST',body:local}).catch(e=>{status(t('Einstellungen konnten nicht gespeichert werden: ')+e.message,'error');throw e;});
 }
 function normalizePath(p){p=String(p||'').trim();if(!p)return '/JoplinV2';if(!p.startsWith('/'))p='/'+p;return p.replace(/\/+/g,'/').replace(/\/\/+/, '/').replace(/\s+$/,'');}
-function openSettings(){const o=$('jp-settings-overlay');if(!o){alert('Einstellungsbereich wurde nicht gefunden.');return;}syncSettingsUi();loadFoldersForSettings();o.classList.add('open');o.setAttribute('aria-hidden','false');}
+function openSettings(){const o=$('jp-settings-overlay');if(!o){alert(t('Einstellungsbereich wurde nicht gefunden.'));return;}syncSettingsUi();loadFoldersForSettings();o.classList.add('open');o.setAttribute('aria-hidden','false');}
 function closeSettings(){const o=$('jp-settings-overlay');if(!o)return;o.classList.remove('open');o.setAttribute('aria-hidden','true');}
 function activateSettingsTab(tab){document.querySelectorAll('[data-settings-tab]').forEach(b=>b.classList.toggle('active',b.dataset.settingsTab===tab));document.querySelectorAll('[data-settings-section]').forEach(sec=>sec.classList.toggle('active',sec.dataset.settingsSection===tab));}
 function syncSettingsUi(){const local=currentLocalSettings();if($('jp-setting-language'))$('jp-setting-language').value=local.language||'system';if($('jp-setting-sort'))$('jp-setting-sort').value=local.sort_order||state.sort||'updated_desc';if($('jp-setting-joplin-path'))$('jp-setting-joplin-path').value=local.joplin_path||'/JoplinV2';if($('jp-setting-office-open-mode'))$('jp-setting-office-open-mode').value=local.office_open_mode==='tab'?'tab':'window';if($('jp-setting-update-backup'))$('jp-setting-update-backup').value=local.update_backup_enabled==='yes'?'yes':'no';setSwitch($('jp-setting-remember-toggle'),(local.remember_last_location||'yes')==='yes');syncUpdateUi();}
-async function loadFoldersForSettings(){try{const data=await api('/api/folders');const list=$('jp-folder-list');if(list){list.innerHTML='';(data.folders||[]).forEach(f=>{const o=document.createElement('option');o.value=f;list.appendChild(o);});}if($('jp-setting-joplin-path')&&!$('jp-setting-joplin-path').value)$('jp-setting-joplin-path').value=data.current||'/JoplinV2';}catch(e){status('Ordnerliste konnte nicht geladen werden: '+e.message,'warning');}}
-async function applyJoplinPathFromInput(){const el=$('jp-setting-joplin-path');if(!el)return;const newPath=normalizePath(el.value);el.value=newPath;const oldPath=(state.settings&&state.settings.joplin_path)||'/JoplinV2';await persistSettings({joplin_path:newPath});if(newPath!==oldPath){storage.del('lastGoodIndex');state.index=null;status('Joplix-Ordner geändert. Index wird neu aufgebaut...','warning');await rebuildAndRestore(true).catch(e=>status('Index-Neuaufbau fehlgeschlagen: '+e.message,'error'));}}
+async function loadFoldersForSettings(){try{const data=await api('/api/folders');const list=$('jp-folder-list');if(list){list.innerHTML='';(data.folders||[]).forEach(f=>{const o=document.createElement('option');o.value=f;list.appendChild(o);});}if($('jp-setting-joplin-path')&&!$('jp-setting-joplin-path').value)$('jp-setting-joplin-path').value=data.current||'/JoplinV2';}catch(e){status(t('Ordnerliste konnte nicht geladen werden: ')+e.message,'warning');}}
+async function applyJoplinPathFromInput(){const el=$('jp-setting-joplin-path');if(!el)return;const newPath=normalizePath(el.value);el.value=newPath;const oldPath=(state.settings&&state.settings.joplin_path)||'/JoplinV2';await persistSettings({joplin_path:newPath});if(newPath!==oldPath){storage.del('lastGoodIndex');state.index=null;status(t('Joplix-Ordner geändert. Index wird neu aufgebaut...'),'warning');await rebuildAndRestore(true).catch(e=>status(t('Index-Neuaufbau fehlgeschlagen: ')+e.message,'error'));}}
 function showWelcomeIfNeeded(){
   const key='joplix.welcome.1.0.43.done';
   if(localStorage.getItem(key)==='yes')return;
@@ -1107,12 +1107,12 @@ function currentNotebookTitle(){
   let found='';
   const walk=nodes=>{(nodes||[]).forEach(n=>{if(n.id===id)found=n.title;(n.children||[]).length&&walk(n.children);});};
   if(state.index)walk(state.index.tree||[]);
-  return found||'Notizbuch';
+  return found||t('Notizbuch');
 }
 function updateNotePath(){
   const el=$('jp-note-path'); if(!el)return;
-  const title=$('jp-title')&&$('jp-title').value?$('jp-title').value:(state.note&&state.note.title?state.note.title:'Neue Notiz');
-  if(!state.note&&!state.noteId&&!state.dirty){el.textContent='Keine Notiz geöffnet';return;}
+  const title=$('jp-title')&&$('jp-title').value?$('jp-title').value:(state.note&&state.note.title?state.note.title:t('Neue Notiz'));
+  if(!state.note&&!state.noteId&&!state.dirty){el.textContent=t('Keine Notiz geöffnet');return;}
   el.textContent=currentNotebookTitle()+' / '+title;
 }
 function resetEditorHistory(value){state.editorHistory={undo:[],last:String(value||''),max:80};}
@@ -1123,7 +1123,7 @@ function jpReplaceSelection(before,after='',placeholder=''){const ta=$('jp-body'
 function jpInsertAtCursor(text){const ta=$('jp-body');if(!ta)return;const start=ta.selectionStart||0,end=ta.selectionEnd||0,val=ta.value||'';pushEditorUndo(val);const next=val.slice(0,start)+text+val.slice(end);const pos=start+text.length;applyEditorValue(next,pos);}
 function jpFormatDateTime(){const d=new Date();try{return new Intl.DateTimeFormat('de-AT',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(d).replace(',', '');}catch(e){return d.toLocaleString();}}
 function continueMarkdownList(ev){const ta=$('jp-body');if(!ta||ev.key!=='Enter'||ev.shiftKey||ev.altKey||ev.ctrlKey||ev.metaKey)return;const val=ta.value||'',pos=ta.selectionStart||0;if(pos!==ta.selectionEnd)return;const lineStart=val.lastIndexOf('\n',pos-1)+1;const line=val.slice(lineStart,pos);const indent=(line.match(/^\s*/)||[''])[0];let marker='';if(/^\s*- \[ \]\s*$/.test(line)||/^\s*-\s*$/.test(line)||/^\s*\d+\.\s*$/.test(line)){ev.preventDefault();pushEditorUndo(val);applyEditorValue(val.slice(0,lineStart)+val.slice(pos),lineStart);return;}if(/^\s*- \[ \] /.test(line))marker=indent+'- [ ] ';else if(/^\s*- /.test(line))marker=indent+'- ';else{const m=line.match(/^(\s*)(\d+)\. /);if(m)marker=m[1]+(parseInt(m[2],10)+1)+'. ';}if(marker){ev.preventDefault();jpInsertAtCursor('\n'+marker);}}
-function handleEditorTool(action){const ta=$('jp-body');if(!ta)return;if(action==='undo'){editorUndo();return;}if(action==='bold')return jpReplaceSelection('**','**','Text');if(action==='italic')return jpReplaceSelection('*','*','Text');if(action==='link')return jpReplaceSelection('[','](https://)','Linktext');if(action==='code')return jpReplaceSelection('`','`','code');if(action==='resource'){const f=$('jp-resource-file');if(f)f.click();return;}if(action==='ul')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- ');if(action==='ol')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'1. ');if(action==='todo')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- [ ] ');if(action==='h2')return jpInsertAtCursor('\n## ');if(action==='hr')return jpInsertAtCursor('\n\n---\n\n');if(action==='datetime')return jpInsertAtCursor(jpFormatDateTime());if(action==='marker')return jpReplaceSelection('==','==','Markierung');}
+function handleEditorTool(action){const ta=$('jp-body');if(!ta)return;if(action==='undo'){editorUndo();return;}if(action==='bold')return jpReplaceSelection('**','**','Text');if(action==='italic')return jpReplaceSelection('*','*','Text');if(action==='link')return jpReplaceSelection('[','](https://)',t('Linktext'));if(action==='code')return jpReplaceSelection('`','`','code');if(action==='resource'){const f=$('jp-resource-file');if(f)f.click();return;}if(action==='ul')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- ');if(action==='ol')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'1. ');if(action==='todo')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- [ ] ');if(action==='h2')return jpInsertAtCursor('\n## ');if(action==='hr')return jpInsertAtCursor('\n\n---\n\n');if(action==='datetime')return jpInsertAtCursor(jpFormatDateTime());if(action==='marker')return jpReplaceSelection('==','==',t('Markierung'));}
 function setupEditorFormatbar(){document.querySelectorAll('[data-jp-editor]').forEach(b=>b.addEventListener('click',ev=>{ev.preventDefault();handleEditorTool(b.dataset.jpEditor);}));const ta=$('jp-body');if(ta){resetEditorHistory(ta.value||'');ta.addEventListener('keydown',continueMarkdownList);ta.addEventListener('input',()=>{const h=state.editorHistory||(state.editorHistory={undo:[],last:'',max:80});if(h.last!==ta.value){h.undo.push(h.last);while(h.undo.length>(h.max||80))h.undo.shift();h.last=ta.value;}});}}
 
 function getInstalledVersion(){const app=document.getElementById('joplix-app');const v=(app&&app.dataset&&app.dataset.joplixVersion)||'';return parseJoplixVersionText(v)?parseJoplixVersionText(v).text:v||'0.0.0';}
@@ -1138,13 +1138,13 @@ function releaseUrl(rel){return (rel&&(rel.html_url||rel.url||rel.release_url))|
 function isAllowedUpdateTransition(rel,installed){const v=releaseVersion(rel);if(!v||!installed)return false;const cmp=compareJoplixVersions(v,installed);const relCh=releaseChannel(rel);const instCh=installedChannel();if(cmp>0)return true;if(cmp<0)return false;if(instCh==='beta'&&relCh==='main')return true;return false;}
 function newestUpdateFromReleases(data){const installed=parseJoplixVersionText(getInstalledVersion());let best=null;for(const rel of ((data&&data.releases)||[])){if(!isAllowedUpdateTransition(rel,installed))continue;const v=releaseVersion(rel);if(!best||compareJoplixVersions(v,best.version)>0||(compareJoplixVersions(v,best.version)===0&&releaseChannel(rel)==='main'&&releaseChannel(best.release)==='beta'))best={release:rel,version:v};}return best;}
 function joplixIsAdmin(){const app=document.getElementById('joplix-app');return !!(app&&app.dataset&&app.dataset.joplixIsAdmin==='1');}
-function setBrandUpdate(update){const el=$('jp-brand-update');if(!el)return;if(!joplixIsAdmin()){el.textContent='';el.hidden=true;el.removeAttribute('href');return;}if(update&&update.version){el.textContent=update.version.text+' Neues Update!';const url=releaseUrl(update.release);if(url)el.href=url;else el.href=normalizeCodebergRepoUrlInput((currentLocalSettings().update_repo_url)||'https://codeberg.org/Stoneubi/joplix/releases');el.hidden=false;el.title='Codeberg Release öffnen';}else{el.textContent='';el.hidden=true;el.removeAttribute('href');}}
+function setBrandUpdate(update){const el=$('jp-brand-update');if(!el)return;if(!joplixIsAdmin()){el.textContent='';el.hidden=true;el.removeAttribute('href');return;}if(update&&update.version){el.textContent=update.version.text+t(' Neues Update!');const url=releaseUrl(update.release);if(url)el.href=url;else el.href=normalizeCodebergRepoUrlInput((currentLocalSettings().update_repo_url)||'https://codeberg.org/Stoneubi/joplix/releases');el.hidden=false;el.title=t('Codeberg Release öffnen');}else{el.textContent='';el.hidden=true;el.removeAttribute('href');}}
 async function checkUpdateOnStart(){try{if(!joplixIsAdmin())return;const local=currentLocalSettings();if(!local.is_admin)return;if((local.update_source||'codeberg')!=='codeberg')return;const data=await api('/api/updates/releases');const upd=newestUpdateFromReleases(data);setBrandUpdate(upd);}catch(e){console.warn('Joplix Update Startprüfung fehlgeschlagen:',e.message);}}
 function syncUpdateUi(){const local=currentLocalSettings();syncInstalledVersionUi();if($('jp-update-repo-url'))$('jp-update-repo-url').value=normalizeCodebergRepoUrlInput(local.update_repo_url||'https://codeberg.org/Stoneubi/joplix/releases');if($('jp-update-channel'))$('jp-update-channel').value=local.update_channel||'main';}
 function updateStatus(txt,cls=''){const el=$('jp-update-status');if(el){el.textContent=txt;el.className='jp-update-status '+cls;}}
 function isInstallableJoplixAsset(asset){const n=String((asset&&asset.name)||'').trim().replace(/\s+/g,'');return /^JoplixNC_v\d+\.\d+\.\d+(?:-beta)?\.zip$/i.test(n);}
 function releaseIsNewer(rel,installed){return isAllowedUpdateTransition(rel,installed);}
-function renderUpdateList(data){const box=$('jp-update-list');if(!box)return;box.innerHTML='';syncInstalledVersionUi();const installed=parseJoplixVersionText(getInstalledVersion());let rels=((data&&data.releases)||[]).filter(rel=>releaseIsNewer(rel,installed));rels=rels.filter(rel=>((rel.assets||[]).some(isInstallableJoplixAsset)));if(!rels.length){box.innerHTML='<p>Keine neuere Version für diesen Channel gefunden. Aktuell installiert: Joplix '+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').</p>';return;}rels.sort((a,b)=>{const c=compareJoplixVersions(releaseVersion(b),releaseVersion(a));if(c!==0)return c;return releaseChannel(a)==='main'?-1:1;});rels.forEach(rel=>{const card=document.createElement('div');card.className='jp-update-release';const h=document.createElement('div');h.className='jp-update-release-head';h.innerHTML='<strong></strong><span></span>';h.querySelector('strong').textContent=(rel.name||rel.tag||'Release')+' ['+(releaseChannel(rel)==='beta'?'Beta':'Main')+']';h.querySelector('span').textContent=rel.published_at||'';card.appendChild(h);(rel.assets||[]).filter(isInstallableJoplixAsset).forEach(asset=>{const row=document.createElement('div');row.className='jp-update-asset';const name=document.createElement('span');name.textContent=asset.name;const btn=document.createElement('button');btn.type='button';btn.textContent='Installieren';btn.onclick=()=>installUpdateAsset(asset,rel);row.appendChild(name);row.appendChild(btn);card.appendChild(row);});box.appendChild(card);});}
+function renderUpdateList(data){const box=$('jp-update-list');if(!box)return;box.innerHTML='';syncInstalledVersionUi();const installed=parseJoplixVersionText(getInstalledVersion());let rels=((data&&data.releases)||[]).filter(rel=>releaseIsNewer(rel,installed));rels=rels.filter(rel=>((rel.assets||[]).some(isInstallableJoplixAsset)));if(!rels.length){box.innerHTML='<p>'+t('Keine neuere Version für diesen Channel gefunden. Aktuell installiert: Joplix ')+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').</p>';return;}rels.sort((a,b)=>{const c=compareJoplixVersions(releaseVersion(b),releaseVersion(a));if(c!==0)return c;return releaseChannel(a)==='main'?-1:1;});rels.forEach(rel=>{const card=document.createElement('div');card.className='jp-update-release';const h=document.createElement('div');h.className='jp-update-release-head';h.innerHTML='<strong></strong><span></span>';h.querySelector('strong').textContent=(rel.name||rel.tag||'Release')+' ['+(releaseChannel(rel)==='beta'?'Beta':'Main')+']';h.querySelector('span').textContent=rel.published_at||'';card.appendChild(h);(rel.assets||[]).filter(isInstallableJoplixAsset).forEach(asset=>{const row=document.createElement('div');row.className='jp-update-asset';const name=document.createElement('span');name.textContent=asset.name;const btn=document.createElement('button');btn.type='button';btn.textContent=t('Installieren');btn.onclick=()=>installUpdateAsset(asset,rel);row.appendChild(name);row.appendChild(btn);card.appendChild(row);});box.appendChild(card);});}
 async function persistUpdateSettings(){
   const repo=normalizeCodebergRepoUrlInput($('jp-update-repo-url')?.value||'https://codeberg.org/Stoneubi/joplix/releases');
   const channel=$('jp-update-channel')?.value||'main';
@@ -1155,20 +1155,20 @@ async function persistUpdateSettings(){
 }
 async function checkUpdates(){
   try{
-    if(!joplixIsAdmin())throw new Error('Administratorrechte erforderlich.');
+    if(!joplixIsAdmin())throw new Error(t('Administratorrechte erforderlich.'));
     await persistUpdateSettings();
-    updateStatus('Update-Liste wird von Codeberg geladen...','warning');
+    updateStatus(t('Update-Liste wird von Codeberg geladen...'),'warning');
     const data=await api('/api/updates/releases');
     renderUpdateList(data);
     const shown=(data.releases||[]).filter(rel=>releaseIsNewer(rel,parseJoplixVersionText(getInstalledVersion()))&&(rel.assets||[]).some(isInstallableJoplixAsset)).length;
     const update=newestUpdateFromReleases(data);
     setBrandUpdate(update);
-    updateStatus(shown+' installierbare Release(s) gefunden.'+(update?' Neues Update: '+update.version.text+' ['+(releaseChannel(update.release)==='beta'?'Beta':'Main')+']':'')+' Aktuell installiert: Joplix '+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').','ok');
+    updateStatus(shown+t(' installierbare Release(s) gefunden.')+(update?t(' Neues Update: ')+update.version.text+' ['+(releaseChannel(update.release)==='beta'?'Beta':'Main')+']':'')+t(' Aktuell installiert: Joplix ')+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').','ok');
   }catch(e){
-    updateStatus('Update-Prüfung fehlgeschlagen: '+e.message,'error');
+    updateStatus(t('Update-Prüfung fehlgeschlagen: ')+e.message,'error');
   }
 }
-async function installUpdateAsset(asset,rel){if(!asset?.id||!rel?.id)return;const backupEnabled=currentLocalSettings().update_backup_enabled==='yes';if(!confirm('Joplix Update jetzt installieren?\n\n'+asset.name+'\n\n'+(backupEnabled?'Vor dem Update wird ein optionales App-Backup erstellt.':'Es wird kein App-Backup erstellt. Bitte stellen Sie sicher, dass ein vollständiges Nextcloud-Backup vorhanden ist.')))return;try{updateStatus('Update wird heruntergeladen und installiert...','warning');const r=await api('/api/updates/install',{method:'POST',body:{release_id:rel.id,asset_id:asset.id}});const ch=releaseChannel(rel||{});storage.set('installed_channel',ch);const settings=storage.get('settings',{});settings.installed_channel=ch;storage.set('settings',settings);updateStatus((r.message||'Update installiert. Bitte Seite neu laden.')+' Version: '+(r.version||''),'ok');alert((r.message||'Update installiert. Bitte Seite neu laden.')+(r.backup?'\n\nBackup: '+r.backup:'')+'\nVersion: '+(r.version||''));}catch(e){updateStatus('Update-Installation fehlgeschlagen: '+e.message,'error');alert('Update-Installation fehlgeschlagen:\n'+e.message);}}
+async function installUpdateAsset(asset,rel){if(!asset?.id||!rel?.id)return;const backupEnabled=currentLocalSettings().update_backup_enabled==='yes';if(!confirm(t('Joplix Update jetzt installieren?')+'\n\n'+asset.name+'\n\n'+(backupEnabled?t('Vor dem Update wird ein optionales App-Backup erstellt.'):t('Es wird kein App-Backup erstellt. Bitte stellen Sie sicher, dass ein vollständiges Nextcloud-Backup vorhanden ist.'))))return;try{updateStatus(t('Update wird heruntergeladen und installiert...'),'warning');const r=await api('/api/updates/install',{method:'POST',body:{release_id:rel.id,asset_id:asset.id}});const ch=releaseChannel(rel||{});storage.set('installed_channel',ch);const settings=storage.get('settings',{});settings.installed_channel=ch;storage.set('settings',settings);updateStatus((r.message||t('Update installiert. Bitte Seite neu laden.'))+' Version: '+(r.version||''),'ok');alert((r.message||t('Update installiert. Bitte Seite neu laden.'))+(r.backup?'\n\nBackup: '+r.backup:'')+'\nVersion: '+(r.version||''));}catch(e){updateStatus(t('Update-Installation fehlgeschlagen: ')+e.message,'error');alert(t('Update-Installation fehlgeschlagen:')+'\n'+e.message);}}
 
 
 // ---------------------------------------------------------------------------
@@ -1237,6 +1237,131 @@ const JP_EN={
 'Extern öffnen':'Open externally',
 'PDF schließen':'Close PDF',
 'PDF-Anzeige':'PDF view',
+// Runtime strings passed through t()
+'Einstellungsbereich wurde nicht gefunden.':'Settings area was not found.',
+'Einstellungen übernommen, Index aktualisiert':'Settings applied, index updated',
+'Einstellungen gespeichert, aber Index-Neuaufbau fehlgeschlagen: ':'Settings saved, but index rebuild failed: ',
+'Einstellungen übernommen':'Settings applied',
+'Einstellungen konnten nicht gespeichert werden: ':'Settings could not be saved: ',
+'Index aktuell':'Index up to date',
+'Volltextsuche: ':'Full-text search: ',
+'Keine Notizinhalte.':'No note content.',
+'Änderungen speichern':'Save changes',
+'Keine Änderungen zum Speichern':'No changes to save',
+'Aenderungen werden gespeichert...':'Saving changes...',
+'Keine Notiz-ID':'No note ID',
+'Notiz wird geladen...':'Loading note...',
+'Notizinhalt wird geladen...':'Loading note content...',
+'Notiz wird geladen. Der Inhalt wird gleich angezeigt.':'Loading note. The content will appear shortly.',
+'Aus lokalem Schnellcache, wird aktualisiert... ':'From local quick cache, refreshing... ',
+'Aktualisiert: ':'Updated: ',
+' | Notizbuch: ':' | Notebook: ',
+'Lokaler Index sofort geladen. Änderungen werden im Hintergrund geprüft...':'Local index loaded instantly. Checking for changes in the background...',
+'Alter Index ohne Volltextsuche erkannt, Neuaufbau läuft...':'Old index without full-text search detected, rebuilding...',
+'Alter Index mit fehlerhaften Zählerständen erkannt, Neuaufbau läuft...':'Old index with incorrect counts detected, rebuilding...',
+'Index-Neuaufbau fehlgeschlagen: ':'Index rebuild failed: ',
+'Index leer oder nicht vorhanden, erster Neuaufbau läuft...':'Index empty or missing, first rebuild in progress...',
+'Server-Index geladen. Änderungen werden im Hintergrund geprüft...':'Server index loaded. Checking for changes in the background...',
+'Kein Index vorhanden. Bitte Joplix-Ordner in den Einstellungen prüfen.':'No index available. Please check the Joplix folder in the settings.',
+'Aktionen':'Actions',
+'Keine Notizen gefunden.':'No notes found.',
+'Speichern fehlgeschlagen: ':'Saving failed: ',
+'Diese Notiz hat ungespeicherte Änderungen.\n\nOK = Änderungen speichern und wechseln.\nAbbrechen = weitere Auswahl.':'This note has unsaved changes.\n\nOK = save changes and switch.\nCancel = more options.',
+'Speichern vor dem Wechsel fehlgeschlagen: ':'Saving before switching failed: ',
+'Änderungen verwerfen und trotzdem zu einer anderen Notiz wechseln?':'Discard changes and switch to another note anyway?',
+'Notiz wird aktualisiert...':'Refreshing note...',
+'Schnellcache: ':'Quick cache: ',
+' | Aktualisierung fehlgeschlagen: ':' | Refresh failed: ',
+'Notiz aus Schnellcache angezeigt. Aktualisierung fehlgeschlagen: ':'Showing note from quick cache. Refresh failed: ',
+'Notiz konnte nicht geladen werden: ':'Note could not be loaded: ',
+'Bitte rechts eine Notiz auswählen.':'Please select a note on the right.',
+'Tag von dieser Notiz entfernen':'Remove tag from this note',
+'+ Tag':'+ Tag',
+'Ressource konnte nicht gelesen werden.':'Attachment could not be read.',
+'Bearbeitungssitzung beendet.':'Editing session ended.',
+'Änderungen wurden in die Joplix-Ressource übernommen und können synchronisiert werden.':'Changes were applied to the Joplix attachment and can be synchronised.',
+'Übernahme fehlgeschlagen: ':'Applying changes failed: ',
+'Office wurde geschlossen. Die endgültige Office-Speicherung wird abgewartet...':'Office was closed. Waiting for the final Office save...',
+'Office wurde geschlossen. Die endgültige Datei wurde in die Joplix-Ressource übernommen.':'Office was closed. The final file was applied to the Joplix attachment.',
+'Nextcloud-Dateiaktion wurde gestartet. Gespeicherte Änderungen werden automatisch zurück in Joplix übernommen.':'Nextcloud file action started. Saved changes are transferred back to Joplix automatically.',
+'Die Arbeitskopie wurde geöffnet. Falls der Office-Editor nicht automatisch startet, bitte einmal auf den Dateinamen klicken.':'The working copy was opened. If the Office editor does not start automatically, please click the file name once.',
+'Das Office-Fenster wurde vom Browser blockiert. Bitte Pop-ups für diese Nextcloud-Adresse erlauben.':'The Office window was blocked by the browser. Please allow pop-ups for this Nextcloud address.',
+'Office-Fenster wurde vom Browser blockiert.':'Office window was blocked by the browser.',
+'Joplix – Office wird vorbereitet':'Joplix – preparing Office',
+'Nextcloud Office wird vorbereitet…':'Preparing Nextcloud Office…',
+'Arbeitskopie wird für Nextcloud Office vorbereitet...':'Preparing working copy for Nextcloud Office...',
+'Die Nextcloud-Datei-ID der Arbeitskopie fehlt.':'The Nextcloud file ID of the working copy is missing.',
+'Bearbeitung wurde in einem eigenen Fenster angefordert. ':'Editing was requested in a separate window. ',
+'Bearbeitung läuft in einem neuen Tab. ':'Editing is running in a new tab. ',
+'EuroOffice wird direkt geöffnet. Gespeicherte Änderungen werden automatisch zurück in Joplix übernommen.':'EuroOffice opens directly. Saved changes are transferred back to Joplix automatically.',
+'Office wurde geschlossen. Letzte gespeicherte Änderungen werden geprüft...':'Office was closed. Checking the last saved changes...',
+'Abschließende Übernahme fehlgeschlagen: ':'Final transfer failed: ',
+'Öffnen':'Open',
+'Abspielen':'Play',
+'Anhänge':'Attachments',
+'Datei fehlt':'File missing',
+'Bild':'Image',
+'Bitte Notizbuch auswaehlen.':'Please select a notebook.',
+'Bitte Notizbuch auswählen.':'Please select a notebook.',
+'Neue Notiz':'New note',
+'Neue Notiz in diesem Notizbuch':'New note in this notebook',
+'Notiz wirklich löschen?':'Really delete this note?',
+'Neuer Name':'New name',
+'Bitte zuerst eine Notiz öffnen.':'Please open a note first.',
+'Die ursprüngliche Notiz ist nicht mehr geöffnet.':'The original note is no longer open.',
+'Anhang hochgeladen. Der Link konnte der ursprünglichen Notiz nicht hinzugefügt werden: ':'Attachment uploaded. The link could not be added to the original note: ',
+'Tag wird entfernt...':'Removing tag...',
+'Tag entfernt':'Tag removed',
+'Tag konnte nicht entfernt werden: ':'Tag could not be removed: ',
+'Neuer Tag':'New tag',
+'Dieser Tag ist der Notiz bereits zugeordnet.':'This tag is already assigned to the note.',
+'Tag wird gespeichert...':'Saving tag...',
+'Der gespeicherte Tag hat keine gültige ID erhalten.':'The saved tag did not receive a valid ID.',
+'Tag gespeichert':'Tag saved',
+'Tag konnte nicht gespeichert werden: ':'Tag could not be saved: ',
+'Verschieben in Notizbuch':'Move to notebook',
+'Keine Notizbücher gefunden.':'No notebooks found.',
+'Ziel-Notizbuch auswählen:':'Select target notebook:',
+'Bitte Nummer eingeben:':'Please enter a number:',
+'Ungültige Auswahl.':'Invalid selection.',
+'Tags bearbeiten. Mehrere Tags mit Komma trennen. Entfernte Namen werden von dieser Notiz gelöst.':'Edit tags. Separate multiple tags with commas. Removed names are detached from this note.',
+'Vorhandene Tags:':'Existing tags:',
+'Keine':'None',
+'Tags für diese Notiz:':'Tags for this note:',
+'Tags werden gespeichert...':'Saving tags...',
+'Tags gespeichert':'Tags saved',
+'Tags konnten nicht gespeichert werden: ':'Tags could not be saved: ',
+'Index wird neu aufgebaut...':'Rebuilding index...',
+'Index aktualisiert':'Index updated',
+'Änderungen erkannt. Index wird im Hintergrund aktualisiert...':'Changes detected. Updating index in the background...',
+'Index aktualisiert. Geöffnete Notiz wegen ungespeicherter Änderungen nicht überschrieben.':'Index updated. Open note not overwritten because of unsaved changes.',
+'Index im Hintergrund aktualisiert':'Index updated in the background',
+'Index-Prüfung fehlgeschlagen: ':'Index check failed: ',
+'Ordnerliste konnte nicht geladen werden: ':'Folder list could not be loaded: ',
+'Joplix-Ordner geändert. Index wird neu aufgebaut...':'Joplix folder changed. Rebuilding index...',
+'Linktext':'link text',
+'Markierung':'highlight',
+' Neues Update!':' New update!',
+'Codeberg Release öffnen':'Open Codeberg release',
+'Keine neuere Version für diesen Channel gefunden. Aktuell installiert: Joplix ':'No newer version found for this channel. Currently installed: Joplix ',
+'Installieren':'Install',
+'Administratorrechte erforderlich.':'Administrator rights required.',
+'Update-Liste wird von Codeberg geladen...':'Loading update list from Codeberg...',
+' installierbare Release(s) gefunden.':' installable release(s) found.',
+' Neues Update: ':' New update: ',
+' Aktuell installiert: Joplix ':' Currently installed: Joplix ',
+'Update-Prüfung fehlgeschlagen: ':'Update check failed: ',
+'Joplix Update jetzt installieren?':'Install Joplix update now?',
+'Vor dem Update wird ein optionales App-Backup erstellt.':'An optional app backup is created before the update.',
+'Es wird kein App-Backup erstellt. Bitte stellen Sie sicher, dass ein vollständiges Nextcloud-Backup vorhanden ist.':'No app backup will be created. Please make sure a complete Nextcloud backup exists.',
+'Update wird heruntergeladen und installiert...':'Downloading and installing update...',
+'Update installiert. Bitte Seite neu laden.':'Update installed. Please reload the page.',
+'Update-Installation fehlgeschlagen: ':'Update installation failed: ',
+'Update-Installation fehlgeschlagen:':'Update installation failed:',
+'Office-Öffnungsart gespeichert.':'Office opening mode saved.',
+'Backup-Einstellung gespeichert.':'Backup setting saved.',
+'Update-Einstellungen gespeichert.':'Update settings saved.',
+'Update-Einstellungen konnten nicht gespeichert werden: ':'Update settings could not be saved: ',
 };
 function resolvedLanguage(){const v=(currentLocalSettings().language||'system');if(v==='de'||v==='en')return v;return String(navigator.language||'en').toLowerCase().startsWith('de')?'de':'en';}
 // German -> English for one string, or the string unchanged when there is no entry. Tries, in order:
@@ -1279,14 +1404,14 @@ function setupSettings(){
   document.querySelectorAll('[data-settings-tab]').forEach(b=>b.addEventListener('click',()=>activateSettingsTab(b.dataset.settingsTab)));
   const languageEl=$('jp-setting-language'); if(languageEl)languageEl.addEventListener('change',async e=>{await persistSettings({language:e.target.value});location.reload();});
   const sortEl=$('jp-setting-sort'); if(sortEl)sortEl.addEventListener('change',async e=>{state.sort=e.target.value;await persistSettings({sort_order:state.sort});if(state.notebookId)selectNotebook(state.notebookId);});
-  const officeMode=$('jp-setting-office-open-mode'); if(officeMode)officeMode.addEventListener('change',async e=>{await persistSettings({office_open_mode:e.target.value==='tab'?'tab':'window'});jpStatusText('Office-Öffnungsart gespeichert.','ok');});const backupMode=$('jp-setting-update-backup');if(backupMode)backupMode.addEventListener('change',async e=>{await persistSettings({update_backup_enabled:e.target.value==='yes'?'yes':'no'});jpStatusText('Backup-Einstellung gespeichert.','ok');});
+  const officeMode=$('jp-setting-office-open-mode'); if(officeMode)officeMode.addEventListener('change',async e=>{await persistSettings({office_open_mode:e.target.value==='tab'?'tab':'window'});jpStatusText(t('Office-Öffnungsart gespeichert.'),'ok');});const backupMode=$('jp-setting-update-backup');if(backupMode)backupMode.addEventListener('change',async e=>{await persistSettings({update_backup_enabled:e.target.value==='yes'?'yes':'no'});jpStatusText(t('Backup-Einstellung gespeichert.'),'ok');});
   const pathEl=$('jp-setting-joplin-path'); if(pathEl){pathEl.addEventListener('change',()=>applyJoplinPathFromInput().catch(e=>alert(e.message)));pathEl.addEventListener('blur',()=>applyJoplinPathFromInput().catch(e=>alert(e.message)));}
   const remember=$('jp-setting-remember-toggle'); if(remember)remember.addEventListener('click',async()=>{const local=currentLocalSettings();local.remember_last_location=(local.remember_last_location||'yes')==='yes'?'no':'yes';setSwitch(remember,local.remember_last_location==='yes');await persistSettings({remember_last_location:local.remember_last_location});});
   const reset=$('jp-layout-reset'); if(reset)reset.addEventListener('click',()=>{storage.del('columnWidths');applyColumnWidths({left:300,right:360});});
   const rebuild=$('jp-settings-rebuild'); if(rebuild)rebuild.addEventListener('click',()=>rebuildAndRestore().catch(e=>alert(e.message)));
   const upd=$('jp-update-check'); if(upd)upd.addEventListener('click',()=>checkUpdates());
-  const updChannel=$('jp-update-channel'); if(updChannel)updChannel.addEventListener('change',()=>persistUpdateSettings().then(()=>updateStatus('Update-Einstellungen gespeichert.','ok')).catch(e=>updateStatus('Update-Einstellungen konnten nicht gespeichert werden: '+e.message,'error')));
-  const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeCodebergRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus('Update-Einstellungen gespeichert.','ok')).catch(e=>updateStatus('Update-Einstellungen konnten nicht gespeichert werden: '+e.message,'error'));});
+  const updChannel=$('jp-update-channel'); if(updChannel)updChannel.addEventListener('change',()=>persistUpdateSettings().then(()=>updateStatus(t('Update-Einstellungen gespeichert.'),'ok')).catch(e=>updateStatus(t('Update-Einstellungen konnten nicht gespeichert werden: ')+e.message,'error')));
+  const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeCodebergRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus(t('Update-Einstellungen gespeichert.'),'ok')).catch(e=>updateStatus(t('Update-Einstellungen konnten nicht gespeichert werden: ')+e.message,'error'));});
   syncSettingsUi();
 }
 // ---------------------------------------------------------------------------

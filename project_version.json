@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.69",
+  "version": "2026.11.70",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-14",
   "channel": "beta",
-  "base_version": "2026.11.68",
+  "base_version": "2026.11.69",
   "build_date": "2026-11-14",
   "release_date": "2026-11-14",
-  "summary": "Interface restyled to match Nextcloud; note list moved to the middle; improved Markdown preview.",
+  "summary": "Translucent notebook sidebar like other Nextcloud apps; browsers no longer offer to translate the page.",
   "updated": "2026-11-14",
-  "notes": "New stylesheet built on Nextcloud theme variables, SVG icons, in-app dialogs instead of browser pop-ups, column order notebooks | notes | note. The Markdown source editor is unchanged: notes are still saved exactly as typed."
+  "notes": "The sidebar uses the Nextcloud navigation background (blurred wallpaper). The page is marked as not to be translated, and English is applied before the settings request finishes."
 }

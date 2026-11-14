@@ -17,11 +17,13 @@ if (is_readable($infoXml)) {
  * - #joplix wraps the app and every overlay; css/style.css scopes all rules to it, and menus/dialogs
  *   created by js/app.js are appended to it.
  * - <span class="jp-icon" data-icon="name"> is filled with an inline SVG by hydrateIcons() in js/app.js.
+ * - translate="no" (plus the notranslate meta tag set in PageController) stops browsers from offering to
+ *   translate the page: the markup is German until translateStaticUi() swaps in the user's language.
  * - Element ids are the contract with js/app.js. Text is German; English comes from JP_EN in js/app.js.
  */
 ?>
 <link rel="icon" type="image/svg+xml" href="<?php p($faviconUrl); ?>">
-<div id="joplix">
+<div id="joplix" class="notranslate" translate="no">
 <div id="joplix-app" class="jp-view-mode jp-no-note" data-pane="nav" data-joplix-version="<?php p($joplixVersion); ?>" data-joplix-is-admin="<?php p($isAdmin ? '1' : '0'); ?>">
   <aside class="jp-sidebar" data-jp-col="nav">
     <div class="jp-brand">

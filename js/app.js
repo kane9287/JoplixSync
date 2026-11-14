@@ -1737,6 +1737,9 @@ function setupChrome(){
   });
 }
 document.addEventListener('DOMContentLoaded',()=>{
+  // First pass with the language known locally (stored setting or browser language), so English users do
+  // not see the German template while the settings request is running; load() repeats it with server settings.
+  try{translateStaticUi();}catch(e){console.error('Joplix early translation failed',e);}
   try{hydrateIcons(jpRoot());setupChrome();}catch(e){console.error('Joplix chrome init failed',e);}
   try{setupResizableColumns();}catch(e){console.error('Joplix resizable init failed',e);} try{setupEditorFormatbar();}catch(e){console.error('Joplix editor toolbar init failed',e);} try{setupSettings();}catch(e){console.error('Joplix settings init failed',e);} try{setupWelcome();}catch(e){console.error('Joplix welcome init failed',e);} try{setupSync();}catch(e){console.error('Joplix sync init failed',e);} try{setTimeout(()=>checkUpdateOnStart(),1200);}catch(e){console.warn('Joplix update startup init failed',e);} if($('jp-pdf-viewer-close'))$('jp-pdf-viewer-close').onclick=closePdfViewer; if($('jp-pdf-viewer-backdrop'))$('jp-pdf-viewer-backdrop').onclick=closePdfViewer;
   if($('jp-new-root'))$('jp-new-root').onclick=()=>newNotebook('');

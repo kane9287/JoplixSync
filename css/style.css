@@ -75,8 +75,11 @@
   display: grid;
   grid-template-columns: var(--jp-nav-width, 300px) 1px var(--jp-list-width, 340px) 1px minmax(0, 1fr);
   height: 100%; min-height: 0; overflow: hidden;
-  background: var(--color-main-background);
 }
+/* Like Nextcloud's own app navigation, the sidebar is translucent over the wallpaper (#content has no
+   background of its own); the list and the note are opaque. */
+#joplix .jp-list,
+#joplix .jp-content { background: var(--color-main-background); }
 #joplix .jp-sidebar,
 #joplix .jp-list,
 #joplix .jp-content { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
@@ -88,7 +91,12 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 #joplix .jp-back { display: none; }
 
 /* 3 — navigation -------------------------------------------------------------------------------------- */
-#joplix .jp-sidebar { padding: var(--jp-gap); gap: 4px; }
+#joplix .jp-sidebar {
+  --jp-muted: var(--color-text-maxcontrast-background-blur, var(--color-main-text));
+  padding: var(--jp-gap); gap: 4px;
+  background-color: var(--color-main-background-blur, var(--color-main-background));
+  -webkit-backdrop-filter: var(--filter-background-blur, none); backdrop-filter: var(--filter-background-blur, none);
+}
 #joplix .jp-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 8px; }
 #joplix .jp-logo-img { width: 28px; height: 28px; border-radius: 7px; flex: 0 0 auto; }
 #joplix .jp-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }

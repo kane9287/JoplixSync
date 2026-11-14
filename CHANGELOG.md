@@ -1,3 +1,8 @@
+# Joplix 2026.11.70
+
+- The notebook sidebar now uses the Nextcloud navigation background, so it is translucent over the wallpaper like in other Nextcloud apps.
+- Browsers (Edge, Chrome) no longer offer to translate the page from German. English is applied immediately on load instead of after the settings request.
+
 # Joplix 2026.11.69
 
 - The interface now follows the Nextcloud design: colours, radii and control sizes come from the active Nextcloud theme, so light, dark, high-contrast and custom accent colours all apply. Emoji buttons are replaced by icons.

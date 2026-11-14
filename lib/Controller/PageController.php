@@ -8,5 +8,9 @@ class PageController extends Controller {
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function index(): TemplateResponse { $u=$this->userSession->getUser(); $isAdmin=$u!==null && $this->groupManager->isAdmin($u->getUID()); return new TemplateResponse('joplix','main',['isAdmin'=>$isAdmin]); }
+ public function index(): TemplateResponse {
+  // The template is written in German and translated in the browser (js/app.js, JP_EN). Without this,
+  // Chrome and Edge detect German in the delivered HTML and offer to translate the page.
+  \OCP\Util::addHeader('meta',['name'=>'google','content'=>'notranslate']);
+  $u=$this->userSession->getUser(); $isAdmin=$u!==null && $this->groupManager->isAdmin($u->getUID()); return new TemplateResponse('joplix','main',['isAdmin'=>$isAdmin]); }
 }

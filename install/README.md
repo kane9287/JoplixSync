@@ -2,9 +2,11 @@
 
 ## Overview
 
-Joplix can be installed, upgraded, or removed directly from the official Codeberg releases.
+Joplix can be installed, upgraded, or removed directly from the GitHub releases of [kane9287/joplix-xsync](https://github.com/kane9287/joplix-xsync/releases).
 
-The installer selects the newest matching package by version. Stable releases must provide `SHA256SUMS`. Beta releases may instead use `nextcloud/beta-update.json` from the `beta` branch when its tag, asset, and version match the selected release.
+The installer selects the newest release of the chosen channel by version. If the release has a `JoplixNC_v<version>.zip` (beta: `JoplixNC_v<version>-beta.zip`) asset, that package is used and its SHA-256 checksum must match the digest GitHub publishes for the asset or a `SHA256SUMS` asset. If no package is attached, the installer uses GitHub’s automatic source archive of the release tag; there is no checksum for it, so the download relies on HTTPS alone.
+
+In both cases the version in the tag (for example `joplix-2026.11.67` or `v2026.11.67`) must equal `<version>` in `appinfo/info.xml` of the tagged commit, otherwise the package is rejected.
 
 Both scripts use Nextcloud’s configured `apps_paths`, including `custom_apps` when configured. Set `NC_DIR` to the Nextcloud root if it lives outside `/var/www` or more than one instance is found. Set `WEBUSER` if the PHP service account differs from the detected account.
 
@@ -17,7 +19,7 @@ Both scripts use Nextcloud’s configured `apps_paths`, including `custom_apps` 
 To install the latest stable version of Joplix, run:
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
 ```
 
 The installer will:
@@ -47,14 +49,14 @@ Example result:
 To install the latest Joplix Beta release, explicitly select the Beta channel:
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.sh | sudo bash -s -- beta
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
 ```
 
 The installer will only consider releases that:
 
-- Are marked as pre-releases on Codeberg
-- Use a tag matching the Joplix Beta naming scheme
-- Contain a matching Joplix Beta ZIP package
+- Are marked as pre-releases on GitHub
+- Have a tag that contains the version
+- Contain a matching Joplix Beta ZIP package, or can be installed from the source archive of the tag
 
 For example:
 
@@ -76,7 +78,7 @@ The One-Step Installer can also be used to upgrade an existing Joplix installati
 Run:
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
 ```
 
 ## Upgrade to the Latest Beta Version
@@ -84,7 +86,7 @@ curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.
 Run:
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.sh | sudo bash -s -- beta
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
 ```
 
 When an existing Joplix installation is detected, the installer will:
@@ -129,7 +131,7 @@ The selected release channel only applies to the current installer run.
 Running:
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
 ```
 
 selects the latest **Stable** release.
@@ -137,7 +139,7 @@ selects the latest **Stable** release.
 Running:
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.sh | sudo bash -s -- beta
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
 ```
 
 selects the latest **Beta** release.
@@ -153,7 +155,7 @@ The standard uninstaller removes the application while keeping backups.
 ## Run
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/uninstall.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash
 ```
 
 The uninstaller will:
@@ -177,7 +179,7 @@ Uninstall backups are stored under the configured app directory. For example:
 The `--purge` option delegates app removal to Nextcloud’s `occ app:remove joplix`. The script keeps app backups and leaves the Nextcloud data directory alone, including users’ `.joplix` workspaces and Joplin sync files.
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/uninstall.sh | sudo bash -s -- --purge
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash -s -- --purge
 ```
 
 ---
@@ -263,7 +265,7 @@ Example:
 JoplixNC_v2026.09.60-beta.zip
 ```
 
-The corresponding Codeberg tag uses the same name without `.zip`.
+The GitHub tag only has to contain the same version, for example `joplix-2026.09.60`. Attaching a package is optional: without one, the source archive of the tag is installed.
 
 Example:
 
@@ -326,7 +328,7 @@ Older Joplix Beta versions may use the previous release-package naming scheme.
 If an older integrated Joplix updater cannot install a current `JoplixNC` release, perform a one-time upgrade using the One-Step Installer:
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.sh | sudo bash -s -- beta
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
 ```
 
 The installer will upgrade the existing installation to the latest Beta release using the current package naming scheme.
@@ -345,11 +347,13 @@ The installer stages the verified package next to the live app. If the upgrade c
 
 ## Repository
 
-https://codeberg.org/Stoneubi/joplix
+https://github.com/kane9287/joplix-xsync
+
+Joplix Xsync is a fork of https://codeberg.org/Stoneubi/joplix
 
 ## Releases
 
-https://codeberg.org/Stoneubi/joplix/releases
+https://github.com/kane9287/joplix-xsync/releases
 
 ---
 

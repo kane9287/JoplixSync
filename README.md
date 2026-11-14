@@ -37,12 +37,12 @@ Nextcloud administrators can update Joplix through its integrated updater and re
 Joplix can be installed on your own server using the **Easy One-Step Installer**. Run the following command as root:
 
 ```bash
-curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
 ```
 
 The installer handles the required installation steps and provides a quick way to get your own Joplix instance up and running.
 
-The installation files and further information are available in the official Joplix repository on Codeberg.
+The installation files and further information are available in the [Joplix Xsync repository on GitHub](https://github.com/kane9287/joplix-xsync). See [install/README.md](install/README.md) for the beta channel, upgrades and removal.
 
 Whether you use Joplix for personal notes, documentation, projects, research, checklists, or everyday organization, it combines the convenience of a modern notes application with the freedom of a self-hosted Nextcloud environment.
 
@@ -57,10 +57,12 @@ Created with ❤️ by Stoneubi from Austria / Tirol.
 
 ## Links
 
-- [Website](https://codeberg.org/Stoneubi/joplix)
-- [Support](https://codeberg.org/Stoneubi/joplix/issues)
-- [Issue tracker](https://codeberg.org/Stoneubi/joplix/issues)
-- [Source code](https://codeberg.org/Stoneubi/joplix)
+- [Website](https://github.com/kane9287/joplix-xsync)
+- [Support](https://github.com/kane9287/joplix-xsync/issues)
+- [Issue tracker](https://github.com/kane9287/joplix-xsync/issues)
+- [Source code](https://github.com/kane9287/joplix-xsync)
+- [Releases](https://github.com/kane9287/joplix-xsync/releases)
+- [Original project (Stoneubi/joplix on Codeberg)](https://codeberg.org/Stoneubi/joplix)
 
 ## Donation
 

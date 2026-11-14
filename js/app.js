@@ -1171,6 +1171,17 @@ async function checkUpdates(){
 async function installUpdateAsset(asset,rel){if(!asset?.id||!rel?.id)return;const backupEnabled=currentLocalSettings().update_backup_enabled==='yes';if(!confirm('Joplix Update jetzt installieren?\n\n'+asset.name+'\n\n'+(backupEnabled?'Vor dem Update wird ein optionales App-Backup erstellt.':'Es wird kein App-Backup erstellt. Bitte stellen Sie sicher, dass ein vollständiges Nextcloud-Backup vorhanden ist.')))return;try{updateStatus('Update wird heruntergeladen und installiert...','warning');const r=await api('/api/updates/install',{method:'POST',body:{release_id:rel.id,asset_id:asset.id}});const ch=releaseChannel(rel||{});storage.set('installed_channel',ch);const settings=storage.get('settings',{});settings.installed_channel=ch;storage.set('settings',settings);updateStatus((r.message||'Update installiert. Bitte Seite neu laden.')+' Version: '+(r.version||''),'ok');alert((r.message||'Update installiert. Bitte Seite neu laden.')+(r.backup?'\n\nBackup: '+r.backup:'')+'\nVersion: '+(r.version||''));}catch(e){updateStatus('Update-Installation fehlgeschlagen: '+e.message,'error');alert('Update-Installation fehlgeschlagen:\n'+e.message);}}
 
 
+// ---------------------------------------------------------------------------
+// i18n. German is the source language: templates/main.php and every literal in this file are German.
+// JP_EN is the only German -> English dictionary. Three entry points use it:
+//   translateStaticUi()  translates the server-rendered template once at startup,
+//   t('Deutsch')         translates a string built at runtime (status line, alert/confirm/prompt, JS-built DOM),
+//   L(de,en)             (defined in the sync section) is for inline pairs, used where English needs a
+//                        different word order around a variable and a dictionary fragment would not work.
+// Adding UI text: write it in German, then add one JP_EN entry (template text needs nothing else;
+// runtime text also needs the t() wrap). Keys must match the German literal exactly, including a
+// trailing ': ' or leading space. Messages returned by the PHP backend are not translated here.
+// ---------------------------------------------------------------------------
 const JP_EN={
 'Einstellungen':'Settings','Allgemein':'General','Aussehen':'Appearance','Sprache':'Language','Datenschutz':'Privacy','Über':'About',
 'Joplix-Ordner':'Joplix folder','Nextcloud-Ordner mit den Joplix-Daten auswählen oder manuell eingeben':'Select the Nextcloud folder containing your Joplix data or enter it manually',
@@ -1183,10 +1194,79 @@ const JP_EN={
 'Systemsprache':'System language','Systemsprache verwendet Deutsch bei einer deutschen Systemsprache, andernfalls Englisch.':'System language uses German when the system language is German; otherwise English.',
 'Lokale Speicherung':'Local storage','Spaltenbreiten, Sortierung und letzte Position werden nur lokal im Browser gespeichert.':'Column widths, sorting and the last position are stored locally in the browser.',
 '+ Notizbuch':'+ New notebook','Notizbücher':'Notebooks','Notizbuch':'Notebook','Notiz':'Note','Bearbeiten':'Edit','Speichern':'Save','Anzeige':'View','Löschen':'Delete','Ressource':'Attachment','Volltextsuche...':'Full-text search...','Bitte Notizbuch auswählen':'Please select a notebook','Keine Notiz geöffnet':'No note open','Index neu':'Rebuild index','Einstellungen schließen':'Close settings',
-"Synchronisation":"Synchronisation","Synchronisieren":"Sync","Joplix gleicht den Joplix-Ordner mit einem Joplin Server ab. Der Ordner in Nextcloud ist zugleich eine versionierte Sicherung aller Notizen.":"Joplix synchronises the Joplix folder with a Joplin Server. The folder in Nextcloud doubles as a versioned backup of all notes.","Server-Adresse":"Server address","Adresse des Joplin Servers, zum Beispiel https://joplin.example.com":"Address of the Joplin Server, for example https://joplin.example.com","E-Mail":"E-mail","Anmeldung des Joplin-Server-Kontos":"Login of the Joplin Server account","Passwort":"Password","Wird verschlüsselt in Nextcloud gespeichert und nie wieder angezeigt. Leer lassen, um das gespeicherte Passwort zu behalten.":"Stored encrypted in Nextcloud and never shown again. Leave empty to keep the stored password.","Synchronisation aktivieren":"Enable synchronisation","Gleicht beim Öffnen, nach dem Speichern und regelmäßig im Hintergrund ab.":"Synchronises on opening, after saving and regularly in the background.","Lokale Server-Adressen erlauben":"Allow local server addresses","Nötig, wenn der Joplin Server im eigenen Netzwerk oder auf demselben Rechner läuft. Gilt für alle Benutzer.":"Needed when the Joplin Server runs in your own network or on the same machine. Applies to all users.","Verbindung testen":"Test connection","Jetzt synchronisieren":"Synchronise now","Noch nicht synchronisiert.":"Not synchronised yet.","Joplix zeigt deine synchronisierten Notizen direkt in Nextcloud an. Für die erste Nutzung muss der Joplix-Ordner korrekt gesetzt und der Index aufgebaut sein. Unter Einstellungen › Synchronisation kann Joplix den Ordner selbst mit einem Joplin Server abgleichen.":"Joplix shows your synchronised notes directly in Nextcloud. For first use, the Joplix folder must be set correctly and the index built. Under Settings › Synchronisation, Joplix can synchronise the folder with a Joplin Server itself."
+"Synchronisation":"Synchronisation","Synchronisieren":"Sync","Joplix gleicht den Joplix-Ordner mit einem Joplin Server ab. Der Ordner in Nextcloud ist zugleich eine versionierte Sicherung aller Notizen.":"Joplix synchronises the Joplix folder with a Joplin Server. The folder in Nextcloud doubles as a versioned backup of all notes.","Server-Adresse":"Server address","Adresse des Joplin Servers, zum Beispiel https://joplin.example.com":"Address of the Joplin Server, for example https://joplin.example.com","E-Mail":"E-mail","Anmeldung des Joplin-Server-Kontos":"Login of the Joplin Server account","Passwort":"Password","Wird verschlüsselt in Nextcloud gespeichert und nie wieder angezeigt. Leer lassen, um das gespeicherte Passwort zu behalten.":"Stored encrypted in Nextcloud and never shown again. Leave empty to keep the stored password.","Synchronisation aktivieren":"Enable synchronisation","Gleicht beim Öffnen, nach dem Speichern und regelmäßig im Hintergrund ab.":"Synchronises on opening, after saving and regularly in the background.","Lokale Server-Adressen erlauben":"Allow local server addresses","Nötig, wenn der Joplin Server im eigenen Netzwerk oder auf demselben Rechner läuft. Gilt für alle Benutzer.":"Needed when the Joplin Server runs in your own network or on the same machine. Applies to all users.","Verbindung testen":"Test connection","Jetzt synchronisieren":"Synchronise now","Noch nicht synchronisiert.":"Not synchronised yet.","Joplix zeigt deine synchronisierten Notizen direkt in Nextcloud an. Für die erste Nutzung muss der Joplix-Ordner korrekt gesetzt und der Index aufgebaut sein. Unter Einstellungen › Synchronisation kann Joplix den Ordner selbst mit einem Joplin Server abgleichen.":"Joplix shows your synchronised notes directly in Nextcloud. For first use, the Joplix folder must be set correctly and the index built. Under Settings › Synchronisation, Joplix can synchronise the folder with a Joplin Server itself.",
+// Template strings (templates/main.php) not covered above
+'+ Notiz':'+ New note',
+'Joplix-':'Joplix',
+'Titel':'Title',
+'Notizinhalt':'Note content',
+'Spaltenbreite ändern':'Resize column',
+'Editor-Werkzeuge':'Editor tools',
+'Rückgängig':'Undo',
+'Fett':'Bold',
+'Kursiv':'Italic',
+'Link einfügen':'Insert link',
+'Code einfügen':'Insert code',
+'Ressource anhängen':'Attach file',
+'Aufzählung':'Bulleted list',
+'Nummerierte Liste':'Numbered list',
+'Checkliste':'Checklist',
+'Überschrift':'Heading',
+'Trennlinie':'Horizontal rule',
+'Aktuelles Datum und Uhrzeit einfügen':'Insert current date and time',
+'Markierung einfügen':'Insert highlight',
+'Index wird geladen...':'Loading index...',
+'Bitte links ein Notizbuch auswählen.':'Please select a notebook on the left.',
+'Standardmäßig werden keine App-Backups erstellt. Vollständige Nextcloud-Backups bleiben Aufgabe des Administrators.':'By default no app backups are created. Complete Nextcloud backups remain the administrator’s responsibility.',
+'Standard: https://codeberg.org/Stoneubi/joplix/releases':'Default: https://codeberg.org/Stoneubi/joplix/releases',
+'Main entspricht dem Codeberg-Hauptchannel, Beta zeigt Vorabversionen.':'Main is the main Codeberg channel; Beta shows pre-releases.',
+'Release-Liste von Codeberg abrufen und ausgewählte Version installieren.':'Fetch the release list from Codeberg and install the selected version.',
+'Nextcloud-App für deine Joplix-Daten.':'Nextcloud app for your Joplix data.',
+'Willkommen schließen':'Close welcome',
+'Willkommen bei Joplix':'Welcome to Joplix',
+'Joplix-Ordner prüfen':'Check the Joplix folder',
+'Standard ist':'Default is',
+'Der Pfad kann in den Einstellungen geändert werden.':'The path can be changed in the settings.',
+'Index aufbauen':'Build the index',
+'Wenn Notizen fehlen, in den Einstellungen unter Index den Neuaufbau starten.':'If notes are missing, start the rebuild under Index in the settings.',
+'Notizen bearbeiten':'Edit notes',
+'Der Speichern-Button wird nur aktiv, wenn es Änderungen gibt.':'The Save button only becomes active when there are changes.',
+'Einstellungen öffnen':'Open settings',
+'Loslegen':'Get started',
+'PDF anzeigen':'View PDF',
+'Extern öffnen':'Open externally',
+'PDF schließen':'Close PDF',
+'PDF-Anzeige':'PDF view',
 };
 function resolvedLanguage(){const v=(currentLocalSettings().language||'system');if(v==='de'||v==='en')return v;return String(navigator.language||'en').toLowerCase().startsWith('de')?'de':'en';}
-function translateStaticUi(){const lang=resolvedLanguage();document.documentElement.lang=lang;if(lang!=='en')return;const root=document.body;const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);nodes.forEach(n=>{const raw=n.nodeValue,trim=raw.trim();if(JP_EN[trim])n.nodeValue=raw.replace(trim,JP_EN[trim]);});document.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el=>['placeholder','title','aria-label'].forEach(a=>{const v=el.getAttribute(a);if(v&&JP_EN[v])el.setAttribute(a,JP_EN[v]);}));}
+// German -> English for one string, or the string unchanged when there is no entry. Tries, in order:
+// the exact string, the trimmed string (surrounding whitespace kept), then an icon/sign prefix plus a
+// known remainder ("⚙ Einstellungen", "+ Notiz", ". Der Pfad ..."). The exact match comes first so a
+// dedicated key such as '+ Notizbuch' wins over the generic 'Notizbuch'.
+function jpTranslate(raw){
+  const has=k=>Object.prototype.hasOwnProperty.call(JP_EN,k);
+  const s=String(raw);
+  if(has(s))return JP_EN[s];
+  const trim=s.trim();
+  if(!trim)return raw;
+  if(has(trim))return s.replace(trim,()=>JP_EN[trim]);
+  const m=trim.match(/^([^0-9A-Za-zÄÖÜäöüß]+\s*)(.+)$/);
+  if(m&&has(m[2]))return s.replace(trim,()=>m[1]+JP_EN[m[2]]);
+  return raw;
+}
+// Runtime strings: wrap every German literal that JavaScript shows to the user in t('...') and add the
+// literal to JP_EN. German mode returns the argument untouched.
+function t(s){return resolvedLanguage()==='en'?jpTranslate(s):s;}
+// Template strings: runs once from load(), before any notebook or note is rendered, and only inside
+// Joplix's own containers, so neither note content nor the surrounding Nextcloud UI is ever rewritten.
+function translateStaticUi(){
+  const lang=resolvedLanguage();document.documentElement.lang=lang;if(lang!=='en')return;
+  ['joplix-app','jp-settings-overlay','jp-welcome-overlay','jp-note-context-menu','jp-pdf-viewer-overlay'].map(id=>document.getElementById(id)).filter(Boolean).forEach(root=>{
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    nodes.forEach(n=>{const en=jpTranslate(n.nodeValue);if(en!==n.nodeValue)n.nodeValue=en;});
+    root.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el=>['placeholder','title','aria-label'].forEach(a=>{const v=el.getAttribute(a);if(v){const en=jpTranslate(v);if(en!==v)el.setAttribute(a,en);}}));
+  });
+}
 
 
 function setupSettings(){

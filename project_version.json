@@ -1,0 +1,14 @@
+{
+  "name": "Joplix",
+  "version": "2026.09.63",
+  "release_type": "beta",
+  "created_by": "Stoneubi",
+  "date": "2026-09-18",
+  "channel": "beta",
+  "base_version": "2026.09.62",
+  "build_date": "2026-09-18",
+  "release_date": "2026-09-18",
+  "summary": "Test release based on Beta 61 for validating the integrated updater.",
+  "updated": "2026-09-18",
+  "notes": "No functional changes. Internal version metadata is bumped to 2026.09.63 solely to test Beta 62 → Beta 63 detection and installation through the integrated updater."
+}

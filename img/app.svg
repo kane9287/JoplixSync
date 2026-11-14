@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Joplix">
+  <defs><linearGradient id="bg" x1="18" y1="12" x2="112" y2="118" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1587d0"/><stop offset="0.55" stop-color="#00679e"/><stop offset="1" stop-color="#003b66"/></linearGradient><linearGradient id="paper" x1="40" y1="22" x2="91" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eaf4fb"/></linearGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#003b66" flood-opacity="0.28"/></filter></defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" filter="url(#shadow)"/>
+  <path d="M38 24h40l20 20v58a8 8 0 0 1-8 8H38a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z" fill="url(#paper)"/>
+  <path d="M78 24v18a6 6 0 0 0 6 6h18" fill="#cde7f7"/>
+  <path d="M45 52h32M45 66h41M45 80h31" fill="none" stroke="#00679e" stroke-width="5" stroke-linecap="round"/>
+  <g transform="translate(76 72) rotate(-35)"><rect x="0" y="0" width="16" height="43" rx="5" fill="#fff"/><rect x="3" y="4" width="10" height="29" rx="3" fill="#003b66"/><path d="M1 35h14l-7 12z" fill="#fff"/><path d="M5 37h6l-3 7z" fill="#003b66"/></g>
+</svg>

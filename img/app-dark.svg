@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Joplix">
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="#17252d" stroke="#52636d" stroke-width="2"/>
+  <path d="M38 24h40l20 20v58a8 8 0 0 1-8 8H38a8 8 0 0 1-8-8V32a8 8 0 0 1 8-8z" fill="#f4f7f8"/>
+  <path d="M78 24v18a6 6 0 0 0 6 6h18" fill="#b9d8e8"/>
+  <path d="M45 52h32M45 66h41M45 80h31" fill="none" stroke="#087ead" stroke-width="5" stroke-linecap="round"/>
+  <g transform="translate(76 72) rotate(-35)"><rect x="0" y="0" width="16" height="43" rx="5" fill="#f4f7f8"/><rect x="3" y="4" width="10" height="29" rx="3" fill="#17252d"/><path d="M1 35h14l-7 12z" fill="#f4f7f8"/><path d="M5 37h6l-3 7z" fill="#17252d"/></g>
+</svg>

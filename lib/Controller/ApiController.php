@@ -1,9 +1,9 @@
 <?php
 namespace OCA\Joplix\Controller;
-use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService;
+use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService;
 use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP\Files\Folder; use OCP\Files\IRootFolder; use OCP\IConfig; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager;
-class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager;
- public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager){parent::__construct($AppName,$request);$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
+class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService;
+ public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService){parent::__construct($AppName,$request);$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
  private function uid(): string{$u=$this->userSession->getUser();if($u===null)throw new \RuntimeException('Nicht angemeldet');return $u->getUID();}
  private function isAdmin(): bool{return $this->groupManager->isAdmin($this->uid());} private function setting(string $k,string $d=''): string{return $this->config->getUserValue($this->uid(),Application::APP_ID,$k,$d);} private function setSetting(string $k,string $v): void{$this->config->setUserValue($this->uid(),Application::APP_ID,$k,$v);} private function userFolder(): Folder{return $this->rootFolder->getUserFolder($this->uid());}
  private function joplinPath(): string{$p=$this->setting('joplin_path','/JoplinV2');$p='/'.trim($p,'/');return $p==='/'?'/JoplinV2':$p;} private function joplinFolder(): Folder{$rel=trim($this->joplinPath(),'/');$uf=$this->userFolder();$n=$rel===''?$uf:$uf->get($rel);if(!$n instanceof Folder)throw new \RuntimeException('Joplix-Pfad ist kein Ordner: '.$this->joplinPath());return $n;}
@@ -259,6 +259,62 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   }
   return new JSONResponse(['active'=>true,'updated'=>$updated,'already_applied'=>$alreadyApplied??false,'file_name'=>$session['file_name'],'last_import_at'=>$session['last_import_at']??0,'sha256'=>$session['resource_hash'],'working_sha256'=>$hash,'working_mtime'=>$file->getMTime(),'working_size'=>$file->getSize()]);
  }catch(\Throwable $e){return $this->err($e);}}
+
+ /**
+  * @NoAdminRequired
+  * @NoCSRFRequired
+  */
+ public function syncStatus(): JSONResponse {
+     try {
+         $status = $this->syncService->status($this->uid());
+         $status['is_admin'] = $this->isAdmin();
+         return new JSONResponse($status);
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
+
+ /**
+  * @NoAdminRequired
+  */
+ public function saveSyncSettings(): JSONResponse {
+     try {
+         $values = [];
+         foreach (['enabled', 'server_url', 'email', 'password', 'allow_local'] as $key) {
+             $values[$key] = $this->request->getParam($key);
+         }
+         $this->syncService->saveSettings($this->uid(), $values, $this->isAdmin());
+         $status = $this->syncService->status($this->uid());
+         $status['is_admin'] = $this->isAdmin();
+         return new JSONResponse($status);
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
+
+ /**
+  * @NoAdminRequired
+  */
+ public function testSync(): JSONResponse {
+     try {
+         return new JSONResponse($this->syncService->test($this->uid()));
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
+
+ /**
+  * @NoAdminRequired
+  */
+ public function runSync(): JSONResponse {
+     try {
+         $confirm = in_array($this->request->getParam('confirm_delete'), [true, 1, '1', 'yes', 'true'], true);
+         // Short budget per request; the browser repeats while the result is "partial".
+         return new JSONResponse($this->syncService->run($this->uid(), 20, $confirm));
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
 
  private function editingFolder(): Folder{
   $uf=$this->userFolder();if(!$uf->nodeExists('.joplix'))$uf->newFolder('.joplix');$base=$uf->get('.joplix');if(!$base instanceof Folder)throw new \RuntimeException('.joplix ist kein Ordner');

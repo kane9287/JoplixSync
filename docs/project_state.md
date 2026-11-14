@@ -68,3 +68,12 @@ Do not begin attachment editing until these acceptance tests pass.
 ## Compatibility checks
 
 The legacy built-in Joplin repository compatibility monitor was removed in 2.3.0-beta.6. Compatibility analysis is planned as an optional external Uplix addon so it cannot block normal Joplix operation.
+
+## Joplin Server synchronisation (2026.11.66)
+
+- `lib/Sync/SyncEngine.php` synchronises the Joplix folder with a Joplin Server account through the server's REST API (`lib/Sync/JoplinServerClient.php`). Runs are time-boxed and resumable.
+- `lib/Service/JoplixSyncService.php` holds per-user settings, encrypted credentials and the sync state (kept in app data, not in the user's files). `lib/BackgroundJob/SyncJob.php` runs every five minutes.
+- Model, write and index services are unchanged: the server delivers the same serialized items the folder already used with WebDAV.
+- Sync state records, per item, the local etag and the server's `updated_time` at the last sync. A different etag means "changed here"; the server's delta feed reports "changed there".
+- Joplix never writes `info.json`, locks or anything other than `<id>.md` and `.resource/<id>` to the server.
+- Resource blobs are streamed in both directions and follow their resource item, as in the Joplin clients.

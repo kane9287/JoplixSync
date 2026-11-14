@@ -14,6 +14,17 @@ Synchronization keeps your Joplix workspace available across your devices and en
 
 A particularly important feature is online access: **Joplix is currently the only tool that provides online access to Joplix.** This means your Joplix environment is not limited to a locally installed application. You can access your notes and work with your Joplix data directly through a web browser from virtually any device.
 
+## Synchronisation with Joplin Server
+
+Joplix can synchronise its Nextcloud folder with a self-hosted [Joplin Server](https://github.com/laurent22/joplin/tree/dev/packages/server) account. Open **Settings › Synchronisation**, enter the server address, e-mail and password, test the connection and enable synchronisation.
+
+- Joplin apps keep synchronising with the Joplin Server. Joplix exchanges changes with the same account in both directions.
+- The Joplix folder in Nextcloud is at the same time a backup of the server content. With the Nextcloud *Versions* and *Deleted files* apps enabled, earlier versions of every note and remotely deleted notes stay recoverable.
+- A Nextcloud background job keeps the folder current even when Joplix is not open. Background jobs should run via cron.
+- End-to-end encryption must be disabled on the Joplin account.
+- If the Joplin Server has a local or private address, a Nextcloud administrator has to switch on *Allow local server addresses* in the same settings tab.
+- Do not let a Joplin app synchronise with the Joplix folder over WebDAV while this is enabled.
+
 ## Installation
 
 Nextcloud administrators can update Joplix through its integrated updater and remove it from the Nextcloud Apps administration. Manual ZIP installations require access to the Nextcloud host. To remove the app while keeping user files, use Nextcloud Apps administration and avoid the separate legacy purge script.

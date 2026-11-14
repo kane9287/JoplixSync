@@ -30,4 +30,8 @@ return ['routes'=>[
  ['name'=>'api#dev_install_package','url'=>'/api/dev/packages/install','verb'=>'POST'],
  ['name'=>'api#update_releases','url'=>'/api/updates/releases','verb'=>'GET'],
  ['name'=>'api#update_install','url'=>'/api/updates/install','verb'=>'POST'],
+ ['name'=>'api#sync_status','url'=>'/api/sync/status','verb'=>'GET'],
+ ['name'=>'api#save_sync_settings','url'=>'/api/sync/settings','verb'=>'POST'],
+ ['name'=>'api#test_sync','url'=>'/api/sync/test','verb'=>'POST'],
+ ['name'=>'api#run_sync','url'=>'/api/sync/run','verb'=>'POST'],
 ]];

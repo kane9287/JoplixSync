@@ -7,7 +7,7 @@ use OCP\Files\IRootFolder;
 use OCP\IConfig;
 
 class JoplixWorkspaceService {
-    public const APP_VERSION = '2026.11.65';
+    public const APP_VERSION = '2026.11.66';
     public const SCHEMA_VERSION = 1;
 
     private IRootFolder $rootFolder;

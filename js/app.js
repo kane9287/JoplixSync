@@ -363,7 +363,7 @@ function renderNoteToEditor(n,fromCache=false){
   resetEditorHistory($('jp-body')?$('jp-body').value:'');renderDisplayMode();
 }
 function ensureNoteSelected(id){document.querySelectorAll('.jp-note-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));}
-async function api(p,o={}){o.headers=Object.assign({'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'HTTP '+r.status);return d;}
+async function api(p,o={}){o.headers=Object.assign({'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'HTTP '+r.status);noteLocalChangeForSync(p,o,d);return d;}
 function status(t,cls=''){const el=$('jp-index-status');el.textContent=t;el.className='jp-index-status '+cls;}
 function restoreLocationWithoutClearing(idx){
   const loc=localLocation();
@@ -1182,7 +1182,8 @@ const JP_EN={
 'Update-Quelle':'Update source','Codeberg Repository für Joplix Updates':'Codeberg repository for Joplix updates','Aktuell installierte Version':'Currently installed version','Codeberg Adresse':'Codeberg address','Release Channel':'Release channel','Verfügbare Versionen':'Available versions','Updates suchen':'Check for updates','Noch nicht geprüft.':'Not checked yet.',
 'Systemsprache':'System language','Systemsprache verwendet Deutsch bei einer deutschen Systemsprache, andernfalls Englisch.':'System language uses German when the system language is German; otherwise English.',
 'Lokale Speicherung':'Local storage','Spaltenbreiten, Sortierung und letzte Position werden nur lokal im Browser gespeichert.':'Column widths, sorting and the last position are stored locally in the browser.',
-'+ Notizbuch':'+ New notebook','Notizbücher':'Notebooks','Notizbuch':'Notebook','Notiz':'Note','Bearbeiten':'Edit','Speichern':'Save','Anzeige':'View','Löschen':'Delete','Ressource':'Attachment','Volltextsuche...':'Full-text search...','Bitte Notizbuch auswählen':'Please select a notebook','Keine Notiz geöffnet':'No note open','Index neu':'Rebuild index','Einstellungen schließen':'Close settings'
+'+ Notizbuch':'+ New notebook','Notizbücher':'Notebooks','Notizbuch':'Notebook','Notiz':'Note','Bearbeiten':'Edit','Speichern':'Save','Anzeige':'View','Löschen':'Delete','Ressource':'Attachment','Volltextsuche...':'Full-text search...','Bitte Notizbuch auswählen':'Please select a notebook','Keine Notiz geöffnet':'No note open','Index neu':'Rebuild index','Einstellungen schließen':'Close settings',
+"Synchronisation":"Synchronisation","Synchronisieren":"Sync","Joplix gleicht den Joplix-Ordner mit einem Joplin Server ab. Der Ordner in Nextcloud ist zugleich eine versionierte Sicherung aller Notizen.":"Joplix synchronises the Joplix folder with a Joplin Server. The folder in Nextcloud doubles as a versioned backup of all notes.","Server-Adresse":"Server address","Adresse des Joplin Servers, zum Beispiel https://joplin.example.com":"Address of the Joplin Server, for example https://joplin.example.com","E-Mail":"E-mail","Anmeldung des Joplin-Server-Kontos":"Login of the Joplin Server account","Passwort":"Password","Wird verschlüsselt in Nextcloud gespeichert und nie wieder angezeigt. Leer lassen, um das gespeicherte Passwort zu behalten.":"Stored encrypted in Nextcloud and never shown again. Leave empty to keep the stored password.","Synchronisation aktivieren":"Enable synchronisation","Gleicht beim Öffnen, nach dem Speichern und regelmäßig im Hintergrund ab.":"Synchronises on opening, after saving and regularly in the background.","Lokale Server-Adressen erlauben":"Allow local server addresses","Nötig, wenn der Joplin Server im eigenen Netzwerk oder auf demselben Rechner läuft. Gilt für alle Benutzer.":"Needed when the Joplin Server runs in your own network or on the same machine. Applies to all users.","Verbindung testen":"Test connection","Jetzt synchronisieren":"Synchronise now","Noch nicht synchronisiert.":"Not synchronised yet.","Joplix zeigt deine synchronisierten Notizen direkt in Nextcloud an. Für die erste Nutzung muss der Joplix-Ordner korrekt gesetzt und der Index aufgebaut sein. Unter Einstellungen › Synchronisation kann Joplix den Ordner selbst mit einem Joplin Server abgleichen.":"Joplix shows your synchronised notes directly in Nextcloud. For first use, the Joplix folder must be set correctly and the index built. Under Settings › Synchronisation, Joplix can synchronise the folder with a Joplin Server itself."
 };
 function resolvedLanguage(){const v=(currentLocalSettings().language||'system');if(v==='de'||v==='en')return v;return String(navigator.language||'en').toLowerCase().startsWith('de')?'de':'en';}
 function translateStaticUi(){const lang=resolvedLanguage();document.documentElement.lang=lang;if(lang!=='en')return;const root=document.body;const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);nodes.forEach(n=>{const raw=n.nodeValue,trim=raw.trim();if(JP_EN[trim])n.nodeValue=raw.replace(trim,JP_EN[trim]);});document.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el=>['placeholder','title','aria-label'].forEach(a=>{const v=el.getAttribute(a);if(v&&JP_EN[v])el.setAttribute(a,JP_EN[v]);}));}
@@ -1208,8 +1209,154 @@ function setupSettings(){
   const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeCodebergRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus('Update-Einstellungen gespeichert.','ok')).catch(e=>updateStatus('Update-Einstellungen konnten nicht gespeichert werden: '+e.message,'error'));});
   syncSettingsUi();
 }
+// ---------------------------------------------------------------------------
+// Joplin Server synchronisation
+// ---------------------------------------------------------------------------
+const syncState={status:null,running:false,timer:null,again:false,lastAuto:0};
+function L(de,en){return resolvedLanguage()==='en'?en:de;}
+function syncPaneStatus(text,cls=''){const el=$('jp-sync-status');if(el){el.textContent=text;el.className='jp-update-status '+cls;}}
+function syncBusy(on){['jp-sync-now','jp-sync-run'].forEach(id=>{const b=$(id);if(b)b.disabled=!!on;});}
+function syncEnabled(){return !!(syncState.status&&syncState.status.enabled&&syncState.status.configured);}
+function describeSyncCounts(r){
+  const parts=[];
+  if(r.pulled)parts.push(r.pulled+' '+L('empfangen','received'));
+  if(r.pushed)parts.push(r.pushed+' '+L('gesendet','sent'));
+  if(r.deleted_local)parts.push(r.deleted_local+' '+L('lokal gelöscht','deleted locally'));
+  if(r.deleted_remote)parts.push(r.deleted_remote+' '+L('auf dem Server gelöscht','deleted on the server'));
+  if(r.conflicts)parts.push(r.conflicts+' '+L('Konflikt(e)','conflict(s)'));
+  if(r.rejected)parts.push(r.rejected+' '+L('vom Server abgelehnt','rejected by the server'));
+  return parts.join(', ');
+}
+function describeLastSync(st){
+  if(!st)return L('Status nicht verfügbar.','Status not available.');
+  if(!st.configured)return L('Noch nicht eingerichtet.','Not set up yet.');
+  if(!st.enabled)return L('Synchronisation ist ausgeschaltet.','Synchronisation is switched off.');
+  if(!st.last_run)return L('Noch nicht synchronisiert.','Not synchronised yet.');
+  const when=formatJoplixDateTime(String(st.last_run*1000));
+  if(st.last_status==='error')return L('Letzter Versuch ','Last attempt ')+when+': '+(st.last_message||L('Fehler','error'));
+  const counts=st.last_result?describeSyncCounts(st.last_result):'';
+  return L('Zuletzt synchronisiert: ','Last synchronised: ')+when+(counts?' ('+counts+')':'')+(st.last_status==='partial'?L(' – wird fortgesetzt',' – continuing'):'');
+}
+function fillSyncUi(){
+  const st=syncState.status;
+  const btn=$('jp-sync-now');if(btn)btn.hidden=!syncEnabled();
+  if(!st)return;
+  if($('jp-sync-url')&&document.activeElement!==$('jp-sync-url'))$('jp-sync-url').value=st.server_url||'';
+  if($('jp-sync-email')&&document.activeElement!==$('jp-sync-email'))$('jp-sync-email').value=st.email||'';
+  if($('jp-sync-password')){$('jp-sync-password').value='';$('jp-sync-password').placeholder=st.password_set?L('(gespeichert)','(stored)'):'';}
+  setSwitch($('jp-sync-enabled'),!!st.enabled);
+  setSwitch($('jp-sync-allow-local'),!!st.allow_local);
+  syncPaneStatus(describeLastSync(st),st.last_status==='error'&&st.enabled?'error':(st.enabled&&st.last_run?'ok':''));
+}
+async function loadSyncStatus(){
+  try{syncState.status=await api('/api/sync/status');}catch(e){syncState.status=null;}
+  fillSyncUi();
+  return syncState.status;
+}
+function syncFormValues(){
+  const v={server_url:$('jp-sync-url')?$('jp-sync-url').value.trim():'',email:$('jp-sync-email')?$('jp-sync-email').value.trim():'',enabled:($('jp-sync-enabled')&&$('jp-sync-enabled').classList.contains('active'))?'yes':'no'};
+  const pw=$('jp-sync-password')?$('jp-sync-password').value:'';
+  if(pw)v.password=pw;
+  if($('jp-sync-allow-local'))v.allow_local=$('jp-sync-allow-local').classList.contains('active')?'yes':'no';
+  return v;
+}
+async function saveSyncSettings(){
+  syncPaneStatus(L('Einstellungen werden gespeichert...','Saving settings...'),'warning');
+  syncState.status=await api('/api/sync/settings',{method:'POST',body:syncFormValues()});
+  fillSyncUi();
+  syncPaneStatus(L('Einstellungen gespeichert.','Settings saved.'),'ok');
+  return syncState.status;
+}
+async function testSyncConnection(){
+  // Save first so the test uses exactly what is in the form, but never switch sync on as a side effect of testing.
+  const values=syncFormValues();
+  if(!(syncState.status&&syncState.status.enabled))values.enabled='no';
+  syncPaneStatus(L('Verbindung wird geprüft...','Testing connection...'),'warning');
+  syncState.status=await api('/api/sync/settings',{method:'POST',body:values});
+  if($('jp-sync-password'))$('jp-sync-password').value='';
+  const r=await api('/api/sync/test',{method:'POST',body:{}});
+  if(!r.has_data)syncPaneStatus(L('Anmeldung erfolgreich, aber das Konto enthält noch keine Sync-Daten. Bitte zuerst einmal mit einer Joplin-App synchronisieren.','Login successful, but the account holds no sync data yet. Synchronise once from a Joplin app first.'),'warning');
+  else if(r.e2ee)syncPaneStatus(L('Anmeldung erfolgreich, aber die Ende-zu-Ende-Verschlüsselung ist aktiv. Joplix kann verschlüsselte Notizen nicht lesen.','Login successful, but end-to-end encryption is enabled. Joplix cannot read encrypted notes.'),'error');
+  else if(r.version!==3)syncPaneStatus(L('Anmeldung erfolgreich, aber die Sync-Version ','Login successful, but sync version ')+r.version+L(' wird nicht unterstützt.',' is not supported.'),'error');
+  else syncPaneStatus(L('Verbindung erfolgreich. Der Server ist bereit für die Synchronisation.','Connection successful. The server is ready for synchronisation.'),'ok');
+}
+async function runSync(opts={}){
+  if(!syncEnabled()){if(opts.manual)syncPaneStatus(L('Bitte die Synchronisation zuerst einrichten und aktivieren.','Please set up and enable synchronisation first.'),'warning');return null;}
+  if(syncState.running){syncState.again=true;return null;}
+  syncState.running=true;syncBusy(true);
+  const total={pulled:0,pushed:0,deleted_local:0,deleted_remote:0,conflicts:0,rejected:0};
+  let last=null,confirmDelete=false;
+  try{
+    if(opts.manual){status(L('Synchronisation läuft...','Synchronising...'),'warning');syncPaneStatus(L('Synchronisation läuft...','Synchronising...'),'warning');}
+    for(let round=0;round<2000;round++){
+      last=await api('/api/sync/run',{method:'POST',body:{confirm_delete:confirmDelete?'yes':'no'}});
+      Object.keys(total).forEach(k=>{total[k]+=Number(last[k]||0);});
+      if(last.status==='partial'){
+        const text=L('Synchronisation läuft... ','Synchronising... ')+describeSyncCounts(total);
+        status(text,'warning');syncPaneStatus(text,'warning');
+        continue;
+      }
+      if(last.status==='error'&&last.code==='massDelete'&&opts.manual&&!confirmDelete){
+        if(window.confirm(last.message+'\n\n'+L('Diese Elemente jetzt auch auf dem Joplin Server löschen?','Delete these items on the Joplin Server as well?'))){confirmDelete=true;continue;}
+      }
+      break;
+    }
+    const counts=describeSyncCounts(total);
+    if(last&&last.status==='done'){
+      const text=L('Synchronisiert','Synchronised')+(counts?': '+counts:'');
+      if(opts.manual||counts)status(text,'ok');
+      syncPaneStatus(text,'ok');
+    }else if(last&&last.status==='busy'){
+      if(opts.manual){status(last.message||L('Synchronisation läuft bereits.','A synchronisation is already running.'),'warning');syncPaneStatus(last.message||'','warning');}
+    }else if(last&&last.status==='error'){
+      const text=L('Synchronisation fehlgeschlagen: ','Synchronisation failed: ')+(last.message||'');
+      status(text,'error');syncPaneStatus(text+(last.code==='massDelete'&&!opts.manual?L(' Zum Bestätigen „Jetzt synchronisieren“ wählen.',' Choose "Synchronise now" to confirm.'):''),'error');
+    }
+    if(total.pulled||total.deleted_local||total.conflicts){
+      // Files in the folder changed: refresh the index and the open note (unless it has unsaved edits).
+      Object.keys(state.noteMemCache).forEach(id=>{if(!(state.dirty&&id===state.noteId))delete state.noteMemCache[id];});
+      await backgroundRefresh().catch(()=>{});
+    }
+    if(last&&last.status!=='busy'&&last.status!=='disabled'&&syncState.status){
+      syncState.status.last_run=Math.floor(Date.now()/1000);syncState.status.last_status=last.status;syncState.status.last_message=last.message||'';syncState.status.last_result=total;
+    }
+    return last;
+  }catch(e){
+    const text=L('Synchronisation fehlgeschlagen: ','Synchronisation failed: ')+e.message;
+    if(opts.manual)status(text,'error');
+    syncPaneStatus(text,'error');
+    return null;
+  }finally{
+    syncState.running=false;syncBusy(false);
+    if(syncState.again){syncState.again=false;scheduleSync(1500);}
+  }
+}
+function scheduleSync(delay=2500){
+  if(!syncEnabled())return;
+  clearTimeout(syncState.timer);
+  syncState.timer=setTimeout(()=>{runSync().catch(()=>{});},delay);
+}
+// Called by api() after every successful request: local edits are sent to the server shortly afterwards.
+function noteLocalChangeForSync(path,options,data){
+  const method=String((options&&options.method)||'GET').toUpperCase();
+  if(method!=='GET'&&/^\/api\/(notes|notebooks|tags|resources)(\/|$)/.test(path))scheduleSync(2500);
+  else if(/\/office\/status$/.test(path)&&data&&data.updated)scheduleSync(2500);
+}
+function setupSync(){
+  const toggle=id=>{const el=$(id);if(el)el.addEventListener('click',()=>setSwitch(el,!el.classList.contains('active')));};
+  toggle('jp-sync-enabled');toggle('jp-sync-allow-local');
+  const fail=e=>syncPaneStatus(e.message,'error');
+  if($('jp-sync-save'))$('jp-sync-save').addEventListener('click',()=>saveSyncSettings().then(()=>{if(syncEnabled())runSync({manual:true});}).catch(fail));
+  if($('jp-sync-test'))$('jp-sync-test').addEventListener('click',()=>testSyncConnection().catch(fail));
+  if($('jp-sync-run'))$('jp-sync-run').addEventListener('click',()=>runSync({manual:true}));
+  if($('jp-sync-now'))$('jp-sync-now').addEventListener('click',()=>runSync({manual:true}));
+  if($('jp-open-settings'))$('jp-open-settings').addEventListener('click',()=>{loadSyncStatus().catch(()=>{});});
+  // While Joplix is open, look for changes from other devices every two minutes.
+  setInterval(()=>{if(document.visibilityState==='visible'&&syncEnabled()&&!state.saving)runSync().catch(()=>{});},120000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&syncEnabled()&&Date.now()-syncState.lastAuto>60000){syncState.lastAuto=Date.now();scheduleSync(800);}});
+}
 document.addEventListener('DOMContentLoaded',()=>{
-  try{setupResizableColumns();}catch(e){console.error('Joplix resizable init failed',e);} try{setupEditorFormatbar();}catch(e){console.error('Joplix editor toolbar init failed',e);} try{setupSettings();}catch(e){console.error('Joplix settings init failed',e);} try{setupWelcome();}catch(e){console.error('Joplix welcome init failed',e);} try{setTimeout(()=>checkUpdateOnStart(),1200);}catch(e){console.warn('Joplix update startup init failed',e);} if($('jp-pdf-viewer-close'))$('jp-pdf-viewer-close').onclick=closePdfViewer; if($('jp-pdf-viewer-backdrop'))$('jp-pdf-viewer-backdrop').onclick=closePdfViewer;
+  try{setupResizableColumns();}catch(e){console.error('Joplix resizable init failed',e);} try{setupEditorFormatbar();}catch(e){console.error('Joplix editor toolbar init failed',e);} try{setupSettings();}catch(e){console.error('Joplix settings init failed',e);} try{setupWelcome();}catch(e){console.error('Joplix welcome init failed',e);} try{setupSync();}catch(e){console.error('Joplix sync init failed',e);} try{setTimeout(()=>checkUpdateOnStart(),1200);}catch(e){console.warn('Joplix update startup init failed',e);} if($('jp-pdf-viewer-close'))$('jp-pdf-viewer-close').onclick=closePdfViewer; if($('jp-pdf-viewer-backdrop'))$('jp-pdf-viewer-backdrop').onclick=closePdfViewer;
   if($('jp-new-root'))$('jp-new-root').onclick=()=>newNotebook('');
   if($('jp-new-note-main'))$('jp-new-note-main').onclick=newNote;
   if($('jp-save-note'))$('jp-save-note').onclick=()=>saveNote({skipReload:true}).catch(e=>alert(e.message)); if($('jp-save-note-top'))$('jp-save-note-top').onclick=()=>saveNote({keepMode:true,skipReload:true,fastDirtySave:true}).catch(e=>alert(e.message)); if($('jp-edit-note'))$('jp-edit-note').onclick=()=>setNoteMode('edit'); if($('jp-cancel-edit'))$('jp-cancel-edit').onclick=()=>setNoteMode('view'); if($('jp-title'))$('jp-title').addEventListener('input',()=>{markDirty();updateNotePath();}); if($('jp-body'))$('jp-body').addEventListener('input',()=>{markDirty();renderDisplayMode();});
@@ -1218,7 +1365,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if($('jp-resource-file'))$('jp-resource-file').onchange=e=>{if(e.target.files[0])uploadResource(e.target.files[0]).catch(err=>alert(err.message));};
   if($('jp-search'))$('jp-search').addEventListener('input',e=>runFullTextSearch(e.target.value));
   if($('jp-sort-button'))$('jp-sort-button').onclick=()=>{state.sort=state.sort==='updated_desc'?'updated_asc':'updated_desc';persistSettings({sort_order:state.sort}).catch(()=>{});if(state.notebookId)selectNotebook(state.notebookId);};
-  updateSaveButton(); load().catch(e=>alert(e.message));
+  updateSaveButton(); load().catch(e=>alert(e.message)).then(()=>loadSyncStatus()).then(()=>{if(syncEnabled()){syncState.lastAuto=Date.now();runSync().catch(()=>{});}});
 });
 })();
 

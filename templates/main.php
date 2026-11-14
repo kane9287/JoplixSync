@@ -36,7 +36,7 @@ if (is_readable($infoXml)) {
     <section id="jp-editor-view" class="jp-editor-view">
       <div class="jp-toolbar">
         <div id="jp-breadcrumb" class="jp-breadcrumb">Bitte Notizbuch auswählen</div>
-        <div class="jp-toolbar-actions"><button id="jp-rebuild-index">Index neu</button><button id="jp-new-note-main">+ Notiz</button></div>
+        <div class="jp-toolbar-actions"><button id="jp-sync-now" type="button" hidden>Synchronisieren</button><button id="jp-rebuild-index">Index neu</button><button id="jp-new-note-main">+ Notiz</button></div>
       </div>
       <div class="jp-note-modebar"><button id="jp-edit-note" type="button" class="jp-mode-edit">Bearbeiten</button><button id="jp-save-note-top" type="button" class="primary jp-save-note-top" disabled>Speichern</button><button id="jp-cancel-edit" type="button" class="jp-mode-cancel">Anzeige</button></div>
       <input id="jp-title" class="jp-title" placeholder="Titel">
@@ -83,6 +83,7 @@ if (is_readable($infoXml)) {
       <button class="active" data-settings-tab="general">Allgemein</button>
       <button data-settings-tab="view">Aussehen</button>
       <button data-settings-tab="index">Index</button>
+      <button data-settings-tab="sync">Synchronisation</button>
       <?php if ($isAdmin): ?><button data-settings-tab="update">Update</button><?php endif; ?>
       <button data-settings-tab="language">Sprache</button>
       <button data-settings-tab="privacy">Datenschutz</button>
@@ -140,6 +141,39 @@ if (is_readable($infoXml)) {
           <div><strong>Index neu aufbauen</strong><span>Wenn Notizbücher oder Notizen fehlen, kann der lokale Index neu aufgebaut werden.</span></div>
           <button id="jp-settings-rebuild" type="button">Starten</button>
         </div>
+      </section>
+
+      <section class="jp-settings-pane" data-settings-section="sync">
+        <h3>Synchronisation</h3>
+        <div class="jp-setting-card jp-setting-card-static">
+          <div><strong>Joplin Server</strong><span>Joplix gleicht den Joplix-Ordner mit einem Joplin Server ab. Der Ordner in Nextcloud ist zugleich eine versionierte Sicherung aller Notizen.</span></div>
+        </div>
+        <div class="jp-setting-card jp-setting-card-path">
+          <label for="jp-sync-url"><strong>Server-Adresse</strong><span>Adresse des Joplin Servers, zum Beispiel https://joplin.example.com</span></label>
+          <div class="jp-path-control"><input id="jp-sync-url" type="url" placeholder="https://joplin.example.com" autocomplete="off" spellcheck="false"></div>
+        </div>
+        <div class="jp-setting-card jp-setting-card-path">
+          <label for="jp-sync-email"><strong>E-Mail</strong><span>Anmeldung des Joplin-Server-Kontos</span></label>
+          <div class="jp-path-control"><input id="jp-sync-email" type="email" autocomplete="off" spellcheck="false"></div>
+        </div>
+        <div class="jp-setting-card jp-setting-card-path">
+          <label for="jp-sync-password"><strong>Passwort</strong><span>Wird verschlüsselt in Nextcloud gespeichert und nie wieder angezeigt. Leer lassen, um das gespeicherte Passwort zu behalten.</span></label>
+          <div class="jp-path-control"><input id="jp-sync-password" type="password" autocomplete="new-password"></div>
+        </div>
+        <div class="jp-setting-card">
+          <label><strong>Synchronisation aktivieren</strong><span>Gleicht beim Öffnen, nach dem Speichern und regelmäßig im Hintergrund ab.</span></label>
+          <button id="jp-sync-enabled" class="jp-switch" type="button" role="switch" aria-checked="false"><span></span></button>
+        </div>
+        <?php if ($isAdmin): ?><div class="jp-setting-card">
+          <label><strong>Lokale Server-Adressen erlauben</strong><span>Nötig, wenn der Joplin Server im eigenen Netzwerk oder auf demselben Rechner läuft. Gilt für alle Benutzer.</span></label>
+          <button id="jp-sync-allow-local" class="jp-switch" type="button" role="switch" aria-checked="false"><span></span></button>
+        </div><?php endif; ?>
+        <div class="jp-sync-actions">
+          <button id="jp-sync-save" class="primary" type="button">Speichern</button>
+          <button id="jp-sync-test" type="button">Verbindung testen</button>
+          <button id="jp-sync-run" type="button">Jetzt synchronisieren</button>
+        </div>
+        <div id="jp-sync-status" class="jp-update-status">Noch nicht synchronisiert.</div>
       </section>
 
 <?php if ($isAdmin): ?>
@@ -208,7 +242,7 @@ if (is_readable($infoXml)) {
     <button id="jp-welcome-close" class="jp-welcome-close" type="button" aria-label="Willkommen schließen">×</button>
     <div class="jp-welcome-icon">📝</div>
     <h2 id="jp-welcome-title">Willkommen bei Joplix</h2>
-    <p>Joplix zeigt deine synchronisierten Notizen direkt in Nextcloud an. Für die erste Nutzung muss der Joplix-Ordner korrekt gesetzt und der Index aufgebaut sein.</p>
+    <p>Joplix zeigt deine synchronisierten Notizen direkt in Nextcloud an. Für die erste Nutzung muss der Joplix-Ordner korrekt gesetzt und der Index aufgebaut sein. Unter Einstellungen › Synchronisation kann Joplix den Ordner selbst mit einem Joplin Server abgleichen.</p>
     <ol class="jp-welcome-steps">
       <li><strong>Joplix-Ordner prüfen</strong><span>Standard ist <code>/JoplinV2</code>. Der Pfad kann in den Einstellungen geändert werden.</span></li>
       <li><strong>Index aufbauen</strong><span>Wenn Notizen fehlen, in den Einstellungen unter Index den Neuaufbau starten.</span></li>

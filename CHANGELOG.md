@@ -1,3 +1,13 @@
+# Joplix 2026.11.66-beta
+
+- Adds two-way synchronisation with a self-hosted Joplin Server (Settings › Synchronisation). Joplix pulls changes from the server into the Joplix folder and pushes edits, new items and deletions made in Joplix.
+- The Joplix folder in Nextcloud therefore doubles as a backup: every synchronised change is written through the Nextcloud files API, so Nextcloud file versions and the trash bin keep earlier states and remotely deleted items.
+- Synchronises when Joplix opens, shortly after each save, every two minutes while open, and every five minutes through a Nextcloud background job even when Joplix is closed.
+- When a note was changed both in Joplix and on another device, the server version wins and the Joplix edit is kept as a Joplin conflict note.
+- Refuses to synchronise accounts with end-to-end encryption, and asks for confirmation before deleting a large share of the library on the server (for example after the folder was emptied or moved).
+- The Joplin Server password and session are stored encrypted per user and are never returned to the browser. Local or private server addresses must be allowed by an administrator.
+- Joplin apps must synchronise with the Joplin Server only. Do not point a Joplin app at the Joplix folder over WebDAV while this synchronisation is enabled.
+
 # Joplix 2026.11.65-beta
 
 - Resolves the selected release and ZIP server-side from the saved Codeberg repository and channel.

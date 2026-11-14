@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.65",
+  "version": "2026.11.66",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-13",
   "channel": "beta",
-  "base_version": "2026.11.64",
+  "base_version": "2026.11.65",
   "build_date": "2026-11-13",
   "release_date": "2026-11-13",
-  "summary": "Repository-bound Codeberg updater with staged installation and file rollback.",
+  "summary": "Two-way synchronisation with a self-hosted Joplin Server; the Nextcloud folder doubles as a versioned backup.",
   "updated": "2026-11-13",
-  "notes": "Release archives are validated and staged before replacing the app. The updater uses the administrator-configured Codeberg repository and channel."
+  "notes": "Joplix can now synchronise its Nextcloud folder with a Joplin Server account (in-app and via a background job). Credentials are stored encrypted per user."
 }

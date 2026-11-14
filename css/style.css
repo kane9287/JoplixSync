@@ -1470,3 +1470,8 @@ html[data-theme="dark"] .jp-settings-overlay {
 .jp-delete-notebook-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
 .jp-delete-notebook-actions button { min-width: 96px; }
 .jp-delete-notebook-actions button.danger { background: var(--color-error, #c62828); color: #fff; border-color: transparent; }
+
+/* Joplin Server synchronisation */
+.jp-sync-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.jp-settings-pane[data-settings-section="sync"] .jp-path-control input { width: 100%; box-sizing: border-box; }
+#jp-sync-now[disabled], .jp-sync-actions button[disabled] { opacity: .6; cursor: progress; }

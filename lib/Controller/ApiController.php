@@ -87,7 +87,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  */ public function updateNote(string $id): JSONResponse{try{$r=$this->writer()->updateNote($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('body',''),(string)$this->request->getParam('known_updated_time',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e,str_starts_with($e->getMessage(),'Konflikt')?409:400);}}
  /**
  * @NoAdminRequired
- */ public function deleteNote(string $id): JSONResponse{try{$r=$this->writer()->deleteNote($id);$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function deleteNote(string $id): JSONResponse{try{$r=$this->permanent()?$this->writer()->deleteNote($id):$this->writer()->trashNote($id);$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
  */ public function moveNote(string $id): JSONResponse{try{$r=$this->writer()->moveNote($id,(string)$this->request->getParam('target_notebook_id',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
@@ -99,7 +99,18 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  */ public function updateNotebook(string $id): JSONResponse{try{$r=$this->writer()->updateNotebook($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('known_updated_time',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e,str_starts_with($e->getMessage(),'Konflikt')?409:400);}}
  /**
  * @NoAdminRequired
- */ public function deleteNotebook(string $id): JSONResponse{try{$r=$this->writer()->deleteNotebook($id);$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function deleteNotebook(string $id): JSONResponse{try{$r=$this->permanent()?$this->writer()->deleteNotebook($id):$this->writer()->trashNotebook($id);$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ /** DELETE moves to Joplin's trash; ?permanent=1 removes the files. */
+ private function permanent(): bool{return (string)$this->request->getParam('permanent','')==='1';}
+ /**
+ * @NoAdminRequired
+ */ public function restoreNote(string $id): JSONResponse{try{$r=$this->writer()->restoreNote($id,(string)$this->request->getParam('target_notebook_id',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ /**
+ * @NoAdminRequired
+ */ public function restoreNotebook(string $id): JSONResponse{try{$r=$this->writer()->restoreNotebook($id);$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ /**
+ * @NoAdminRequired
+ */ public function emptyTrash(): JSONResponse{try{$r=$this->writer()->emptyTrash();$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
  * @NoCSRFRequired

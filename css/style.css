@@ -125,6 +125,12 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 #joplix .jp-tree-row:focus-within button.jp-tree-menu,
 #joplix .jp-tree-row.active button.jp-tree-menu { opacity: 1; }
 #joplix button.jp-tree-menu:hover { background: var(--color-background-hover); color: var(--color-main-text); }
+/* Trash entry below the notebooks, and controls that only exist while it is selected. */
+#joplix .jp-trash-row { margin-top: 10px; }
+#joplix .jp-trash-row .jp-icon { flex: 0 0 18px; width: 18px; height: 18px; }
+#joplix .jp-trash-only { display: none; }
+#joplix-app.jp-in-trash .jp-trash-only { display: inline-flex; }
+#joplix-app.jp-in-trash #jp-new-note-main { display: none; }
 #joplix button.jp-settings-button {
   justify-content: flex-start; gap: 8px; width: 100%; margin-top: 4px; padding: 0 8px;
   background: transparent; color: var(--color-main-text); font-weight: normal;
@@ -177,6 +183,17 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 
 #joplix-app.jp-no-note .jp-note-only,
 #joplix-app.jp-no-note .jp-note-area { display: none; }
+/* A note in the trash is read-only: no editing controls, no tag or checkbox changes. */
+#joplix .jp-trash-bar { display: none; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 8px 12px; border-radius: var(--jp-radius); background: var(--color-background-dark); }
+#joplix .jp-trash-bar .jp-icon { width: 18px; height: 18px; }
+#joplix .jp-trash-bar-text { flex: 1 1 auto; min-width: 0; }
+#joplix-app.jp-trash-note .jp-trash-bar { display: flex; }
+#joplix-app.jp-trash-note .jp-note-only,
+#joplix-app.jp-trash-note .jp-editor-formatbar,
+#joplix-app.jp-trash-note .jp-tag-add,
+#joplix-app.jp-trash-note .jp-tag-remove { display: none; }
+#joplix-app.jp-trash-note .jp-tags,
+#joplix-app.jp-trash-note input[type="checkbox"] { pointer-events: none; }
 #joplix .jp-empty { display: none; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; color: var(--jp-muted); text-align: center; }
 #joplix-app.jp-no-note .jp-empty { display: flex; }
 #joplix .jp-empty .jp-icon { width: 64px; height: 64px; opacity: .5; }

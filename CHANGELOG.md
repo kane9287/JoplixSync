@@ -1,3 +1,12 @@
+# Joplix 2026.11.73
+
+- Notes and notebooks deleted in a Joplin app no longer stay in the note list. Joplin moves deleted items to its trash, which keeps the file on the server with a deletion mark; Joplix ignored that mark for notes.
+- New: a trash that works like Joplin's and is shared with it. "Trash" appears below the notebooks whenever something is in it. Notes there open read-only and can be restored or deleted permanently; "Empty trash" removes everything.
+- Deleting a note or notebook in Joplix now moves it to the trash instead of removing it for good, so it can be restored from Joplix or from any Joplin app. Deleting a notebook takes its sub-notebooks and notes along.
+- Restoring a note whose notebook is itself in the trash asks which notebook it should go to. A restored sub-notebook whose parent is in the trash becomes a top-level notebook.
+- Items are removed from the Nextcloud folder only when they are deleted permanently or the trash is emptied, in Joplix or in Joplin.
+- The index is rebuilt once automatically after the update.
+
 # Joplix 2026.11.72
 
 - Fixes the in-app updater (Settings › Update), which rejected every release with "ZIP enthaelt keine gueltige Joplix-App".

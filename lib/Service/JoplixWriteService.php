@@ -8,6 +8,57 @@ class JoplixWriteService {
  public function createNotebook(string $title,string $parentId=''): array{$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>trim($title)?:'Neues Notizbuch','id'=>$id,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','parent_id'=>$parentId,'is_shared'=>'0','share_id'=>'','master_key_id'=>'','icon'=>'','type_'=>'2'];$this->writeNew($id,$item);return ['id'=>$id];}
  public function updateNotebook(string $id,string $title,string $known=''): array{$item=$this->must($id,'2');$this->conflict($item,$known,'Notizbuch');$this->backup($id);$item['_body']=trim($title)?:($item['_title']??'Notizbuch');$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time']);return ['id'=>$id,'updated_time'=>$item['updated_time']];}
  public function deleteNotebook(string $id): array{$deleted=$this->deleteNotebookRecursive($id);return ['id'=>$id,'deleted'=>true,'deleted_items'=>$deleted];}
+
+ // ---- Trash. Same representation as Joplin 3.x: the item file stays and carries
+ // deleted_time (milliseconds) until it is restored (deleted_time: 0) or purged
+ // (file removed). Only that line, the two update times and, on a re-parented
+ // restore, parent_id are rewritten; everything else stays byte-exact.
+ public function trashNote(string $id): array{
+  $item=$this->must($id,'1');
+  if(!isset($this->model->trashedRaw()[$id]))$this->mark($id,$item,$this->nowMs());
+  return ['id'=>$id,'trashed'=>true];
+ }
+ /** Marks the notebook, every sub-notebook and every note in them, with one shared timestamp. */
+ public function trashNotebook(string $id): array{
+  $item=$this->must($id,'2');
+  if(isset($this->model->trashedRaw()[$id]))return ['id'=>$id,'trashed'=>true,'trashed_items'=>['notebooks'=>0,'notes'=>0]];
+  $books=$this->model->notebooksRaw(); $ids=$this->withDescendants($id,$books); $when=$this->nowMs(); $count=['notebooks'=>0,'notes'=>0];
+  foreach($this->model->notesRaw() as $noteId=>$note){ if(isset($ids[(string)($note['parent_id']??'')])){ $this->mark((string)$noteId,$note,$when); $count['notes']++; } }
+  foreach($ids as $bookId=>$_){ $this->mark((string)$bookId,$bookId===$id?$item:$books[$bookId],$when); $count['notebooks']++; }
+  return ['id'=>$id,'trashed'=>true,'trashed_items'=>$count];
+ }
+ /** Back to its notebook, or to $targetNotebookId when that notebook is itself trashed or gone. */
+ public function restoreNote(string $id,string $targetNotebookId=''): array{
+  $item=$this->trashedItem($id,'1'); $books=$this->model->notebooksRaw(); $parent=(string)($item['parent_id']??'');
+  if($targetNotebookId!==''){ if(!isset($books[$targetNotebookId]))throw new \RuntimeException('Zielnotizbuch nicht gefunden'); $parent=$targetNotebookId; }
+  elseif(!isset($books[$parent]))throw new \RuntimeException('Das Notizbuch dieser Notiz ist nicht mehr vorhanden. Bitte ein Zielnotizbuch waehlen.');
+  $this->mark($id,$item,'0',$parent===(string)($item['parent_id']??'')?null:$parent);
+  return ['id'=>$id,'restored'=>true,'notebook_id'=>$parent];
+ }
+ /** Restores the notebook with everything in the trash below it; top level when its parent is not available. */
+ public function restoreNotebook(string $id): array{
+  $item=$this->trashedItem($id,'2'); $trashed=$this->model->trashedRaw(); $parent=(string)($item['parent_id']??''); $count=['notebooks'=>0,'notes'=>0];
+  $trashedBooks=array_filter($trashed,fn($t)=>($t['type_']??'')==='2'); $ids=$this->withDescendants($id,$trashedBooks);
+  foreach($ids as $bookId=>$_){ $reparent=($bookId===$id&&$parent!==''&&!isset($this->model->notebooksRaw()[$parent]))?'':null; $this->mark((string)$bookId,$trashed[$bookId],'0',$reparent); $count['notebooks']++; }
+  foreach($trashed as $noteId=>$t){ if(($t['type_']??'')==='1'&&isset($ids[(string)($t['parent_id']??'')])){ $this->mark((string)$noteId,$t,'0'); $count['notes']++; } }
+  return ['id'=>$id,'restored'=>true,'restored_items'=>$count];
+ }
+ /** Permanently removes everything in the trash. */
+ public function emptyTrash(): array{
+  $count=['notebooks'=>0,'notes'=>0];
+  foreach($this->model->trashedRaw() as $id=>$t){ if(($t['type_']??'')==='1'){ $this->deleteNoteRelations((string)$id); $this->deleteSyncItem((string)$id); $count['notes']++; } }
+  foreach($this->model->trashedRaw() as $id=>$t){ if(($t['type_']??'')==='2'){ $this->deleteSyncItem((string)$id); $count['notebooks']++; } }
+  return ['ok'=>true,'deleted_items'=>$count];
+ }
+ private function nowMs(): string{return (string)(int)round(microtime(true)*1000);}
+ private function trashedItem(string $id,string $type): array{$t=$this->model->trashedRaw()[$id]??null;if(!$t||($t['type_']??'')!==$type)throw new \RuntimeException('Objekt nicht im Papierkorb gefunden');return $t;}
+ /** @return array<string,true> $id plus all notebooks of $books below it */
+ private function withDescendants(string $id,array $books): array{ $ids=[$id=>true]; do{ $grew=false; foreach($books as $bookId=>$nb){ if(!isset($ids[$bookId])&&isset($ids[(string)($nb['parent_id']??'')])){$ids[$bookId]=true;$grew=true;} } }while($grew); return $ids; }
+ private function mark(string $id,array $item,string $deletedTime,?string $parentId=null): void{
+  $this->backup($id); $now=$this->model->now(); $item['deleted_time']=$deletedTime; $item['updated_time']=$now; $item['user_updated_time']=$now;
+  $fields=['updated_time','user_updated_time','deleted_time']; if($parentId!==null){$item['parent_id']=$parentId;$fields[]='parent_id';}
+  $this->writeExisting($id,$item,$fields);
+ }
  public function createNote(string $title,string $body,string $parentId): array{$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>$this->compose($title,$body),'id'=>$id,'parent_id'=>$parentId,'created_time'=>$now,'updated_time'=>$now,'is_conflict'=>'0','latitude'=>'0.00000000','longitude'=>'0.00000000','altitude'=>'0.0000','author'=>'','source_url'=>'','is_todo'=>'0','todo_due'=>'0','todo_completed'=>'0','source'=>'joplix','source_application'=>'joplix','application_data'=>'','order'=>(string)time(),'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','markup_language'=>'1','is_shared'=>'0','share_id'=>'','conflict_original_id'=>'','master_key_id'=>'','user_data'=>'','type_'=>'1'];$this->writeNew($id,$item);return ['id'=>$id];}
  public function updateNote(string $id,string $title,string $body,string $known=''): array{$item=$this->must($id,'1');$this->conflict($item,$known,'Notiz');$this->backup($id);$item['_body']=$this->compose($title,$body);$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time']);return ['id'=>$id,'updated_time'=>$item['updated_time']];}
  public function moveNote(string $id,string $targetNotebookId): array{$item=$this->must($id,'1');$this->backup($id);$item['parent_id']=$targetNotebookId;$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time','parent_id']);return ['id'=>$id];}
@@ -104,9 +155,11 @@ class JoplixWriteService {
  private function deleteNotebookRecursive(string $id): array{
   $deleted=['notebooks'=>0,'notes'=>0];
   $children=[];
-  foreach($this->model->notebooksRaw() as $childId=>$nb){ if(($nb['parent_id']??'')===$id)$children[]=$childId; }
+  // Live and trashed children alike, so purging a notebook never leaves items behind in the trash.
+  $trashed=$this->model->trashedRaw();
+  foreach($this->model->notebooksRaw()+array_filter($trashed,fn($t)=>($t['type_']??'')==='2') as $childId=>$nb){ if(($nb['parent_id']??'')===$id)$children[]=(string)$childId; }
   foreach($children as $childId){ $sub=$this->deleteNotebookRecursive($childId); $deleted['notebooks']+=$sub['notebooks']; $deleted['notes']+=$sub['notes']; }
-  foreach($this->model->notesRaw() as $noteId=>$note){ if(($note['parent_id']??'')===$id){ $this->deleteNoteRelations((string)$noteId); $this->deleteSyncItem((string)$noteId); $deleted['notes']++; } }
+  foreach($this->model->notesRaw()+array_filter($trashed,fn($t)=>($t['type_']??'')==='1') as $noteId=>$note){ if(($note['parent_id']??'')===$id){ $this->deleteNoteRelations((string)$noteId); $this->deleteSyncItem((string)$noteId); $deleted['notes']++; } }
   $this->must($id,'2'); $this->deleteSyncItem($id); $deleted['notebooks']++;
   return $deleted;
  }
@@ -122,9 +175,8 @@ class JoplixWriteService {
   $file=$this->model->fileFor($id);
   if(!$file)throw new \RuntimeException('Datei nicht gefunden: '.$id);
   $this->backup($id);
-  // Joplin represents a remote deletion by removing the sync-target item. A
-  // deleted_time field belongs to the local database model and is not a valid
-  // tombstone in a WebDAV/filesystem sync item.
+  // Permanent deletion: the sync-target item is removed. Joplin's own "move to
+  // trash" instead keeps the item with deleted_time set; the model hides those.
   $file->delete();
  }
 

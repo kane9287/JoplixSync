@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.72",
+  "version": "2026.11.73",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-14",
   "channel": "beta",
-  "base_version": "2026.11.71",
+  "base_version": "2026.11.72",
   "build_date": "2026-11-14",
   "release_date": "2026-11-14",
-  "summary": "The in-app updater can install releases again.",
+  "summary": "Joplin-compatible trash.",
   "updated": "2026-11-14",
-  "notes": "Updating from inside Nextcloud failed with \"ZIP enthaelt keine gueltige Joplix-App\". Versions up to 2026.11.71 contain the faulty updater and must be updated once with install/install.sh."
+  "notes": "Items in Joplin's trash (deleted_time set) are no longer listed as notes. Joplix has its own trash view (restore, delete permanently, empty trash), and deleting in Joplix now moves items to the trash instead of removing the files. The index is rebuilt once after the update."
 }

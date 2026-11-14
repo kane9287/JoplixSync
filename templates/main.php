@@ -43,6 +43,7 @@ if (is_readable($infoXml)) {
       <button id="jp-back-to-nav" class="jp-icon-btn jp-back" type="button" title="Notizbücher" aria-label="Notizbücher"><span class="jp-icon" data-icon="arrowLeft"></span></button>
       <div class="jp-search-wrap"><span class="jp-icon" data-icon="magnify"></span><input id="jp-search" type="search" placeholder="Notizen durchsuchen …" aria-label="Notizen durchsuchen …"></div>
       <button id="jp-sort-button" class="jp-icon-btn" type="button" title="Sortierung umkehren" aria-label="Sortierung umkehren"><span class="jp-icon" data-icon="sort"></span></button>
+      <button id="jp-empty-trash" class="jp-icon-btn jp-trash-only" type="button" title="Papierkorb leeren" aria-label="Papierkorb leeren"><span class="jp-icon" data-icon="delete"></span></button>
       <button id="jp-new-note-main" class="jp-icon-btn primary" type="button" title="Neue Notiz" aria-label="Neue Notiz"><span class="jp-icon" data-icon="plus"></span></button>
     </div>
     <div id="jp-breadcrumb" class="jp-breadcrumb">Bitte Notizbuch auswählen</div>
@@ -83,6 +84,7 @@ if (is_readable($infoXml)) {
 
       <div class="jp-note-area">
         <div class="jp-note-inner">
+          <div id="jp-trash-bar" class="jp-trash-bar"><span class="jp-icon" data-icon="delete"></span><span class="jp-trash-bar-text">Diese Notiz liegt im Papierkorb.</span><button id="jp-trash-restore" type="button"><span class="jp-icon" data-icon="restore"></span><span>Wiederherstellen</span></button><button id="jp-trash-purge" class="danger" type="button">Endgültig löschen</button></div>
           <input id="jp-title" class="jp-title" placeholder="Titel" aria-label="Titel">
           <div id="jp-meta" class="jp-meta"></div>
           <div id="jp-tags" class="jp-tags"></div>

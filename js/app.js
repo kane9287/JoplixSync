@@ -43,6 +43,7 @@ tag:'M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 
 file:'M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z',
 image:'M8.5,13.5L11,16.5L14.5,12L19,18H5M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19Z',
 note:'M5,3C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H19C20.11,21 21,20.11 21,19V5C21,3.89 20.11,3 19,3H5M5,5H19V19H5V5M7,7V9H17V7H7M7,11V13H17V11H7M7,15V17H14V15H7Z',
+restore:'M13,3A9,9 0 0,0 4,12H1L4.89,15.89L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3Z',
 folderMove:'M14,18V15H10V11H14V8L19,13M20,6H12L10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6Z',
 folderPlus:'M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4C2.89,20 2,19.1 2,18V6C2,4.89 2.89,4 4,4H10M15,9V12H12V14H15V17H17V14H20V12H17V9H15Z'
 };
@@ -54,7 +55,8 @@ function jpRoot(){return document.getElementById('joplix')||document.body;}
 // Small screens show one column at a time (css/style.css section 11): 'nav' | 'list' | 'note'.
 function setPane(p){const app=$('joplix-app');if(app)app.dataset.pane=p;}
 // Without an open note the editor column shows the empty state instead of title/body/attachments.
-function setHasNote(on){const app=$('joplix-app');if(app)app.classList.toggle('jp-no-note',!on);}
+function setHasNote(on){const app=$('joplix-app');if(app){app.classList.toggle('jp-no-note',!on);app.classList.remove('jp-trash-note');}if($('jp-title'))$('jp-title').readOnly=false;}
+function setTrashNote(on){const app=$('joplix-app');if(app)app.classList.toggle('jp-trash-note',!!on);if($('jp-title'))$('jp-title').readOnly=!!on;}
 function jpSettingsOpen(){const o=document.getElementById('jp-settings-overlay');return !!(o&&o.classList.contains('open'));}
 function jpDialogOpen(){return !!document.querySelector('.jp-dialog-overlay');}
 // One modal for every question. opts: title, message, input (string => text field), select ([{value,label}])
@@ -299,7 +301,7 @@ function setupResizableColumns(){
 }
 function isEmptyIndex(idx){return !idx||(!(idx.tree||[]).length&&!(idx.notebooks||[]).length&&!(idx.notes||[]).length);}
 function hasFullTextIndex(idx){return !!(idx&&idx.search_version>=1&&(idx.notes||[]).every(n=>Object.prototype.hasOwnProperty.call(n,'search_text')));}
-function hasCurrentCountIndex(idx){return !!(idx&&idx.count_version>=2);}
+function hasCurrentCountIndex(idx){return !!(idx&&idx.count_version>=4);}
 function visibleNoteCountForNotebook(id){return ((state.index&&state.index.notes)||[]).filter(n=>n.notebook_id===id).length;}
 function notebookTitleWithCount(n){const c=visibleNoteCountForNotebook(n.id);return (n.title||'')+(c>0?' ('+c+')':'');}
 function normalizeSearchText(v){return String(v||'').toLocaleLowerCase();}
@@ -468,7 +470,7 @@ function cachedNote(id){
 function rememberNote(n){
   if(!n||!n.id)return;
   noteMemorySet(n);
-  const item={id:n.id,title:n.title||'',body:String(n.body||''),updated_time:n.updated_time||'',notebook_title:n.notebook_title||'',tags:n.tags||[],resources:n.resources||[],cached_at:Date.now()};
+  const item={id:n.id,title:n.title||'',body:String(n.body||''),updated_time:n.updated_time||'',notebook_title:n.notebook_title||'',is_deleted:!!n.is_deleted,tags:n.tags||[],resources:n.resources||[],cached_at:Date.now()};
   // Older cache entries may contain a body stripped by Beta 63.
   item.bodyFormat=2;
   if(item.body.length>700000){
@@ -481,6 +483,7 @@ function rememberNote(n){
   while(ids.length>30){const old=ids.pop();storage.del(noteCacheKey(old));}
   storage.set('recentNoteCacheIds',ids);
 }
+function forgetNote(id){if(!id)return;if(state.noteMemCache)delete state.noteMemCache[id];storage.del(noteCacheKey(id));}
 function noteMemoryGet(id){return id&&state.noteMemCache?state.noteMemCache[id]:null;}
 function noteMemorySet(n){if(!n||!n.id)return n;state.noteMemCache[n.id]=n;const keys=Object.keys(state.noteMemCache);while(keys.length>50){delete state.noteMemCache[keys.shift()];}return n;}
 function apiNote(id){
@@ -517,11 +520,11 @@ function showNoteLoading(id,title=''){
   updateSaveButton();
 }
 function renderNoteToEditor(n,fromCache=false){
-  state.note=n;state.noteId=n.id;state.noteLoading=false;setHasNote(true);
+  state.note=n;state.noteId=n.id;state.noteLoading=false;setHasNote(true);setTrashNote(n.is_deleted);
   ensureNoteSelected(n.id);
   if($('jp-title'))$('jp-title').value=n.title||'';
   if($('jp-body')){$('jp-body').classList.remove('jp-note-loading');$('jp-body').placeholder=t('Notizinhalt');$('jp-body').value=n.body||'';renderDisplayMode();setNoteMode('view');}
-  if($('jp-meta'))$('jp-meta').textContent=(fromCache?t('Aus lokalem Schnellcache, wird aktualisiert... '):'')+t('Aktualisiert: ')+formatJoplixDateTime(n.updated_time)+t(' | Notizbuch: ')+(n.notebook_title||'');
+  if($('jp-meta'))$('jp-meta').textContent=(fromCache?t('Aus lokalem Schnellcache, wird aktualisiert... '):'')+t('Aktualisiert: ')+formatJoplixDateTime(n.updated_time)+t(' | Notizbuch: ')+(n.notebook_title||'')+(n.is_deleted?' | '+t('Im Papierkorb'):'');
   renderTags(n.tags||[]);
   renderResources(n.resources||[]);
   updateNotePath();
@@ -541,6 +544,7 @@ function restoreLocationWithoutClearing(idx){
 }
 function renderNotesForCurrentNotebook(keepNote=true){
   if(!state.index||!state.notebookId)return;
+  if(state.notebookId===JP_TRASH_ID){renderTrash();if(!keepNote)clearNote();return;}
   const notes=(state.index.notes||[]).filter(n=>n.notebook_id===state.notebookId).sort(sorter());
   renderNotes(notes);
   ensureNoteSelected(state.noteId);
@@ -555,7 +559,7 @@ function applyIndexPreservingFocus(idx,reason=''){
   state.index=idx;
   rememberIndex(idx);
   renderTree(idx.tree||[]);
-  if(previousNotebook&&((idx.notebooks||[]).find(n=>n.id===previousNotebook))){
+  if(previousNotebook&&(previousNotebook===JP_TRASH_ID?trashCount(idx)>0:(idx.notebooks||[]).find(n=>n.id===previousNotebook))){
     state.notebookId=previousNotebook;
     document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===previousNotebook));
     document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===previousNotebook));
@@ -620,8 +624,8 @@ function restoreLocation(idx){
 }
 function fillSettings(){/* Einstellungen in 1.0.6 voruebergehend deaktiviert */}
 function renderIndex(idx){rememberIndex(idx);renderTree(idx.tree||[]);renderNotes([]);}
-function renderTree(nodes){const root=$('jp-tree');root.innerHTML='';const walk=(n,l)=>{const row=document.createElement('div');row.className='jp-tree-row';row.dataset.id=n.id;row.style.paddingLeft=(4+l*18)+'px';const b=document.createElement('button');b.type='button';b.className='jp-tree-item';b.dataset.id=n.id;b.onclick=()=>selectNotebook(n.id);const icon=document.createElement('span');icon.className='jp-folder-icon';icon.setAttribute('aria-hidden','true');const label=document.createElement('span');label.className='jp-tree-label';label.textContent=notebookTitleWithCount(n);b.appendChild(icon);b.appendChild(label);const menu=document.createElement('button');menu.type='button';menu.className='jp-tree-menu';menu.appendChild(jpIconEl('dots'));menu.title=t('Aktionen');menu.setAttribute('aria-label',t('Aktionen'));menu.onclick=(ev)=>{ev.stopPropagation();showNotebookMenu(n,row,menu);};row.appendChild(b);row.appendChild(menu);root.appendChild(row);(n.children||[]).forEach(c=>walk(c,l+1));};nodes.forEach(n=>walk(n,0));}
-function selectNotebook(id,opts={}){state.notebookId=id;setPane('list');document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));const notes=(state.index.notes||[]).filter(n=>n.notebook_id===id).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent=breadcrumb(id);if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);if(!opts.skipSave)saveLastLocation();}
+function renderTree(nodes){const root=$('jp-tree');root.innerHTML='';const walk=(n,l)=>{const row=document.createElement('div');row.className='jp-tree-row';row.dataset.id=n.id;row.style.paddingLeft=(4+l*18)+'px';const b=document.createElement('button');b.type='button';b.className='jp-tree-item';b.dataset.id=n.id;b.onclick=()=>selectNotebook(n.id);const icon=document.createElement('span');icon.className='jp-folder-icon';icon.setAttribute('aria-hidden','true');const label=document.createElement('span');label.className='jp-tree-label';label.textContent=notebookTitleWithCount(n);b.appendChild(icon);b.appendChild(label);const menu=document.createElement('button');menu.type='button';menu.className='jp-tree-menu';menu.appendChild(jpIconEl('dots'));menu.title=t('Aktionen');menu.setAttribute('aria-label',t('Aktionen'));menu.onclick=(ev)=>{ev.stopPropagation();showNotebookMenu(n,row,menu);};row.appendChild(b);row.appendChild(menu);root.appendChild(row);(n.children||[]).forEach(c=>walk(c,l+1));};nodes.forEach(n=>walk(n,0));renderTrashRow(root);}
+function selectNotebook(id,opts={}){if(id===JP_TRASH_ID&&!trashCount(state.index)){id=firstNotebookId(state.index);if(!id){state.notebookId='';return;}}const app=$('joplix-app');if(app)app.classList.toggle('jp-in-trash',id===JP_TRASH_ID);if(id===JP_TRASH_ID){state.notebookId=id;setPane('list');document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));renderTrash();if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);return;}state.notebookId=id;setPane('list');document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));const notes=(state.index.notes||[]).filter(n=>n.notebook_id===id).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent=breadcrumb(id);if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);if(!opts.skipSave)saveLastLocation();}
 function breadcrumb(id){const names=[];let guard=0;while(id&&guard<20){const nb=(state.index.notebooks||[]).find(n=>n.id===id);if(!nb)break;names.unshift(nb.title);id=nb.parent_id;guard++;}return names.join(' › ')||t('Notizbuch');}
 function sorter(){return (a,b)=>state.sort==='title_asc'?a.title.localeCompare(b.title):(state.sort==='updated_asc'?String(a.updated_time).localeCompare(String(b.updated_time)):String(b.updated_time).localeCompare(String(a.updated_time)));}
 function renderNotes(notes){
@@ -950,24 +954,24 @@ function confirmNotebookDeletion(node){
   const isSub=!!(node.parent_id||'');
   const title=String(node.title||'').trim()|| (en?'Untitled':'Ohne Titel');
   const heading=en
-    ?('Delete '+(isSub?'sub-notebook':'notebook')+' “'+title+'”?')
-    :((isSub?'Unter-Notizbuch':'Notizbuch')+' „'+title+'“ löschen?');
+    ?('Move '+(isSub?'sub-notebook':'notebook')+' “'+title+'” to the trash?')
+    :((isSub?'Unter-Notizbuch':'Notizbuch')+' „'+title+'“ in den Papierkorb verschieben?');
   const body=en
-    ?(isSub?'All notes and nested sub-notebooks in it will also be permanently deleted.':'All notes and sub-notebooks in this notebook will also be permanently deleted.')
-    :(isSub?'Alle Notizen und weiteren Unter-Notizbücher darin werden ebenfalls endgültig gelöscht.':'Alle Notizen und Unter-Notizbücher in diesem Notizbuch werden ebenfalls endgültig gelöscht.');
-  return jpConfirm(body,{title:heading,danger:true,confirmLabel:en?'Delete':'Löschen',cancelLabel:en?'Cancel':'Abbrechen'});
+    ?'All notes and sub-notebooks in it are moved to the trash as well. They can be restored from there.'
+    :'Alle Notizen und Unter-Notizbücher darin werden ebenfalls in den Papierkorb verschoben. Von dort lassen sie sich wiederherstellen.';
+  return jpConfirm(body,{title:heading,confirmLabel:en?'Move to trash':'In den Papierkorb',cancelLabel:en?'Cancel':'Abbrechen'});
 }
 async function deleteNotebookNode(node){
   const en=resolvedLanguage()==='en';
   const isSub=!!(node.parent_id||'');
   const kind=en?(isSub?'sub-notebook':'notebook'):(isSub?'Unter-Notizbuch':'Notizbuch');
   if(!(await confirmNotebookDeletion(node)))return;
-  status(en?'Deleting…':'Wird gelöscht…','warning');
+  status(en?'Moving to trash…':'Wird in den Papierkorb verschoben…','warning');
   try{
     await api('/api/notebooks/'+node.id,{method:'DELETE'});
     if(state.notebookId===node.id){state.notebookId='';clearNote();}
     await rebuildAndRestore(true);
-    status(en?'Deleted permanently':'Endgültig gelöscht','ok');
+    status(en?'Moved to trash':'In den Papierkorb verschoben','ok');
   }catch(e){
     const msg=(en?'Could not delete '+kind+': ':'Löschen fehlgeschlagen: ')+e.message;
     status(msg,'error');
@@ -979,6 +983,7 @@ async function saveNote(options={}){
     state.saveAgain=true;
     return state.savePromise;
   }
+  if(state.note&&state.note.is_deleted)return false;
   state.savePromise=(async()=>{
     if(!state.notebookId&&!state.note){jpAlert(t('Bitte Notizbuch auswaehlen.'));return false;}
     do{
@@ -1049,8 +1054,8 @@ async function saveNote(options={}){
   try{return await state.savePromise;}
   finally{state.savePromise=null;state.saving=false;state.saveAgain=false;setSavingUi(false);updateSaveButton();}
 }
-async function newNote(){if(!(await handleDirtyBeforeNoteChange('__new__')))return;state.note=null;state.noteId='';setHasNote(true);setPane('note');setNoteMode('edit');$('jp-title').value=t('Neue Notiz');$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Notizinhalt');$('jp-meta').textContent=t('Neue Notiz in diesem Notizbuch');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();state.originalNote={title:'',body:''};resetEditorHistory('');state.dirty=true;updateSaveButton();}
-async function deleteNote(){if(!state.note||!(await jpConfirm(state.note.title||'',{title:t('Notiz wirklich löschen?'),danger:true,confirmLabel:t('Löschen')})))return;await api('/api/notes/'+state.note.id,{method:'DELETE'});await rebuildAndRestore(true);clearNote();}
+async function newNote(){if(state.notebookId===JP_TRASH_ID)return;if(!(await handleDirtyBeforeNoteChange('__new__')))return;state.note=null;state.noteId='';setHasNote(true);setPane('note');setNoteMode('edit');$('jp-title').value=t('Neue Notiz');$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Notizinhalt');$('jp-meta').textContent=t('Neue Notiz in diesem Notizbuch');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();state.originalNote={title:'',body:''};resetEditorHistory('');state.dirty=true;updateSaveButton();}
+async function deleteNote(){if(!state.note)return;if(state.note.is_deleted)return purgeTrashedNote(state.note.id,state.note.title);const id=state.note.id;if(!(await jpConfirm(state.note.title||'',{title:t('Notiz in den Papierkorb verschieben?'),confirmLabel:t('In den Papierkorb')})))return;await api('/api/notes/'+id,{method:'DELETE'});forgetNote(id);await rebuildAndRestore(true);clearNote();status(t('In den Papierkorb verschoben'),'ok');}
 async function newNotebook(parent){const en=resolvedLanguage()==='en';const title=await jpPrompt(parent?(en?'New sub-notebook':'Neues Unter-Notizbuch'):(en?'New notebook':'Neues Notizbuch'),'',{confirmLabel:en?'Create':'Anlegen'});if(!title)return;await api('/api/notebooks',{method:'POST',body:{title,parent_id:parent||''}});await rebuildAndRestore();}
 async function renameNotebook(){if(!state.notebookId){jpAlert(t('Bitte Notizbuch auswählen.'));return;}const nb=(state.index.notebooks||[]).find(n=>n.id===state.notebookId);const title=await jpPrompt(t('Neuer Name'),nb?nb.title:'');if(!title)return;await api('/api/notebooks/'+state.notebookId,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
 function mimeFromFilename(name){const ext=String(name||'').toLowerCase().split('.').pop();const map={pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',doc:'application/msword',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',ppt:'application/vnd.ms-powerpoint',odt:'application/vnd.oasis.opendocument.text',ods:'application/vnd.oasis.opendocument.spreadsheet',odp:'application/vnd.oasis.opendocument.presentation'};return map[ext]||'application/octet-stream';}
@@ -1164,7 +1169,92 @@ async function addTag(){
 function closeNoteContextMenu(){const m=$('jp-note-context-menu');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');m.innerHTML='';}}
 function showNoteContextMenu(ev,note){ev.preventDefault();ev.stopPropagation();closeNoteContextMenu();const m=$('jp-note-context-menu');if(!m)return;m.dataset.noteId=note.id;m.innerHTML=jpMenuItem('move','folderMove',t('Verschieben in Notizbuch'))+jpMenuItem('tags','tag','Tags')+jpMenuItem('delete','delete',t('Löschen'),'danger');m.style.left=Math.min(ev.clientX,window.innerWidth-240)+'px';m.style.top=Math.min(ev.clientY,window.innerHeight-150)+'px';m.classList.add('open');m.setAttribute('aria-hidden','false');m.querySelector('[data-act="delete"]').onclick=()=>{closeNoteContextMenu();deleteNoteById(note.id,note.title);};m.querySelector('[data-act="move"]').onclick=()=>{closeNoteContextMenu();moveNoteByPrompt(note.id);};m.querySelector('[data-act="tags"]').onclick=()=>{closeNoteContextMenu();editTagsByPrompt(note.id);};setTimeout(()=>document.addEventListener('click',closeNoteContextMenu,{once:true}),0);}
 function flatNotebooks(){return (state.index&&state.index.notebooks?state.index.notebooks:[]).slice().sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));}
-async function deleteNoteById(id,title){if(!(await jpConfirm(title||id,{title:t('Notiz wirklich löschen?'),danger:true,confirmLabel:t('Löschen')})))return;await api('/api/notes/'+id,{method:'DELETE'});if(state.noteId===id)clearNote();await rebuildAndRestore(true);}
+async function deleteNoteById(id,title){if(!(await jpConfirm(title||id,{title:t('Notiz in den Papierkorb verschieben?'),confirmLabel:t('In den Papierkorb')})))return;await api('/api/notes/'+id,{method:'DELETE'});forgetNote(id);if(state.noteId===id)clearNote();await rebuildAndRestore(true);status(t('In den Papierkorb verschoben'),'ok');}
+// ---- Trash. Mirrors Joplin's trash: the server keeps trashed notes and notebooks (deleted_time set) and
+// reports them in index.trash. The trash is a pseudo notebook (JP_TRASH_ID) in the sidebar; trashed notes
+// open read-only (app class jp-trash-note), trashed notebooks only offer restore / delete permanently.
+const JP_TRASH_ID='__trash__';
+function trashOf(idx){const tr=(idx&&idx.trash)||{};return {notes:tr.notes||[],notebooks:tr.notebooks||[]};}
+function trashCount(idx){const tr=trashOf(idx);return tr.notes.length+tr.notebooks.length;}
+function renderTrashRow(root){
+  const n=trashCount(state.index);if(!n)return;
+  const row=document.createElement('div');row.className='jp-tree-row jp-trash-row';row.dataset.id=JP_TRASH_ID;row.style.paddingLeft='4px';
+  const b=document.createElement('button');b.type='button';b.className='jp-tree-item';b.dataset.id=JP_TRASH_ID;b.onclick=()=>selectNotebook(JP_TRASH_ID);
+  const label=document.createElement('span');label.className='jp-tree-label';label.textContent=t('Papierkorb')+' ('+n+')';
+  b.appendChild(jpIconEl('delete'));b.appendChild(label);row.appendChild(b);root.appendChild(row);
+  if(state.notebookId===JP_TRASH_ID){row.classList.add('active');b.classList.add('active');}
+}
+function renderTrash(){
+  const box=$('jp-notes');if(!box)return;box.innerHTML='';
+  $('jp-breadcrumb').textContent=t('Papierkorb');
+  const tr=trashOf(state.index);
+  if(!tr.notes.length&&!tr.notebooks.length){box.innerHTML='<p>'+t('Der Papierkorb ist leer.')+'</p>';return;}
+  const byDeleted=(a,b)=>String(b.deleted_time||'').localeCompare(String(a.deleted_time||''));
+  const item=(entry,kind)=>{
+    const b=document.createElement('button');b.type='button';b.className='jp-note-item';b.dataset.id=entry.id;
+    const title=document.createElement('strong');title.textContent=entry.title||t('Ohne Titel');
+    const sub=document.createElement('span');sub.className='jp-note-sub';
+    const info=document.createElement('time');
+    const where=kind==='notebook'?(entry.parent_title||''):(entry.notebook_title||'');
+    info.textContent=(kind==='notebook'?t('Notizbuch')+(entry.note_count?' · '+entry.note_count+' '+(entry.note_count===1?t('Notiz'):t('Notizen')):''):formatJoplixDateTime(entry.updated_time))+(where?' · '+where:'');
+    sub.appendChild(info);
+    if(kind==='notebook'){const c=document.createElement('span');c.className='jp-note-count';c.appendChild(jpIconEl('folderMove'));sub.appendChild(c);}
+    b.appendChild(title);b.appendChild(sub);
+    b.onclick=kind==='notebook'?(ev=>showTrashMenu(ev,entry,kind)):(()=>openNote(entry.id));
+    b.addEventListener('contextmenu',ev=>showTrashMenu(ev,entry,kind));
+    box.appendChild(b);
+  };
+  tr.notebooks.slice().sort(byDeleted).forEach(n=>item(n,'notebook'));
+  tr.notes.slice().sort(byDeleted).forEach(n=>item(n,'note'));
+  ensureNoteSelected(state.noteId);
+}
+function showTrashMenu(ev,entry,kind){
+  ev.preventDefault();ev.stopPropagation();closeNoteContextMenu();
+  const m=$('jp-note-context-menu');if(!m)return;
+  m.innerHTML=jpMenuItem('restore','restore',t('Wiederherstellen'))+jpMenuItem('purge','delete',t('Endgültig löschen'),'danger');
+  m.style.left=Math.max(8,Math.min(ev.clientX,window.innerWidth-240))+'px';m.style.top=Math.max(8,Math.min(ev.clientY,window.innerHeight-110))+'px';
+  m.classList.add('open');m.setAttribute('aria-hidden','false');
+  const run=p=>p.catch(e=>{status(e.message,'error');jpAlert(e.message);});
+  m.querySelector('[data-act="restore"]').onclick=()=>{closeNoteContextMenu();run(kind==='notebook'?restoreTrashedNotebook(entry.id):restoreTrashedNote(entry.id));};
+  m.querySelector('[data-act="purge"]').onclick=()=>{closeNoteContextMenu();run(kind==='notebook'?purgeTrashedNotebook(entry.id,entry.title):purgeTrashedNote(entry.id,entry.title));};
+  setTimeout(()=>document.addEventListener('click',closeNoteContextMenu,{once:true}),0);
+}
+async function afterTrashChange(id,message){forgetNote(id);if(id&&state.noteId===id)clearNote();await rebuildAndRestore(true);status(message,'ok');}
+async function restoreTrashedNote(id){
+  const entry=trashOf(state.index).notes.find(n=>n.id===id)||{};
+  const body={};
+  if(!entry.parent_available){
+    // Its notebook is in the trash too, or gone: Joplix needs a notebook to show the note in.
+    const books=flatNotebooks().map(b=>({value:b.id,label:breadcrumb(b.id)})).sort((a,b)=>a.label.localeCompare(b.label));
+    if(!books.length){jpAlert(t('Keine Notizbücher gefunden.'));return;}
+    const target=await jpDialog({title:t('Wiederherstellen in Notizbuch'),message:t('Das ursprüngliche Notizbuch ist nicht mehr vorhanden.'),select:books,value:books[0].value,cancelValue:null,buttons:[{label:t('Abbrechen'),value:null},{label:t('Wiederherstellen'),submit:true,primary:true}]});
+    if(!target)return;
+    body.target_notebook_id=target;
+  }
+  await api('/api/notes/'+id+'/restore',{method:'POST',body});
+  await afterTrashChange(id,t('Wiederhergestellt'));
+}
+async function restoreTrashedNotebook(id){
+  await api('/api/notebooks/'+id+'/restore',{method:'POST',body:{}});
+  (trashOf(state.index).notes||[]).forEach(n=>forgetNote(n.id));
+  await afterTrashChange(state.note&&state.note.is_deleted?state.noteId:'',t('Wiederhergestellt'));
+}
+async function purgeTrashedNote(id,title){
+  if(!(await jpConfirm(title||id,{title:t('Notiz endgültig löschen?'),danger:true,confirmLabel:t('Endgültig löschen')})))return;
+  await api('/api/notes/'+id+'?permanent=1',{method:'DELETE'});
+  await afterTrashChange(id,t('Endgültig gelöscht'));
+}
+async function purgeTrashedNotebook(id,title){
+  if(!(await jpConfirm(t('Alle Notizen und Unter-Notizbücher darin werden ebenfalls endgültig gelöscht.'),{title:t('Notizbuch endgültig löschen?')+' '+(title||''),danger:true,confirmLabel:t('Endgültig löschen')})))return;
+  await api('/api/notebooks/'+id+'?permanent=1',{method:'DELETE'});
+  await afterTrashChange(state.note&&state.note.is_deleted?state.noteId:'',t('Endgültig gelöscht'));
+}
+async function emptyTrash(){
+  const n=trashCount(state.index);if(!n)return;
+  if(!(await jpConfirm(t('Alle Notizen und Notizbücher im Papierkorb werden endgültig gelöscht, auch in den Joplin-Apps.'),{title:t('Papierkorb leeren?'),danger:true,confirmLabel:t('Papierkorb leeren')})))return;
+  await api('/api/trash/empty',{method:'POST',body:{}});
+  await afterTrashChange(state.note&&state.note.is_deleted?state.noteId:'',t('Papierkorb geleert'));
+}
 async function moveNoteByPrompt(id){
   const books=flatNotebooks().map(b=>({value:b.id,label:breadcrumb(b.id)})).sort((a,b)=>a.label.localeCompare(b.label));
   if(!books.length){jpAlert(t('Keine Notizbücher gefunden.'));return;}
@@ -1274,7 +1364,7 @@ function updateNotePath(){
   const el=$('jp-note-path'); if(!el)return;
   const title=$('jp-title')&&$('jp-title').value?$('jp-title').value:(state.note&&state.note.title?state.note.title:t('Neue Notiz'));
   if(!state.note&&!state.noteId&&!state.dirty){el.textContent=t('Keine Notiz geöffnet');return;}
-  el.textContent=currentNotebookTitle()+' / '+title;
+  el.textContent=(state.note&&state.note.is_deleted?t('Papierkorb'):currentNotebookTitle())+' / '+title;
 }
 function resetEditorHistory(value){state.editorHistory={undo:[],last:String(value||''),max:80};}
 function pushEditorUndo(value){const h=state.editorHistory||(state.editorHistory={undo:[],last:String(value||''),max:80});value=String(value||'');if(h.undo[h.undo.length-1]!==value&&h.last!==value){h.undo.push(value);while(h.undo.length>(h.max||80))h.undo.shift();}h.last=value;}
@@ -1467,6 +1557,13 @@ const JP_EN={
 'Neue Notiz':'New note',
 'Neue Notiz in diesem Notizbuch':'New note in this notebook',
 'Notiz wirklich löschen?':'Really delete this note?',
+'Notiz in den Papierkorb verschieben?':'Move this note to the trash?','In den Papierkorb':'Move to trash','In den Papierkorb verschoben':'Moved to trash',
+'Papierkorb':'Trash','Der Papierkorb ist leer.':'The trash is empty.','Notizen':'notes','Wiederherstellen':'Restore','Endgültig löschen':'Delete permanently',
+'Wiederherstellen in Notizbuch':'Restore to notebook','Das ursprüngliche Notizbuch ist nicht mehr vorhanden.':'The original notebook is no longer available.','Wiederhergestellt':'Restored',
+'Notiz endgültig löschen?':'Delete this note permanently?','Endgültig gelöscht':'Deleted permanently','Notizbuch endgültig löschen?':'Delete this notebook permanently?',
+'Alle Notizen und Unter-Notizbücher darin werden ebenfalls endgültig gelöscht.':'All notes and sub-notebooks in it will be permanently deleted as well.',
+'Alle Notizen und Notizbücher im Papierkorb werden endgültig gelöscht, auch in den Joplin-Apps.':'All notes and notebooks in the trash will be permanently deleted, in the Joplin apps as well.',
+'Papierkorb leeren?':'Empty the trash?','Papierkorb leeren':'Empty trash','Papierkorb geleert':'Trash emptied','Im Papierkorb':'In trash','Diese Notiz liegt im Papierkorb.':'This note is in the trash.',
 'Neuer Name':'New name',
 'Bitte zuerst eine Notiz öffnen.':'Please open a note first.',
 'Die ursprüngliche Notiz ist nicht mehr geöffnet.':'The original note is no longer open.',
@@ -1710,7 +1807,7 @@ function scheduleSync(delay=2500){
 // Called by api() after every successful request: local edits are sent to the server shortly afterwards.
 function noteLocalChangeForSync(path,options,data){
   const method=String((options&&options.method)||'GET').toUpperCase();
-  if(method!=='GET'&&/^\/api\/(notes|notebooks|tags|resources)(\/|$)/.test(path))scheduleSync(2500);
+  if(method!=='GET'&&/^\/api\/(notes|notebooks|tags|resources|trash)(\/|$)/.test(path))scheduleSync(2500);
   else if(/\/office\/status$/.test(path)&&data&&data.updated)scheduleSync(2500);
 }
 function setupSync(){
@@ -1753,6 +1850,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   if($('jp-new-note-main'))$('jp-new-note-main').onclick=newNote;
   if($('jp-save-note'))$('jp-save-note').onclick=()=>saveNote({keepMode:true,skipReload:true}).then(ok=>{if(ok)jpToast(t('Notiz gespeichert'));}).catch(e=>jpAlert(e.message)); if($('jp-save-note-top'))$('jp-save-note-top').onclick=()=>saveNote({keepMode:true,skipReload:true,fastDirtySave:true}).catch(e=>jpAlert(e.message)); if($('jp-edit-note'))$('jp-edit-note').onclick=()=>setNoteMode('edit'); if($('jp-cancel-edit'))$('jp-cancel-edit').onclick=()=>setNoteMode('view'); if($('jp-title'))$('jp-title').addEventListener('input',()=>{markDirty();updateNotePath();}); if($('jp-body'))$('jp-body').addEventListener('input',()=>{markDirty();});
   if($('jp-delete-note'))$('jp-delete-note').onclick=()=>deleteNote().catch(e=>jpAlert(e.message));
+  if($('jp-trash-restore'))$('jp-trash-restore').onclick=()=>{if(state.note&&state.note.is_deleted)restoreTrashedNote(state.note.id).catch(e=>jpAlert(e.message));};
+  if($('jp-trash-purge'))$('jp-trash-purge').onclick=()=>{if(state.note&&state.note.is_deleted)purgeTrashedNote(state.note.id,state.note.title).catch(e=>jpAlert(e.message));};
+  if($('jp-empty-trash'))$('jp-empty-trash').onclick=()=>emptyTrash().catch(e=>jpAlert(e.message));
   if($('jp-rebuild-index'))$('jp-rebuild-index').onclick=()=>rebuildAndRestore().catch(e=>jpAlert(e.message));
   if($('jp-resource-file'))$('jp-resource-file').onchange=e=>{if(e.target.files[0])uploadResource(e.target.files[0]).catch(err=>jpAlert(err.message));};
   if($('jp-search'))$('jp-search').addEventListener('input',e=>runFullTextSearch(e.target.value));

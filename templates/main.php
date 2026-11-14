@@ -180,27 +180,27 @@ if (is_readable($infoXml)) {
       <section class="jp-settings-pane" data-settings-section="update">
         <h3>Update</h3>
         <div class="jp-setting-card jp-setting-card-static">
-          <div><strong>Update-Quelle</strong><span>Codeberg Repository für Joplix Updates</span></div>
+          <div><strong>Update-Quelle</strong><span>GitHub-Repository für Joplix-Updates</span></div>
           <div class="jp-segmented jp-update-source">
-            <button id="jp-update-source-codeberg" class="active" type="button">Codeberg</button>
+            <button id="jp-update-source-codeberg" class="active" type="button">GitHub</button>
           </div>
         </div>
         <div class="jp-setting-card jp-setting-card-static jp-update-current-version">
           <div><strong>Aktuell installierte Version</strong><span id="jp-update-installed-version">Joplix <?php p($joplixVersion); ?></span></div>
         </div>
         <div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-update-repo-url"><strong>Codeberg Adresse</strong><span>Standard: https://codeberg.org/Stoneubi/joplix/releases</span></label>
-          <input id="jp-update-repo-url" value="https://codeberg.org/Stoneubi/joplix/releases" autocomplete="off">
+          <label for="jp-update-repo-url"><strong>GitHub-Adresse</strong><span>Standard: https://github.com/kane9287/joplix-xsync/releases</span></label>
+          <input id="jp-update-repo-url" value="https://github.com/kane9287/joplix-xsync/releases" autocomplete="off">
         </div>
         <div class="jp-setting-card">
-          <label for="jp-update-channel"><strong>Release Channel</strong><span>Main entspricht dem Codeberg-Hauptchannel, Beta zeigt Vorabversionen.</span></label>
+          <label for="jp-update-channel"><strong>Release Channel</strong><span>Main zeigt reguläre GitHub-Releases, Beta zeigt Vorabversionen (Pre-releases).</span></label>
           <select id="jp-update-channel">
             <option value="main">Main</option>
             <option value="beta">Beta</option>
           </select>
         </div>
         <div class="jp-setting-card jp-setting-card-action">
-          <div><strong>Verfügbare Versionen</strong><span>Release-Liste von Codeberg abrufen und ausgewählte Version installieren.</span></div>
+          <div><strong>Verfügbare Versionen</strong><span>Release-Liste von GitHub abrufen und ausgewählte Version installieren.</span></div>
           <button id="jp-update-check" type="button">Updates suchen</button>
         </div>
         <div id="jp-update-status" class="jp-update-status">Noch nicht geprüft.</div>

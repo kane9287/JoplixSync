@@ -8,6 +8,12 @@ use OCP\IConfig;
 
 class JoplixDevUpdateService {
     private const MAX_ZIP_BYTES = 35 * 1024 * 1024;
+    // Update source: GitHub releases of this repository. The admin can point the updater at another
+    // GitHub repository (a fork) in the settings; other hosts are rejected by normalizeRepo().
+    public const DEFAULT_REPO_URL = 'https://github.com/kane9287/joplix-xsync/releases';
+    // Present in a source checkout but not part of the installed app. Removed from every package before
+    // activation so a GitHub source archive installs the same files as a packaged JoplixNC_v<version>.zip.
+    private const NON_APP_ENTRIES = ['tools', 'docs', 'install', 'assets', '.github', '.gitignore', '.gitattributes'];
 
     private Folder $userFolder;
     private string $devPath;
@@ -117,6 +123,9 @@ class JoplixDevUpdateService {
             $this->extractArchive($archive, $extracted);
             $source = $this->detectPackageSource($extracted);
             $version = $this->validateApp($source);
+            foreach (self::NON_APP_ENTRIES as $entry) {
+                $this->recursiveDelete($source . '/' . $entry);
+            }
             if ($releaseVersion !== null) {
                 $installed = $this->parseVersion($this->installedVersion());
                 $candidate = $this->parseVersion($version);
@@ -293,14 +302,12 @@ class JoplixDevUpdateService {
     public function remoteReleases(string $repoUrl, string $channel, string $installedVersion, ?int $releaseId = null): array {
         $repo = self::normalizeRepo($repoUrl);
         $channel = strtolower($channel) === 'beta' ? 'beta' : 'main';
-        $api = 'https://codeberg.org/api/v1/repos/' . rawurlencode($repo['owner']) . '/' . rawurlencode($repo['repo']) . '/releases';
-        if ($releaseId !== null) {
-            $api .= '/' . $releaseId;
-        }
+        $api = 'https://api.github.com/repos/' . rawurlencode($repo['owner']) . '/' . rawurlencode($repo['repo']) . '/releases';
+        $api .= $releaseId !== null ? '/' . $releaseId : '?per_page=50';
         $json = $this->httpGet($api, 5 * 1024 * 1024);
         $data = json_decode($json, true);
         if (!is_array($data)) {
-            throw new \RuntimeException('Codeberg Antwort konnte nicht gelesen werden');
+            throw new \RuntimeException('GitHub-Antwort konnte nicht gelesen werden');
         }
         if ($releaseId !== null) {
             $data = [$data];
@@ -310,7 +317,9 @@ class JoplixDevUpdateService {
             if (!is_array($rel) || !empty($rel['draft']) || (int)($rel['id'] ?? 0) < 1) continue;
             $tag = (string)($rel['tag_name'] ?? $rel['tag'] ?? '');
             $name = (string)($rel['name'] ?? $tag);
-            $isBeta = !empty($rel['prerelease']) || preg_match('/(beta|alpha|rc|pre|dev)/i', $tag . ' ' . $name);
+            // GitHub's pre-release flag selects the beta channel. The name check only matches whole words so
+            // that a name such as "Search fix" (contains "rc") is not mistaken for a pre-release.
+            $isBeta = !empty($rel['prerelease']) || preg_match('/(?<![a-z])(beta|alpha|rc|pre|dev)(?![a-z])/i', $tag . ' ' . $name);
             if ($channel === 'main' && $isBeta) continue;
             if ($channel === 'beta' && !$isBeta) continue;
             $relVersion = $this->releaseVersion($tag, $name);
@@ -327,6 +336,15 @@ class JoplixDevUpdateService {
                     continue;
                 }
                 $assets[] = ['id'=>$assetId, 'name'=>$filename, 'url'=>$url, 'size'=>(int)($a['size'] ?? 0)];
+            }
+            if (!$assets) {
+                // No packaged JoplixNC_v<version>.zip attached: use GitHub's automatic source archive of
+                // the tag. It gets a synthetic asset (release id, canonical package name) so the browser
+                // and installRemoteAsset() handle it like a packaged asset. Size 0 skips the size check.
+                $zipball = (string)($rel['zipball_url'] ?? '');
+                if (preg_match('/^\d+\.\d+\.\d+$/D', $relVersion) && $this->isSourceArchive($zipball, $repo, $tag)) {
+                    $assets[] = ['id'=>(int)$rel['id'], 'name'=>'JoplixNC_v' . $relVersion . ($isBeta ? '-beta' : '') . '.zip', 'url'=>$zipball, 'size'=>0];
+                }
             }
             if (!$assets) continue;
             $out[] = [
@@ -355,7 +373,7 @@ class JoplixDevUpdateService {
             if ($av === null || $bv === null) return 0;
             return -1 * $this->compareVersions($av, $bv);
         });
-        return ['source'=>'codeberg','repo_url'=>$repo['url'],'api_url'=>$api,'channel'=>$channel,'installed_version'=>$installedVersion,'releases'=>$out];
+        return ['source'=>'github','repo_url'=>$repo['url'],'api_url'=>$api,'channel'=>$channel,'installed_version'=>$installedVersion,'releases'=>$out];
     }
 
     public function installRemoteAsset(string $repoUrl, string $channel, int $releaseId, int $assetId): array {
@@ -437,74 +455,141 @@ class JoplixDevUpdateService {
         return 0;
     }
 
+    // For reading a stored setting: never throws, falls back to the default repository.
+    public static function repoUrlOrDefault(string $repoUrl): string {
+        try {
+            return self::normalizeRepo($repoUrl)['url'];
+        } catch (\Throwable $e) {
+            return self::DEFAULT_REPO_URL;
+        }
+    }
+
     public static function normalizeRepo(string $repoUrl): array {
-        $repoUrl = trim($repoUrl) !== '' ? trim($repoUrl) : 'https://codeberg.org/Stoneubi/joplix/releases';
+        $repoUrl = trim($repoUrl) !== '' ? trim($repoUrl) : self::DEFAULT_REPO_URL;
         $repoUrl = html_entity_decode($repoUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if (preg_match('/href=["\']([^"\']+)["\']/i', $repoUrl, $hm)) {
             $repoUrl = $hm[1];
         }
         $repoUrl = preg_replace('/\s+/', '', trim($repoUrl));
         $repoUrl = preg_replace('#^http://#i', 'https://', $repoUrl);
-        if (preg_match('#^codeberg\.(?:org|com)/#i', $repoUrl)) {
+        if (preg_match('#^(?:www\.)?(?:github\.com|codeberg\.(?:org|com))/#i', $repoUrl)) {
             $repoUrl = 'https://' . $repoUrl;
         }
-        $repoUrl = preg_replace('#^https://www\.codeberg\.#i', 'https://codeberg.', $repoUrl);
         $parts = parse_url($repoUrl);
         $host = strtolower((string)($parts['host'] ?? ''));
+        if (preg_match('/^(?:www\.)?codeberg\.(?:org|com)$/D', $host)) {
+            // Installations that still store the former Codeberg update source move to the GitHub repository.
+            $parts = parse_url(self::DEFAULT_REPO_URL);
+            $host = 'github.com';
+        }
         $path = trim((string)($parts['path'] ?? ''), '/');
-        if (!in_array($host, ['codeberg.com','codeberg.org'], true) || $path === '') {
-            throw new \RuntimeException('Nur Codeberg-Repositories werden unterstuetzt. Erwartet wird z.B. https://codeberg.org/Stoneubi/joplix/releases');
+        if (!in_array($host, ['github.com', 'www.github.com'], true) || $path === '') {
+            throw new \RuntimeException('Nur GitHub-Repositories werden unterstuetzt. Erwartet wird z.B. ' . self::DEFAULT_REPO_URL);
         }
         $segments = array_values(array_filter(explode('/', $path), fn($v) => $v !== ''));
         if (count($segments) < 2) {
-            throw new \RuntimeException('Codeberg-Repository unvollstaendig. Erwartet wird Besitzer/Repository, z.B. Stoneubi/joplix');
+            throw new \RuntimeException('GitHub-Repository unvollstaendig. Erwartet wird Besitzer/Repository, z.B. kane9287/joplix-xsync');
         }
         $owner = rawurldecode($segments[0]);
         $repo = rawurldecode(preg_replace('/\.git$/i', '', $segments[1]));
         if (!preg_match('/^[a-z0-9_.-]+$/iD', $owner) || !preg_match('/^[a-z0-9_.-]+$/iD', $repo)
             || in_array($owner, ['.', '..'], true) || in_array($repo, ['.', '..'], true)) {
-            throw new \RuntimeException('Codeberg-Repository enthaelt ungueltige Zeichen');
+            throw new \RuntimeException('GitHub-Repository enthaelt ungueltige Zeichen');
         }
-        return ['owner'=>$owner,'repo'=>$repo,'url'=>'https://codeberg.org/'.$owner.'/'.$repo.'/releases'];
+        return ['owner'=>$owner,'repo'=>$repo,'url'=>'https://github.com/'.$owner.'/'.$repo.'/releases'];
     }
 
+    private function isPlainHttpsUrl(array $parts, string $host): bool {
+        return ($parts['scheme'] ?? '') === 'https' && strtolower($parts['host'] ?? '') === $host
+            && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['port'])
+            && !isset($parts['query']) && !isset($parts['fragment']);
+    }
+
+    private function isSafeTag(string $tag): bool {
+        return !str_contains($tag, '/') && !str_contains($tag, '\\') && !in_array($tag, ['', '.', '..'], true);
+    }
+
+    // https://github.com/<owner>/<repo>/releases/download/<tag>/<name>
     private function isReleaseAsset(string $url, array $repo, string $tag, string $name): bool {
         $parts = parse_url($url);
-        if (($parts['scheme'] ?? '') !== 'https' || strtolower($parts['host'] ?? '') !== 'codeberg.org'
-            || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])
-            || isset($parts['query']) || isset($parts['fragment'])) {
+        if (!is_array($parts) || !$this->isPlainHttpsUrl($parts, 'github.com')) {
             return false;
         }
         $segments = array_map('rawurldecode', explode('/', $parts['path'] ?? ''));
         return count($segments) === 7 && $segments[0] === ''
             && strcasecmp($segments[1], $repo['owner']) === 0 && strcasecmp($segments[2], $repo['repo']) === 0
             && $segments[3] === 'releases' && $segments[4] === 'download'
-            && $segments[5] === $tag && $segments[6] === $name
-            && !str_contains($tag, '/') && !str_contains($tag, '\\') && !in_array($tag, ['', '.', '..'], true);
+            && $segments[5] === $tag && $segments[6] === $name && $this->isSafeTag($tag);
+    }
+
+    // https://api.github.com/repos/<owner>/<repo>/zipball/<tag>
+    private function isSourceArchive(string $url, array $repo, string $tag): bool {
+        $parts = parse_url($url);
+        if (!is_array($parts) || !$this->isPlainHttpsUrl($parts, 'api.github.com')) {
+            return false;
+        }
+        $segments = array_map('rawurldecode', explode('/', $parts['path'] ?? ''));
+        return count($segments) === 6 && $segments[0] === '' && $segments[1] === 'repos'
+            && strcasecmp($segments[2], $repo['owner']) === 0 && strcasecmp($segments[3], $repo['repo']) === 0
+            && $segments[4] === 'zipball' && $segments[5] === $tag && $this->isSafeTag($tag);
+    }
+
+    // GitHub answers downloads with a redirect to its storage hosts, so redirects are followed by hand
+    // and every hop must stay on HTTPS and on a GitHub host.
+    private function isGitHubDownloadUrl(string $url): bool {
+        $parts = parse_url($url);
+        if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'https'
+            || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) {
+            return false;
+        }
+        $host = strtolower((string)($parts['host'] ?? ''));
+        return in_array($host, ['github.com', 'api.github.com', 'codeload.github.com'], true)
+            || str_ends_with($host, '.githubusercontent.com');
     }
 
     private function httpGet(string $url, int $maxBytes): string {
-        $ctx = stream_context_create(['http'=>[
-            'method'=>'GET',
-            'timeout'=>30,
-            'follow_location'=>0,
-            'ignore_errors'=>true,
-            'header'=>"Accept: application/json, application/octet-stream\r\nUser-Agent: Joplix-Updater\r\n",
-        ]]);
-        $data = @file_get_contents($url, false, $ctx, 0, $maxBytes + 1);
-        if ($data === false || $data === '') {
-            throw new \RuntimeException('Download von Codeberg fehlgeschlagen: ' . $url);
-        }
-        if (strlen($data) > $maxBytes) {
-            throw new \RuntimeException('Download ist groesser als erlaubt');
-        }
-        if (isset($http_response_header) && is_array($http_response_header)) {
-            $line = $http_response_header[0] ?? '';
-            if (!preg_match('/^HTTP\/\S+ 200(?:\s|$)/', $line)) {
-                throw new \RuntimeException('Codeberg meldet Fehler: ' . $line);
+        for ($hop = 0; $hop < 5; $hop++) {
+            if (!$this->isGitHubDownloadUrl($url)) {
+                throw new \RuntimeException('Unerlaubte Download-Adresse: ' . $url);
             }
+            $ctx = stream_context_create(['http'=>[
+                'method'=>'GET',
+                'timeout'=>30,
+                'follow_location'=>0,
+                'ignore_errors'=>true,
+                'header'=>"Accept: application/vnd.github+json, application/octet-stream, */*\r\nUser-Agent: Joplix-Updater\r\n",
+            ]]);
+            $data = @file_get_contents($url, false, $ctx, 0, $maxBytes + 1);
+            $headers = function_exists('http_get_last_response_headers')
+                ? (http_get_last_response_headers() ?? [])
+                : ($http_response_header ?? []);
+            $line = (string)($headers[0] ?? '');
+            if (preg_match('/^HTTP\/\S+ 30[1278](?:\s|$)/', $line)) {
+                $location = '';
+                foreach ($headers as $header) {
+                    if (stripos($header, 'Location:') === 0) {
+                        $location = trim(substr($header, 9));
+                    }
+                }
+                if ($location === '') {
+                    throw new \RuntimeException('GitHub-Weiterleitung ohne Ziel: ' . $url);
+                }
+                $url = $location;
+                continue;
+            }
+            if ($line !== '' && !preg_match('/^HTTP\/\S+ 200(?:\s|$)/', $line)) {
+                $hint = preg_match('/ (403|429)(?:\s|$)/', $line) ? ' (moeglicherweise GitHub-Anfragelimit erreicht, spaeter erneut versuchen)' : '';
+                throw new \RuntimeException('GitHub meldet Fehler: ' . $line . $hint);
+            }
+            if ($data === false || $data === '') {
+                throw new \RuntimeException('Download von GitHub fehlgeschlagen: ' . $url);
+            }
+            if (strlen($data) > $maxBytes) {
+                throw new \RuntimeException('Download ist groesser als erlaubt');
+            }
+            return $data;
         }
-        return $data;
+        throw new \RuntimeException('Zu viele Weiterleitungen beim Download von GitHub');
     }
 
     private function devFolder(): Folder {

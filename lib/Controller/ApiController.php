@@ -12,7 +12,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function getSettings(): JSONResponse{$this->workspace()->ensureWorkspace();return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_source'=>$this->setting('update_source','codeberg'),'update_repo_url'=>$this->setting('update_repo_url','https://codeberg.org/Stoneubi/joplix/releases'),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'language'=>$this->setting('language','system'),'is_admin'=>$this->isAdmin()]);}
+ public function getSettings(): JSONResponse{$this->workspace()->ensureWorkspace();return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_source'=>'github','update_repo_url'=>JoplixDevUpdateService::repoUrlOrDefault($this->setting('update_repo_url','')),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'language'=>$this->setting('language','system'),'is_admin'=>$this->isAdmin()]);}
  /**
   * @NoAdminRequired
   */
@@ -143,8 +143,8 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          if (!$this->isAdmin()) {
              return new JSONResponse(['error' => 'Administratorrechte erforderlich.'], 403);
          }
-         if (!in_array($this->setting('update_source', 'codeberg'), ['', 'codeberg'], true)) {
-             throw new \RuntimeException('Aktuell wird nur Codeberg als Update-Quelle unterstuetzt');
+         if (!in_array($this->setting('update_source', 'github'), ['', 'github', 'codeberg'], true)) {
+             throw new \RuntimeException('Aktuell wird nur GitHub als Update-Quelle unterstuetzt');
          }
          $releaseId = filter_var($this->request->getParam('release_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
          $assetId = filter_var($this->request->getParam('asset_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);

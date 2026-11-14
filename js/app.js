@@ -56,25 +56,29 @@ function jpStatusText(t,cls){const el=document.getElementById('jp-index-status')
 function jpNormalizePath(p){p=String(p||'').trim();if(!p)return '/JoplinV2';if(!p.startsWith('/'))p='/'+p;return p.replace(/\\/g,'/').replace(/\/+/g, '/').replace(/\s+$/,'');}
 async function jpApi(p,o={}){o.headers=Object.assign({'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);let d={};try{d=await r.json();}catch(e){}if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
 
-function normalizeCodebergRepoUrlInput(value){
+// Update source: GitHub releases. Must match JoplixDevUpdateService::DEFAULT_REPO_URL (PHP).
+const JP_UPDATE_REPO_URL='https://github.com/kane9287/joplix-xsync/releases';
+function normalizeUpdateRepoUrlInput(value){
   let v=String(value||'').trim();
-  if(!v)return 'https://codeberg.org/Stoneubi/joplix/releases';
+  if(!v)return JP_UPDATE_REPO_URL;
   v=v.replace(/^<a\s+[^>]*href=["']([^"']+)["'][^>]*>.*$/i,'$1');
   v=v.replace(/^<a\s+[^>]*>(.*?)<\/a>$/i,'$1');
   v=v.replace(/&amp;/g,'&');
   v=v.replace(/\s+/g,'');
   v=v.replace(/^http:\/\//i,'https://');
-  if(/^codeberg\.(org|com)\//i.test(v))v='https://'+v;
-  v=v.replace(/^https:\/\/www\.codeberg\./i,'https://codeberg.');
+  // Installations that still store the former Codeberg update source move to the GitHub repository.
+  if(/^(https:\/\/)?(www\.)?codeberg\.(org|com)(\/|$)/i.test(v))return JP_UPDATE_REPO_URL;
+  if(/^(www\.)?github\.com\//i.test(v))v='https://'+v;
+  v=v.replace(/^https:\/\/www\.github\./i,'https://github.');
   v=v.replace(/\.git$/i,'');
   v=v.replace(/[?#].*$/,'');
   v=v.replace(/\/+$/,'');
-  const m=v.match(/^https:\/\/codeberg\.(?:org|com)\/([^\/]+)\/([^\/]+)(?:\/releases)?$/i);
-  if(m)return 'https://codeberg.org/'+m[1]+'/'+m[2].replace(/\.git$/i,'')+'/releases';
+  const m=v.match(/^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(?:\/releases)?$/i);
+  if(m)return 'https://github.com/'+m[1]+'/'+m[2].replace(/\.git$/i,'')+'/releases';
   return v;
 }
 
-function jpLocalSettings(){let local={};try{local=JSON.parse(localStorage.getItem('joplix.settings')||'{}')||{};}catch(e){local={};}return Object.assign({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2',update_source:'codeberg',update_repo_url:'https://codeberg.org/Stoneubi/joplix/releases',update_channel:'main',office_open_mode:'window',update_backup_enabled:'no'},local,window.JoplixServerSettings||{});}
+function jpLocalSettings(){let local={};try{local=JSON.parse(localStorage.getItem('joplix.settings')||'{}')||{};}catch(e){local={};}return Object.assign({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2',update_source:'github',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',update_backup_enabled:'no'},local,window.JoplixServerSettings||{});}
 function jpSetLocalSettings(local){try{localStorage.setItem('joplix.settings',JSON.stringify(local));}catch(e){}}
 async function jpApplySettingsFromUi(forceReindex){
   const pathEl=document.getElementById('jp-setting-joplin-path');
@@ -85,7 +89,7 @@ async function jpApplySettingsFromUi(forceReindex){
   local.sort_order=sortEl?sortEl.value:(local.sort_order||'updated_desc');
   local.remember_last_location=local.remember_last_location||'yes';
   const urlEl=document.getElementById('jp-update-repo-url'); const chEl=document.getElementById('jp-update-channel');
-  local.update_source='codeberg'; local.update_repo_url=urlEl?urlEl.value:(local.update_repo_url||'https://codeberg.org/Stoneubi/joplix/releases'); local.update_channel=chEl?chEl.value:(local.update_channel||'main');
+  local.update_source='github'; local.update_repo_url=urlEl?urlEl.value:(local.update_repo_url||JP_UPDATE_REPO_URL); local.update_channel=chEl?chEl.value:(local.update_channel||'main');
   if(pathEl)pathEl.value=local.joplin_path;
   jpSetLocalSettings(local);
   window.JoplixServerSettings=Object.assign({},local,window.JoplixServerSettings||{});
@@ -1074,7 +1078,7 @@ async function backgroundRefresh(){
 }
 async function saveLastLocation(){const loc={notebook_id:state.notebookId||'',note_id:state.noteId||''};storage.set('lastLocation',loc);api('/api/state/last-location',{method:'POST',body:loc}).catch(()=>{});}
 function setSwitch(el,on){if(!el)return;el.classList.toggle('active',!!on);el.setAttribute('aria-checked',on?'true':'false');}
-function currentLocalSettings(){return Object.assign({remember_last_location:'yes',sort_order:state.sort||'updated_desc',joplin_path:'/JoplinV2',update_source:'codeberg',update_repo_url:'https://codeberg.org/Stoneubi/joplix/releases',update_channel:'main',office_open_mode:'window',update_backup_enabled:'no',language:'system',is_admin:false},storage.get('settings',{}),state.settings||{});}
+function currentLocalSettings(){return Object.assign({remember_last_location:'yes',sort_order:state.sort||'updated_desc',joplin_path:'/JoplinV2',update_source:'github',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',update_backup_enabled:'no',language:'system',is_admin:false},storage.get('settings',{}),state.settings||{});}
 async function persistSettings(extra={}){
   const local=Object.assign(currentLocalSettings(),extra);
   local.sort_order=local.sort_order||state.sort||'updated_desc';
@@ -1138,18 +1142,18 @@ function releaseUrl(rel){return (rel&&(rel.html_url||rel.url||rel.release_url))|
 function isAllowedUpdateTransition(rel,installed){const v=releaseVersion(rel);if(!v||!installed)return false;const cmp=compareJoplixVersions(v,installed);const relCh=releaseChannel(rel);const instCh=installedChannel();if(cmp>0)return true;if(cmp<0)return false;if(instCh==='beta'&&relCh==='main')return true;return false;}
 function newestUpdateFromReleases(data){const installed=parseJoplixVersionText(getInstalledVersion());let best=null;for(const rel of ((data&&data.releases)||[])){if(!isAllowedUpdateTransition(rel,installed))continue;const v=releaseVersion(rel);if(!best||compareJoplixVersions(v,best.version)>0||(compareJoplixVersions(v,best.version)===0&&releaseChannel(rel)==='main'&&releaseChannel(best.release)==='beta'))best={release:rel,version:v};}return best;}
 function joplixIsAdmin(){const app=document.getElementById('joplix-app');return !!(app&&app.dataset&&app.dataset.joplixIsAdmin==='1');}
-function setBrandUpdate(update){const el=$('jp-brand-update');if(!el)return;if(!joplixIsAdmin()){el.textContent='';el.hidden=true;el.removeAttribute('href');return;}if(update&&update.version){el.textContent=update.version.text+t(' Neues Update!');const url=releaseUrl(update.release);if(url)el.href=url;else el.href=normalizeCodebergRepoUrlInput((currentLocalSettings().update_repo_url)||'https://codeberg.org/Stoneubi/joplix/releases');el.hidden=false;el.title=t('Codeberg Release öffnen');}else{el.textContent='';el.hidden=true;el.removeAttribute('href');}}
-async function checkUpdateOnStart(){try{if(!joplixIsAdmin())return;const local=currentLocalSettings();if(!local.is_admin)return;if((local.update_source||'codeberg')!=='codeberg')return;const data=await api('/api/updates/releases');const upd=newestUpdateFromReleases(data);setBrandUpdate(upd);}catch(e){console.warn('Joplix Update Startprüfung fehlgeschlagen:',e.message);}}
-function syncUpdateUi(){const local=currentLocalSettings();syncInstalledVersionUi();if($('jp-update-repo-url'))$('jp-update-repo-url').value=normalizeCodebergRepoUrlInput(local.update_repo_url||'https://codeberg.org/Stoneubi/joplix/releases');if($('jp-update-channel'))$('jp-update-channel').value=local.update_channel||'main';}
+function setBrandUpdate(update){const el=$('jp-brand-update');if(!el)return;if(!joplixIsAdmin()){el.textContent='';el.hidden=true;el.removeAttribute('href');return;}if(update&&update.version){el.textContent=update.version.text+t(' Neues Update!');const url=releaseUrl(update.release);if(url)el.href=url;else el.href=normalizeUpdateRepoUrlInput((currentLocalSettings().update_repo_url)||JP_UPDATE_REPO_URL);el.hidden=false;el.title=t('GitHub-Release öffnen');}else{el.textContent='';el.hidden=true;el.removeAttribute('href');}}
+async function checkUpdateOnStart(){try{if(!joplixIsAdmin())return;const local=currentLocalSettings();if(!local.is_admin)return;const data=await api('/api/updates/releases');const upd=newestUpdateFromReleases(data);setBrandUpdate(upd);}catch(e){console.warn('Joplix Update Startprüfung fehlgeschlagen:',e.message);}}
+function syncUpdateUi(){const local=currentLocalSettings();syncInstalledVersionUi();if($('jp-update-repo-url'))$('jp-update-repo-url').value=normalizeUpdateRepoUrlInput(local.update_repo_url||JP_UPDATE_REPO_URL);if($('jp-update-channel'))$('jp-update-channel').value=local.update_channel||'main';}
 function updateStatus(txt,cls=''){const el=$('jp-update-status');if(el){el.textContent=txt;el.className='jp-update-status '+cls;}}
 function isInstallableJoplixAsset(asset){const n=String((asset&&asset.name)||'').trim().replace(/\s+/g,'');return /^JoplixNC_v\d+\.\d+\.\d+(?:-beta)?\.zip$/i.test(n);}
 function releaseIsNewer(rel,installed){return isAllowedUpdateTransition(rel,installed);}
 function renderUpdateList(data){const box=$('jp-update-list');if(!box)return;box.innerHTML='';syncInstalledVersionUi();const installed=parseJoplixVersionText(getInstalledVersion());let rels=((data&&data.releases)||[]).filter(rel=>releaseIsNewer(rel,installed));rels=rels.filter(rel=>((rel.assets||[]).some(isInstallableJoplixAsset)));if(!rels.length){box.innerHTML='<p>'+t('Keine neuere Version für diesen Channel gefunden. Aktuell installiert: Joplix ')+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').</p>';return;}rels.sort((a,b)=>{const c=compareJoplixVersions(releaseVersion(b),releaseVersion(a));if(c!==0)return c;return releaseChannel(a)==='main'?-1:1;});rels.forEach(rel=>{const card=document.createElement('div');card.className='jp-update-release';const h=document.createElement('div');h.className='jp-update-release-head';h.innerHTML='<strong></strong><span></span>';h.querySelector('strong').textContent=(rel.name||rel.tag||'Release')+' ['+(releaseChannel(rel)==='beta'?'Beta':'Main')+']';h.querySelector('span').textContent=rel.published_at||'';card.appendChild(h);(rel.assets||[]).filter(isInstallableJoplixAsset).forEach(asset=>{const row=document.createElement('div');row.className='jp-update-asset';const name=document.createElement('span');name.textContent=asset.name;const btn=document.createElement('button');btn.type='button';btn.textContent=t('Installieren');btn.onclick=()=>installUpdateAsset(asset,rel);row.appendChild(name);row.appendChild(btn);card.appendChild(row);});box.appendChild(card);});}
 async function persistUpdateSettings(){
-  const repo=normalizeCodebergRepoUrlInput($('jp-update-repo-url')?.value||'https://codeberg.org/Stoneubi/joplix/releases');
+  const repo=normalizeUpdateRepoUrlInput($('jp-update-repo-url')?.value||JP_UPDATE_REPO_URL);
   const channel=$('jp-update-channel')?.value||'main';
-  await api('/api/settings',{method:'POST',body:{update_source:'codeberg',update_repo_url:repo,update_channel:channel}});
-  const updates={update_source:'codeberg',update_repo_url:repo,update_channel:channel};
+  await api('/api/settings',{method:'POST',body:{update_source:'github',update_repo_url:repo,update_channel:channel}});
+  const updates={update_source:'github',update_repo_url:repo,update_channel:channel};
   storage.set('settings',Object.assign(storage.get('settings',{}),updates));
   state.settings=Object.assign({},state.settings||{},updates);
 }
@@ -1157,7 +1161,7 @@ async function checkUpdates(){
   try{
     if(!joplixIsAdmin())throw new Error(t('Administratorrechte erforderlich.'));
     await persistUpdateSettings();
-    updateStatus(t('Update-Liste wird von Codeberg geladen...'),'warning');
+    updateStatus(t('Update-Liste wird von GitHub geladen...'),'warning');
     const data=await api('/api/updates/releases');
     renderUpdateList(data);
     const shown=(data.releases||[]).filter(rel=>releaseIsNewer(rel,parseJoplixVersionText(getInstalledVersion()))&&(rel.assets||[]).some(isInstallableJoplixAsset)).length;
@@ -1190,7 +1194,7 @@ const JP_EN={
 'Automatische App-Backups':'Automatic app backups','Keine Backups (empfohlen)':'No backups (recommended)','Backup vor Update erstellen':'Create backup before update',
 'Letzte Position merken':'Remember last position','Beim Öffnen wieder zum zuletzt verwendeten Notizbuch springen':'Return to the last used notebook when opening Joplix','Layout':'Layout','Vertikale Aufteilung':'Vertical layout','Spalten zurücksetzen':'Reset columns',
 'Index neu aufbauen':'Rebuild index','Wenn Notizbücher oder Notizen fehlen, kann der lokale Index neu aufgebaut werden.':'Rebuild the local index if notebooks or notes are missing.','Starten':'Start',
-'Update-Quelle':'Update source','Codeberg Repository für Joplix Updates':'Codeberg repository for Joplix updates','Aktuell installierte Version':'Currently installed version','Codeberg Adresse':'Codeberg address','Release Channel':'Release channel','Verfügbare Versionen':'Available versions','Updates suchen':'Check for updates','Noch nicht geprüft.':'Not checked yet.',
+'Update-Quelle':'Update source','GitHub-Repository für Joplix-Updates':'GitHub repository for Joplix updates','Aktuell installierte Version':'Currently installed version','GitHub-Adresse':'GitHub address','Release Channel':'Release channel','Verfügbare Versionen':'Available versions','Updates suchen':'Check for updates','Noch nicht geprüft.':'Not checked yet.',
 'Systemsprache':'System language','Systemsprache verwendet Deutsch bei einer deutschen Systemsprache, andernfalls Englisch.':'System language uses German when the system language is German; otherwise English.',
 'Lokale Speicherung':'Local storage','Spaltenbreiten, Sortierung und letzte Position werden nur lokal im Browser gespeichert.':'Column widths, sorting and the last position are stored locally in the browser.',
 '+ Notizbuch':'+ New notebook','Notizbücher':'Notebooks','Notizbuch':'Notebook','Notiz':'Note','Bearbeiten':'Edit','Speichern':'Save','Anzeige':'View','Löschen':'Delete','Ressource':'Attachment','Volltextsuche...':'Full-text search...','Bitte Notizbuch auswählen':'Please select a notebook','Keine Notiz geöffnet':'No note open','Index neu':'Rebuild index','Einstellungen schließen':'Close settings',
@@ -1218,9 +1222,9 @@ const JP_EN={
 'Index wird geladen...':'Loading index...',
 'Bitte links ein Notizbuch auswählen.':'Please select a notebook on the left.',
 'Standardmäßig werden keine App-Backups erstellt. Vollständige Nextcloud-Backups bleiben Aufgabe des Administrators.':'By default no app backups are created. Complete Nextcloud backups remain the administrator’s responsibility.',
-'Standard: https://codeberg.org/Stoneubi/joplix/releases':'Default: https://codeberg.org/Stoneubi/joplix/releases',
-'Main entspricht dem Codeberg-Hauptchannel, Beta zeigt Vorabversionen.':'Main is the main Codeberg channel; Beta shows pre-releases.',
-'Release-Liste von Codeberg abrufen und ausgewählte Version installieren.':'Fetch the release list from Codeberg and install the selected version.',
+'Standard: https://github.com/kane9287/joplix-xsync/releases':'Default: https://github.com/kane9287/joplix-xsync/releases',
+'Main zeigt reguläre GitHub-Releases, Beta zeigt Vorabversionen (Pre-releases).':'Main shows regular GitHub releases; Beta shows pre-releases.',
+'Release-Liste von GitHub abrufen und ausgewählte Version installieren.':'Fetch the release list from GitHub and install the selected version.',
 'Nextcloud-App für deine Joplix-Daten.':'Nextcloud app for your Joplix data.',
 'Willkommen schließen':'Close welcome',
 'Willkommen bei Joplix':'Welcome to Joplix',
@@ -1342,11 +1346,11 @@ const JP_EN={
 'Linktext':'link text',
 'Markierung':'highlight',
 ' Neues Update!':' New update!',
-'Codeberg Release öffnen':'Open Codeberg release',
+'GitHub-Release öffnen':'Open GitHub release',
 'Keine neuere Version für diesen Channel gefunden. Aktuell installiert: Joplix ':'No newer version found for this channel. Currently installed: Joplix ',
 'Installieren':'Install',
 'Administratorrechte erforderlich.':'Administrator rights required.',
-'Update-Liste wird von Codeberg geladen...':'Loading update list from Codeberg...',
+'Update-Liste wird von GitHub geladen...':'Loading update list from GitHub...',
 ' installierbare Release(s) gefunden.':' installable release(s) found.',
 ' Neues Update: ':' New update: ',
 ' Aktuell installiert: Joplix ':' Currently installed: Joplix ',
@@ -1411,7 +1415,7 @@ function setupSettings(){
   const rebuild=$('jp-settings-rebuild'); if(rebuild)rebuild.addEventListener('click',()=>rebuildAndRestore().catch(e=>alert(e.message)));
   const upd=$('jp-update-check'); if(upd)upd.addEventListener('click',()=>checkUpdates());
   const updChannel=$('jp-update-channel'); if(updChannel)updChannel.addEventListener('change',()=>persistUpdateSettings().then(()=>updateStatus(t('Update-Einstellungen gespeichert.'),'ok')).catch(e=>updateStatus(t('Update-Einstellungen konnten nicht gespeichert werden: ')+e.message,'error')));
-  const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeCodebergRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus(t('Update-Einstellungen gespeichert.'),'ok')).catch(e=>updateStatus(t('Update-Einstellungen konnten nicht gespeichert werden: ')+e.message,'error'));});
+  const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeUpdateRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus(t('Update-Einstellungen gespeichert.'),'ok')).catch(e=>updateStatus(t('Update-Einstellungen konnten nicht gespeichert werden: ')+e.message,'error'));});
   syncSettingsUi();
 }
 // ---------------------------------------------------------------------------

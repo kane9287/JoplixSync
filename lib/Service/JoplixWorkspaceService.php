@@ -7,7 +7,7 @@ use OCP\Files\IRootFolder;
 use OCP\IConfig;
 
 class JoplixWorkspaceService {
-    public const APP_VERSION = '2026.09.63';
+    public const APP_VERSION = '2026.11.65';
     public const SCHEMA_VERSION = 1;
 
     private IRootFolder $rootFolder;
@@ -20,18 +20,17 @@ class JoplixWorkspaceService {
         $this->uid = $uid;
     }
 
-    public function ensureAndMigrate(): array {
+    public function ensureWorkspace(): array {
         $userFolder = $this->rootFolder->getUserFolder($this->uid);
         $base = $this->folder($userFolder, '.joplix');
         foreach (['backups','cache','editing','logs','updates','updater'] as $name) {
             $this->folder($base, $name);
         }
-        $migration = $this->migrateLegacy($userFolder, $base);
         $this->removeLegacyCompatibilityState($base);
         $this->cleanup($base);
         $this->writeVersion($base);
         $this->ensureLock($base);
-        return ['ok' => true, 'workspace' => '/.joplix', 'migration' => $migration];
+        return ['ok' => true, 'workspace' => '/.joplix'];
     }
 
     public function base(): Folder {
@@ -41,44 +40,6 @@ class JoplixWorkspaceService {
 
     public function child(string $name): Folder {
         return $this->folder($this->base(), trim($name, '/'));
-    }
-
-    private function migrateLegacy(Folder $userFolder, Folder $base): array {
-        $moved = [];
-        $removed = [];
-        $backupEnabled = $this->config->getUserValue($this->uid, 'joplix', 'update_backup_enabled', 'no') === 'yes';
-        $updates = $this->folder($base, 'updates');
-        $backups = $this->folder($base, 'backups');
-
-        foreach (['JoplixUpdates', 'Joplix Editing'] as $legacyName) {
-            if (!$userFolder->nodeExists($legacyName)) continue;
-            $node = $userFolder->get($legacyName);
-            if (!$node instanceof Folder) continue;
-            $target = $legacyName === 'JoplixUpdates' ? $updates : $this->folder($base, 'editing');
-            foreach ($node->getDirectoryListing() as $child) {
-                $name = $this->uniqueName($target, $child->getName());
-                try {
-                    $child->move($target->getPath() . '/' . $name);
-                    $moved[] = $legacyName . '/' . $child->getName();
-                } catch (\Throwable $e) {
-                    // Preserve data when a provider cannot move a node atomically.
-                }
-            }
-            try { $node->delete(); $removed[] = $legacyName; } catch (\Throwable $e) {}
-        }
-
-        foreach ($userFolder->getDirectoryListing() as $node) {
-            if (!$node instanceof Folder) continue;
-            $name = $node->getName();
-            if (!preg_match('/^joplix(?:backup|webupdate|[._-](?:backup|webupdate)).*/i', $name)) continue;
-            if ($backupEnabled) {
-                $targetName = $this->uniqueName($backups, $name);
-                try { $node->move($backups->getPath() . '/' . $targetName); $moved[] = $name; } catch (\Throwable $e) {}
-            } else {
-                try { $node->delete(); $removed[] = $name; } catch (\Throwable $e) {}
-            }
-        }
-        return ['moved' => $moved, 'removed' => $removed];
     }
 
     private function removeLegacyCompatibilityState(Folder $base): void {
@@ -176,10 +137,5 @@ class JoplixWorkspaceService {
                 try { $node->delete(); } catch (\Throwable $e) {}
             }
         }
-    }
-
-    private function uniqueName(Folder $folder, string $name): string {
-        if (!$folder->nodeExists($name)) return $name;
-        return $name . '_' . gmdate('Ymd_His');
     }
 }

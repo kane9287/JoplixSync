@@ -7,6 +7,8 @@ use OCP\App\IAppManager;
 use OCP\IConfig;
 
 class JoplixDevUpdateService {
+    private const MAX_ZIP_BYTES = 35 * 1024 * 1024;
+
     private Folder $userFolder;
     private string $devPath;
     private IConfig $config;
@@ -56,75 +58,180 @@ class JoplixDevUpdateService {
 
     public function installPackage(string $name): array {
         $file = $this->packageFile($name);
-        $tmpZip = $this->writeTemp($file->getContent(), 'joplix_update_', '.zip');
-        $tmpDir = sys_get_temp_dir() . '/joplix_update_' . bin2hex(random_bytes(6));
-        if (!mkdir($tmpDir, 0700, true) && !is_dir($tmpDir)) {
-            throw new \RuntimeException('Temp-Verzeichnis konnte nicht erstellt werden');
+        if ($file->getSize() > self::MAX_ZIP_BYTES) {
+            throw new \RuntimeException('ZIP ist zu gross.');
         }
-        $zip = new \ZipArchive();
-        if ($zip->open($tmpZip) !== true) {
-            throw new \RuntimeException('ZIP kann nicht geoeffnet werden');
-        }
-        $zip->extractTo($tmpDir);
-        $zip->close();
+        return $this->installArchive($file->getContent(), $name);
+    }
 
-        $source = $this->detectPackageSource($tmpDir);
-        if ($source === '') {
-            $this->cleanup($tmpZip, $tmpDir);
-            throw new \RuntimeException('ZIP enthaelt weder joplix/appinfo/info.xml noch appinfo/info.xml im ZIP-Root');
+    public function installedVersion(): string {
+        clearstatcache(true, __DIR__ . '/../../appinfo/info.xml');
+        return (string)($this->readAppInfo(__DIR__ . '/../../appinfo/info.xml')['version'] ?? '');
+    }
+
+    private function installArchive(string $content, string $name, ?string $releaseVersion = null): array {
+        if ($content === '' || strlen($content) > self::MAX_ZIP_BYTES) {
+            throw new \RuntimeException('ZIP ist leer oder zu gross.');
         }
-        $info = $source . '/appinfo/info.xml';
-        if (!is_file($info)) {
-            $this->cleanup($tmpZip, $tmpDir);
-            throw new \RuntimeException('ZIP enthaelt keine appinfo/info.xml');
-        }
-        $meta = $this->readAppInfo($info);
-        if (($meta['id'] ?? '') !== 'joplix') {
-            $this->cleanup($tmpZip, $tmpDir);
-            throw new \RuntimeException('ZIP ist kein gueltiges Joplix-Paket: appinfo/info.xml enthaelt keine Joplix-ID');
-        }
-        $newVersion = (string)($meta['version'] ?? '');
         $appDir = realpath(__DIR__ . '/../../');
-        if ($appDir === false || basename($appDir) !== 'joplix') {
-            $this->cleanup($tmpZip, $tmpDir);
-            throw new \RuntimeException('Aktuelles App-Verzeichnis konnte nicht bestimmt werden');
+        if ($appDir === false || basename($appDir) !== 'joplix' || !is_writable(dirname($appDir))) {
+            throw new \RuntimeException('App-Verzeichnis kann nicht ersetzt werden. Bitte CLI-Installer verwenden.');
         }
-        if (!is_writable($appDir) || !is_writable(dirname($appDir))) {
-            $this->cleanup($tmpZip, $tmpDir);
-            throw new \RuntimeException('App-Verzeichnis ist fuer den Webserver nicht schreibbar. Bitte CLI-Installer verwenden.');
+        $work = dirname($appDir) . '/.joplix-update';
+        if (is_link($work) || (!is_dir($work) && !@mkdir($work, 0700) && !is_dir($work))) {
+            throw new \RuntimeException('Update-Verzeichnis konnte nicht erstellt werden.');
         }
-        $appsDir = dirname($appDir);
-        $backupRoot = $this->backupEnabled ? $this->backupRoot() : '';
-        $this->cleanupLegacyAppBackups($appsDir, $backupRoot);
+        $lock = @fopen($work . '/lock', 'c');
+        if ($lock === false) {
+            throw new \RuntimeException('Update-Sperre konnte nicht geoeffnet werden.');
+        }
+        try {
+            if (!flock($lock, LOCK_EX | LOCK_NB)) {
+                throw new \RuntimeException('Ein Joplix-Update laeuft bereits.');
+            }
+            return $this->replaceApp($appDir, $work, $content, $name, $releaseVersion);
+        } finally {
+            fclose($lock);
+        }
+    }
+
+    private function replaceApp(string $appDir, string $work, string $content, string $name, ?string $releaseVersion): array {
+        $previous = $work . '/previous';
+        if (file_exists($previous)) {
+            throw new \RuntimeException('Vorheriges Update wurde unterbrochen. Wiederherstellung erforderlich: ' . $previous);
+        }
+        $stage = $work . '/stage-' . bin2hex(random_bytes(8));
+        if (!mkdir($stage, 0700)) {
+            throw new \RuntimeException('Update konnte nicht vorbereitet werden.');
+        }
         $backup = '';
-        if ($this->backupEnabled) {
-            $backup = $backupRoot . '/joplix.webupdate_' . date('Ymd_His');
-            $this->recursiveCopy($appDir, $backup);
-            $this->cleanupBackups($backupRoot);
+        try {
+            $archive = $stage . '/package.zip';
+            if (file_put_contents($archive, $content) !== strlen($content)) {
+                throw new \RuntimeException('ZIP konnte nicht vollstaendig gespeichert werden.');
+            }
+            $extracted = $stage . '/extracted';
+            if (!mkdir($extracted, 0750)) {
+                throw new \RuntimeException('Entpackverzeichnis konnte nicht erstellt werden.');
+            }
+            $this->extractArchive($archive, $extracted);
+            $source = $this->detectPackageSource($extracted);
+            $version = $this->validateApp($source);
+            if ($releaseVersion !== null) {
+                $installed = $this->parseVersion($this->installedVersion());
+                $candidate = $this->parseVersion($version);
+                if ($version !== $releaseVersion || $installed === null || $candidate === null
+                    || $this->compareVersions($candidate, $installed) <= 0) {
+                    throw new \RuntimeException('ZIP-Version passt nicht zum Release oder ist bereits installiert.');
+                }
+            }
+            if (is_file($appDir . '/.joplix_keep') && !file_exists($source . '/.joplix_keep')
+                && !copy($appDir . '/.joplix_keep', $source . '/.joplix_keep')) {
+                throw new \RuntimeException('Lokale Markierungsdatei konnte nicht uebernommen werden.');
+            }
+            if ($this->backupEnabled) {
+                $backup = $this->backupRoot() . '/joplix.webupdate_' . date('Ymd_His') . '_' . basename($stage);
+                try {
+                    $this->recursiveCopy($appDir, $backup);
+                } catch (\Throwable $error) {
+                    $this->recursiveDelete($backup);
+                    throw $error;
+                }
+            }
+            if (!@rename($appDir, $previous)) {
+                throw new \RuntimeException('Bisherige App konnte nicht fuer die Wiederherstellung gesichert werden.');
+            }
+
+            $activated = false;
+            try {
+                if (!@rename($source, $appDir)) {
+                    throw new \RuntimeException('Vorbereitete App konnte nicht aktiviert werden.');
+                }
+                $activated = true;
+                clearstatcache(true);
+                $this->completeNextcloudAppUpgrade($version);
+            } catch (\Throwable $error) {
+                if (($activated && !@rename($appDir, $stage . '/failed')) || !@rename($previous, $appDir)) {
+                    throw new \RuntimeException('Automatische Wiederherstellung fehlgeschlagen. Alte App-Dateien: ' . $previous . '. ' . $error->getMessage(), 0, $error);
+                }
+                clearstatcache(true);
+                $databaseWarning = $activated ? ' Nextcloud-Datenbank und App-Version auf teilweise ausgefuehrte Migrationen pruefen.' : '';
+                throw new \RuntimeException('Alte App-Dateien wiederhergestellt.' . $databaseWarning . ' ' . $error->getMessage(), 0, $error);
+            }
+
+            $this->recursiveDelete($previous);
+            if ($backup !== '') {
+                $this->cleanupBackups(dirname($backup));
+            }
+            return [
+                'ok' => true,
+                'installed' => $name,
+                'version' => $version,
+                'backup' => $backup,
+                'nextcloud_upgrade_completed' => true,
+                'message' => 'Joplix-Update abgeschlossen. Bitte Seite neu laden.',
+            ];
+        } finally {
+            $this->recursiveDelete($stage);
         }
-        $preserve = ['.joplix_keep'];
-        $this->recursiveClear($appDir, $preserve);
-        $this->recursiveCopy($source, $appDir);
-        // A previous updater version may have left app-like backup directories behind.
-        // Remove or archive them again after replacing the application so Nextcloud never
-        // attempts to load them as separate apps during the following upgrade/repair run.
-        $this->cleanupLegacyAppBackups($appsDir, $backupRoot);
-        // Replacing the files changes info.xml immediately, but Nextcloud still
-        // keeps the previous installed_version in app config. If that mismatch
-        // survives this request, the next page load opens the global Nextcloud
-        // app-upgrade screen and runs repair steps for the whole installation.
-        // Finish the same app-specific upgrade lifecycle that Nextcloud's own
-        // installer uses after it has replaced an app's files.
-        $this->completeNextcloudAppUpgrade($newVersion);
-        $this->cleanup($tmpZip, $tmpDir);
-        return [
-            'ok' => true,
-            'installed' => $name,
-            'version' => $newVersion,
-            'backup' => $backup,
-            'nextcloud_upgrade_completed' => true,
-            'message' => $this->backupEnabled ? 'Update installiert, Joplix-Aktualisierung abgeschlossen und App-Backup erstellt. Bitte Seite neu laden.' : 'Update installiert und Joplix-Aktualisierung abgeschlossen. Es wurde entsprechend der Einstellung kein App-Backup erstellt. Bitte Seite neu laden.',
-        ];
+    }
+
+    private function extractArchive(string $archive, string $destination): void {
+        $zip = new \ZipArchive();
+        if ($zip->open($archive, \ZipArchive::CHECKCONS) !== true) {
+            throw new \RuntimeException('ZIP kann nicht geoeffnet werden.');
+        }
+        try {
+            $totalSize = 0;
+            $seen = [];
+            if ($zip->numFiles > 10000) {
+                throw new \RuntimeException('ZIP enthaelt zu viele Eintraege.');
+            }
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                $entry = $zip->statIndex($index);
+                $path = $entry['name'] ?? '';
+                $normalized = rtrim($path, '/');
+                if ($normalized === '' || str_starts_with($path, '/') || str_contains($path, '\\')
+                    || preg_match('/[\x00-\x1f:]/', $path)
+                    || array_intersect(explode('/', $normalized), ['', '.', '..']) || isset($seen[$normalized])) {
+                    throw new \RuntimeException('ZIP enthaelt einen unsicheren oder doppelten Pfad.');
+                }
+                $seen[$normalized] = true;
+                if ($zip->getExternalAttributesIndex($index, $os, $attributes) && $os === \ZipArchive::OPSYS_UNIX
+                    && !in_array(($attributes >> 16) & 0170000, [0, 0100000, 0040000], true)) {
+                    throw new \RuntimeException('ZIP enthaelt Links oder Sonderdateien.');
+                }
+                $totalSize += $entry['size'];
+                if ($totalSize > 200 * 1024 * 1024) {
+                    throw new \RuntimeException('Entpacktes ZIP ist zu gross.');
+                }
+            }
+            if (!$zip->extractTo($destination)) {
+                throw new \RuntimeException('ZIP konnte nicht vollstaendig entpackt werden.');
+            }
+        } finally {
+            $zip->close();
+        }
+    }
+
+    private function validateApp(string $source): string {
+        $info = $source === '' ? false : @simplexml_load_file($source . '/appinfo/info.xml', \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        if ($info === false || (string)$info->id !== 'joplix' || !preg_match('/^\d+\.\d+\.\d+$/D', (string)$info->version)) {
+            throw new \RuntimeException('ZIP enthaelt keine gueltige Joplix-App.');
+        }
+        foreach (['appinfo/routes.php', 'lib/AppInfo/Application.php', 'js/app.js', 'templates/main.php'] as $required) {
+            if (!is_file($source . '/' . $required)) {
+                throw new \RuntimeException('Unvollstaendiges Joplix-Paket: ' . $required);
+            }
+        }
+        $nextcloud = $info->dependencies->nextcloud;
+        $serverMajor = \OCP\Util::getVersion()[0];
+        $min = (int)$nextcloud['min-version'];
+        $max = (int)$nextcloud['max-version'];
+        if (!$min || !$max || $serverMajor < $min || $serverMajor > $max) {
+            throw new \RuntimeException('Dieses Paket ist mit der installierten Nextcloud-Version nicht kompatibel.');
+        }
+        return (string)$info->version;
     }
 
     private function completeNextcloudAppUpgrade(string $expectedVersion): void {
@@ -156,40 +263,6 @@ class JoplixDevUpdateService {
         return $root;
     }
 
-    private function cleanupLegacyAppBackups(string $appsDir, string $backupRoot = ''): void {
-        $entries = @scandir($appsDir);
-        if (!is_array($entries)) {
-            return;
-        }
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-            // Historical updater versions used names such as:
-            // joplixbackup20260801_181413, joplixwebupdate_...,
-            // joplix.webupdate_... and joplix_backup_....
-            if (!preg_match('/^joplix(?:backup|webupdate|[._-](?:backup|webupdate)).*/i', $entry)) {
-                continue;
-            }
-            $source = $appsDir . '/' . $entry;
-            if (!is_dir($source)) {
-                continue;
-            }
-            if (!$this->backupEnabled || $backupRoot === '') {
-                $this->recursiveDelete($source);
-                continue;
-            }
-            $target = $backupRoot . '/' . $entry;
-            if (file_exists($target)) {
-                $target .= '_' . date('Ymd_His');
-            }
-            if (!@rename($source, $target)) {
-                $this->recursiveCopy($source, $target);
-                $this->recursiveDelete($source);
-            }
-        }
-    }
-
     private function cleanupBackups(string $root): void {
         $items = glob($root . '/joplix.webupdate_*', GLOB_ONLYDIR) ?: [];
         usort($items, fn($a, $b) => filemtime($b) <=> filemtime($a));
@@ -200,14 +273,14 @@ class JoplixDevUpdateService {
     }
 
     private function recursiveDelete(string $path): void {
-        if (!file_exists($path)) {
+        if (!file_exists($path) && !is_link($path)) {
             return;
         }
         if (is_file($path) || is_link($path)) {
             @unlink($path);
             return;
         }
-        $items = scandir($path);
+        $items = @scandir($path);
         if (is_array($items)) {
             foreach ($items as $item) {
                 if ($item === '.' || $item === '..') continue;
@@ -217,37 +290,47 @@ class JoplixDevUpdateService {
         @rmdir($path);
     }
 
-    public function remoteReleases(string $repoUrl, string $channel, string $installedVersion = ''): array {
-        $repo = $this->normalizeRepo($repoUrl);
+    public function remoteReleases(string $repoUrl, string $channel, string $installedVersion, ?int $releaseId = null): array {
+        $repo = self::normalizeRepo($repoUrl);
         $channel = strtolower($channel) === 'beta' ? 'beta' : 'main';
         $api = 'https://codeberg.org/api/v1/repos/' . rawurlencode($repo['owner']) . '/' . rawurlencode($repo['repo']) . '/releases';
+        if ($releaseId !== null) {
+            $api .= '/' . $releaseId;
+        }
         $json = $this->httpGet($api, 5 * 1024 * 1024);
         $data = json_decode($json, true);
         if (!is_array($data)) {
             throw new \RuntimeException('Codeberg Antwort konnte nicht gelesen werden');
         }
+        if ($releaseId !== null) {
+            $data = [$data];
+        }
         $out = [];
         foreach ($data as $rel) {
-            if (!is_array($rel) || !empty($rel['draft'])) continue;
+            if (!is_array($rel) || !empty($rel['draft']) || (int)($rel['id'] ?? 0) < 1) continue;
             $tag = (string)($rel['tag_name'] ?? $rel['tag'] ?? '');
             $name = (string)($rel['name'] ?? $tag);
             $isBeta = !empty($rel['prerelease']) || preg_match('/(beta|alpha|rc|pre|dev)/i', $tag . ' ' . $name);
             if ($channel === 'main' && $isBeta) continue;
             if ($channel === 'beta' && !$isBeta) continue;
+            $relVersion = $this->releaseVersion($tag, $name);
+            if ($relVersion === '') continue;
             $assets = [];
             foreach (($rel['assets'] ?? []) as $a) {
                 if (!is_array($a)) continue;
-                $an = (string)($a['name'] ?? '');
+                $assetId = (int)($a['id'] ?? 0);
+                $filename = (string)($a['name'] ?? '');
                 $url = (string)($a['browser_download_url'] ?? $a['download_url'] ?? '');
-                if ($an === '' || $url === '') continue;
-                if (!preg_match('/^JoplixNC_v\d+\.\d+\.\d+(?:-beta)?\.zip$/i', $an)) continue;
-                if (preg_match('/install_bundle/i', $an)) continue;
-                $assets[] = ['name'=>$an,'url'=>$url,'size'=>(int)($a['size'] ?? 0)];
+                if ($assetId < 1 || !$this->isReleaseAsset($url, $repo, $tag, $filename)
+                    || !preg_match('/^JoplixNC_v(\d+\.\d+\.\d+)(?:-beta)?\.zip$/iD', $filename, $match)
+                    || $match[1] !== $relVersion) {
+                    continue;
+                }
+                $assets[] = ['id'=>$assetId, 'name'=>$filename, 'url'=>$url, 'size'=>(int)($a['size'] ?? 0)];
             }
             if (!$assets) continue;
-            $relVersion = $this->releaseVersion($tag, $name);
-            if ($relVersion === '') continue;
             $out[] = [
+                'id'=>(int)$rel['id'],
                 'tag'=>$tag,
                 'name'=>$name ?: $tag,
                 'channel'=>$isBeta ? 'beta' : 'main',
@@ -275,30 +358,27 @@ class JoplixDevUpdateService {
         return ['source'=>'codeberg','repo_url'=>$repo['url'],'api_url'=>$api,'channel'=>$channel,'installed_version'=>$installedVersion,'releases'=>$out];
     }
 
-    public function installRemoteAsset(string $assetUrl, string $assetName): array {
-        $this->assertCodebergAsset($assetUrl);
-        if (!preg_match('/^JoplixNC_v\d+\.\d+\.\d+(?:-beta)?\.zip$/i', $assetName) || preg_match('/install_bundle/i', $assetName)) {
-            throw new \RuntimeException('Ungueltiger Release-Dateiname');
+    public function installRemoteAsset(string $repoUrl, string $channel, int $releaseId, int $assetId): array {
+        if ($releaseId < 1 || $assetId < 1) {
+            throw new \RuntimeException('Bitte ein Update aus der aktuellen Release-Liste auswaehlen.');
         }
-        $content = $this->httpGet($assetUrl, 35 * 1024 * 1024);
-        if (strlen($content) < 1000) {
-            throw new \RuntimeException('Download ist zu klein oder unvollstaendig');
+        $installed = $this->installedVersion();
+        if ($this->parseVersion($installed) === null) {
+            throw new \RuntimeException('Installierte Joplix-Version konnte nicht bestimmt werden.');
         }
-        $folder = $this->devFolder();
-        $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $assetName);
-        // Keep the canonical Codeberg asset name. installPackage()/packageFile() deliberately
-        // validates that same public JoplixNC_v<version>[-beta].zip schema. Beta 59
-        // appended _remote_<timestamp> here, making a valid downloaded release fail the
-        // second validation step with "Ungueltiger Paketname".
-        $name = $safe;
-        if ($folder->nodeExists($name)) {
-            $folder->get($name)->delete();
+        $result = $this->remoteReleases($repoUrl, $channel, $installed, $releaseId);
+        foreach ($result['releases'] as $release) {
+            if ($release['id'] !== $releaseId) continue;
+            foreach ($release['assets'] as $asset) {
+                if ($asset['id'] !== $assetId) continue;
+                $content = $this->httpGet($asset['url'], self::MAX_ZIP_BYTES);
+                if ($asset['size'] > 0 && strlen($content) !== $asset['size']) {
+                    throw new \RuntimeException('Download-Groesse stimmt nicht mit dem Release ueberein.');
+                }
+                return $this->installArchive($content, $asset['name'], $release['version']);
+            }
         }
-        $folder->newFile($name, $content);
-        $result = $this->installPackage($name);
-        $result['downloaded_as'] = $name;
-        $result['source'] = 'codeberg';
-        return $result;
+        throw new \RuntimeException('Paket wurde in der konfigurierten Updatequelle und im gewaehlten Kanal nicht gefunden.');
     }
 
     private function detectPackageSource(string $tmpDir): string {
@@ -357,7 +437,7 @@ class JoplixDevUpdateService {
         return 0;
     }
 
-    private function normalizeRepo(string $repoUrl): array {
+    public static function normalizeRepo(string $repoUrl): array {
         $repoUrl = trim($repoUrl) !== '' ? trim($repoUrl) : 'https://codeberg.org/Stoneubi/joplix/releases';
         $repoUrl = html_entity_decode($repoUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if (preg_match('/href=["\']([^"\']+)["\']/i', $repoUrl, $hm)) {
@@ -381,22 +461,33 @@ class JoplixDevUpdateService {
         }
         $owner = rawurldecode($segments[0]);
         $repo = rawurldecode(preg_replace('/\.git$/i', '', $segments[1]));
-        if (!preg_match('/^[a-z0-9_.-]+$/i', $owner) || !preg_match('/^[a-z0-9_.-]+$/i', $repo)) {
+        if (!preg_match('/^[a-z0-9_.-]+$/iD', $owner) || !preg_match('/^[a-z0-9_.-]+$/iD', $repo)
+            || in_array($owner, ['.', '..'], true) || in_array($repo, ['.', '..'], true)) {
             throw new \RuntimeException('Codeberg-Repository enthaelt ungueltige Zeichen');
         }
         return ['owner'=>$owner,'repo'=>$repo,'url'=>'https://codeberg.org/'.$owner.'/'.$repo.'/releases'];
     }
 
-    private function assertCodebergAsset(string $url): void {
-        if (!preg_match('#^https://codeberg\.(?:org|com)/#i', $url)) {
-            throw new \RuntimeException('Nur Codeberg-Download-URLs werden unterstuetzt');
+    private function isReleaseAsset(string $url, array $repo, string $tag, string $name): bool {
+        $parts = parse_url($url);
+        if (($parts['scheme'] ?? '') !== 'https' || strtolower($parts['host'] ?? '') !== 'codeberg.org'
+            || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])
+            || isset($parts['query']) || isset($parts['fragment'])) {
+            return false;
         }
+        $segments = array_map('rawurldecode', explode('/', $parts['path'] ?? ''));
+        return count($segments) === 7 && $segments[0] === ''
+            && strcasecmp($segments[1], $repo['owner']) === 0 && strcasecmp($segments[2], $repo['repo']) === 0
+            && $segments[3] === 'releases' && $segments[4] === 'download'
+            && $segments[5] === $tag && $segments[6] === $name
+            && !str_contains($tag, '/') && !str_contains($tag, '\\') && !in_array($tag, ['', '.', '..'], true);
     }
 
     private function httpGet(string $url, int $maxBytes): string {
         $ctx = stream_context_create(['http'=>[
             'method'=>'GET',
             'timeout'=>30,
+            'follow_location'=>0,
             'ignore_errors'=>true,
             'header'=>"Accept: application/json, application/octet-stream\r\nUser-Agent: Joplix-Updater\r\n",
         ]]);
@@ -409,7 +500,7 @@ class JoplixDevUpdateService {
         }
         if (isset($http_response_header) && is_array($http_response_header)) {
             $line = $http_response_header[0] ?? '';
-            if (preg_match('/\s(4\d\d|5\d\d)\s/', $line)) {
+            if (!preg_match('/^HTTP\/\S+ 200(?:\s|$)/', $line)) {
                 throw new \RuntimeException('Codeberg meldet Fehler: ' . $line);
             }
         }
@@ -492,8 +583,11 @@ class JoplixDevUpdateService {
             throw new \RuntimeException('Temp-Datei konnte nicht erstellt werden');
         }
         $path = $tmp . $suffix;
-        rename($tmp, $path);
-        file_put_contents($path, $content);
+        if (!@rename($tmp, $path) || file_put_contents($path, $content) !== strlen($content)) {
+            @unlink($tmp);
+            @unlink($path);
+            throw new \RuntimeException('Temp-Datei konnte nicht vollstaendig geschrieben werden.');
+        }
         return $path;
     }
 
@@ -503,42 +597,14 @@ class JoplixDevUpdateService {
                 throw new \RuntimeException('Verzeichnis konnte nicht erstellt werden: ' . $dst);
             }
             $items = scandir($src);
-            if ($items === false) return;
+            if ($items === false) throw new \RuntimeException('Backup-Quellordner nicht lesbar: ' . $src);
             foreach ($items as $item) {
                 if ($item === '.' || $item === '..') continue;
                 $this->recursiveCopy($src . '/' . $item, $dst . '/' . $item);
             }
-        } else {
-            copy($src, $dst);
+        } elseif (!copy($src, $dst)) {
+            throw new \RuntimeException('Backup-Datei konnte nicht geschrieben werden: ' . $dst);
         }
     }
 
-    private function recursiveClear(string $dir, array $preserveNames = []): void {
-        $items = scandir($dir);
-        if ($items === false) return;
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..' || in_array($item, $preserveNames, true)) continue;
-            $path = $dir . '/' . $item;
-            $this->recursiveRemove($path);
-        }
-    }
-
-    private function recursiveRemove(string $path): void {
-        if (is_dir($path) && !is_link($path)) {
-            $items = scandir($path);
-            if ($items !== false) {
-                foreach ($items as $item) {
-                    if ($item !== '.' && $item !== '..') $this->recursiveRemove($path . '/' . $item);
-                }
-            }
-            rmdir($path);
-        } else {
-            unlink($path);
-        }
-    }
-
-    private function cleanup(string $zip, string $dir): void {
-        if (is_file($zip)) @unlink($zip);
-        if (is_dir($dir)) $this->recursiveRemove($dir);
-    }
 }

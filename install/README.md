@@ -2,9 +2,11 @@
 
 ## Overview
 
-Joplix can be installed, upgraded, removed, or completely purged directly from the official Codeberg releases.
+Joplix can be installed, upgraded, or removed directly from the official Codeberg releases.
 
-The installer automatically selects the correct package for the requested release channel.
+The installer selects the newest matching package by version. Stable releases must provide `SHA256SUMS`. Beta releases may instead use `nextcloud/beta-update.json` from the `beta` branch when its tag, asset, and version match the selected release.
+
+Both scripts use Nextcloud’s configured `apps_paths`, including `custom_apps` when configured. Set `NC_DIR` to the Nextcloud root if it lives outside `/var/www` or more than one instance is found. Set `WEBUSER` if the PHP service account differs from the detected account.
 
 ---
 
@@ -23,7 +25,7 @@ The installer will:
 1. Detect Nextcloud automatically
 2. Find the newest stable Joplix release
 3. Find the matching `JoplixNC_v<version>.zip` package
-4. Download the package
+4. Download the package and verify its SHA-256 checksum before extraction
 5. Install or upgrade Joplix
 6. Complete the Nextcloud app upgrade lifecycle when required
 7. Activate Joplix
@@ -104,7 +106,7 @@ This avoids leaving Nextcloud with different application-file and `installed_ver
 
 Before replacing an existing Joplix installation, the installer creates a backup.
 
-Upgrade backups are stored in:
+Upgrade backups are stored under the configured app directory. For example:
 
 ```text
 /var/www/nextcloud/apps/.joplix-backups
@@ -113,7 +115,7 @@ Upgrade backups are stored in:
 Example:
 
 ```text
-/var/www/nextcloud/apps/.joplix-backups/joplix-20260916195335
+/var/www/nextcloud/apps/.joplix-backups/joplix-Ab12Cd34/previous
 ```
 
 These backups contain the previous Joplix application files.
@@ -162,7 +164,7 @@ The uninstaller will:
 - Disable Joplix
 - Remove the application files
 
-Uninstall backups are stored in:
+Uninstall backups are stored under the configured app directory. For example:
 
 ```text
 /var/www/nextcloud/apps/.joplix-uninstall
@@ -172,38 +174,10 @@ Uninstall backups are stored in:
 
 # Purge Mode
 
-## Overview
-
-Purge mode completely removes Joplix from the server.
-
-In addition to normal uninstallation, it may also remove:
-
-- Nextcloud app configuration
-- Joplix app data
-- Installer backups
-- Uninstaller backups
-- Remaining Joplix-related directories in the Nextcloud data directory
-
-Use purge mode only when Joplix and its associated application data should be removed completely.
-
-## Run Purge Mode
+The `--purge` option delegates app removal to Nextcloud’s `occ app:remove joplix`. The script keeps app backups and leaves the Nextcloud data directory alone, including users’ `.joplix` workspaces and Joplin sync files.
 
 ```bash
 curl -fsSL https://codeberg.org/Stoneubi/joplix/raw/branch/main/install/uninstall.sh | sudo bash -s -- --purge
-```
-
-Example:
-
-```text
-PURGE MODE ACTIVE
-
-Removing app configuration...
-Removing Joplix app data...
-Removing installer backups...
-Removing uninstall backups...
-Running maintenance repair...
-
-Joplix completely removed.
 ```
 
 ---
@@ -225,7 +199,7 @@ Joplix completely removed.
 Example upgrade backup:
 
 ```text
-/var/www/nextcloud/apps/.joplix-backups/joplix-20260916195335
+/var/www/nextcloud/apps/.joplix-backups/joplix-Ab12Cd34/previous
 ```
 
 ---
@@ -361,18 +335,9 @@ After upgrading to a current Joplix version, future updates can again be install
 
 ---
 
-# Safety Notice
+# Recovery
 
-Standard upgrades create a backup of the existing Joplix application before replacing it.
-
-Purge mode may permanently remove:
-
-- App configuration
-- Joplix app data
-- Backup directories
-- Cache files
-
-Always ensure that you have a valid backup before executing purge mode.
+The installer stages the verified package next to the live app. If the upgrade command fails, it restores the previous app files. Review Nextcloud’s database state if an upgrade started applying migrations before failing. If the process was forcibly stopped during the swap, the previous app files may still be under `.joplix-backups`.
 
 ---
 

@@ -296,13 +296,20 @@ function setSavingUi(active){
   }
 }
 function noteCacheKey(id){return 'noteCache_'+id;}
-function cachedNote(id){return storage.get(noteCacheKey(id),null);}
+function cachedNote(id){
+  const note=storage.get(noteCacheKey(id),null);
+  return note?.bodyFormat===2?note:null;
+}
 function rememberNote(n){
   if(!n||!n.id)return;
   noteMemorySet(n);
-  const maxBody=700000;
   const item={id:n.id,title:n.title||'',body:String(n.body||''),updated_time:n.updated_time||'',notebook_title:n.notebook_title||'',tags:n.tags||[],resources:n.resources||[],cached_at:Date.now()};
-  if(item.body.length>maxBody)item.body=item.body.slice(0,maxBody)+'\n\n[Hinweis: Notiz wurde fuer den lokalen Schnellcache gekuerzt. Vollstaendige Notiz wird geladen.]';
+  // Older cache entries may contain a body stripped by Beta 63.
+  item.bodyFormat=2;
+  if(item.body.length>700000){
+    storage.del(noteCacheKey(n.id));
+    return;
+  }
   storage.set(noteCacheKey(n.id),item);
   const ids=(storage.get('recentNoteCacheIds',[])||[]).filter(x=>x!==n.id);
   ids.unshift(n.id);
@@ -901,7 +908,22 @@ async function deleteNote(){if(!state.note||!confirm('Notiz wirklich löschen?')
 async function newNotebook(parent){const en=resolvedLanguage()==='en';const title=prompt(parent?(en?'Sub-notebook name:':'Name des Unter-Notizbuchs:'):(en?'Notebook name:':'Name des Notizbuchs:'));if(!title)return;await api('/api/notebooks',{method:'POST',body:{title,parent_id:parent||''}});await rebuildAndRestore();}
 async function renameNotebook(){if(!state.notebookId){alert('Bitte Notizbuch auswählen.');return;}const nb=(state.index.notebooks||[]).find(n=>n.id===state.notebookId);const title=prompt('Neuer Name',nb?nb.title:'');if(!title)return;await api('/api/notebooks/'+state.notebookId,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
 function mimeFromFilename(name){const ext=String(name||'').toLowerCase().split('.').pop();const map={pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',doc:'application/msword',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',ppt:'application/vnd.ms-powerpoint',odt:'application/vnd.oasis.opendocument.text',ods:'application/vnd.oasis.opendocument.spreadsheet',odp:'application/vnd.oasis.opendocument.presentation'};return map[ext]||'application/octet-stream';}
-async function uploadResource(file){if(!state.note){alert('Bitte zuerst eine Notiz öffnen.');return;}const data=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(file);});const r=await api('/api/resources',{method:'POST',body:{filename:file.name,mime:file.type||mimeFromFilename(file.name),data_base64:data}});$('jp-body').value += '\n\n'+r.markdown;await saveNote();}
+async function uploadResource(file){
+  if(!state.note){alert('Bitte zuerst eine Notiz öffnen.');return;}
+  const noteId=state.note.id;
+  const data=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result).split(',')[1]);
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+  if(state.note?.id!==noteId||state.noteLoading)throw new Error('Die ursprüngliche Notiz ist nicht mehr geöffnet.');
+  const resource=await api('/api/resources',{method:'POST',body:{filename:file.name,mime:file.type||mimeFromFilename(file.name),data_base64:data}});
+  if(state.note?.id!==noteId||state.noteLoading)throw new Error('Anhang hochgeladen. Der Link konnte der ursprünglichen Notiz nicht hinzugefügt werden: '+resource.markdown);
+  $('jp-body').value+='\n\n'+resource.markdown;
+  markDirty();
+  await saveNote();
+}
 function normalizeLocalTags(tags){
   const seen=new Set();
   return (Array.isArray(tags)?tags:[]).map(t=>({
@@ -1117,15 +1139,36 @@ function isAllowedUpdateTransition(rel,installed){const v=releaseVersion(rel);if
 function newestUpdateFromReleases(data){const installed=parseJoplixVersionText(getInstalledVersion());let best=null;for(const rel of ((data&&data.releases)||[])){if(!isAllowedUpdateTransition(rel,installed))continue;const v=releaseVersion(rel);if(!best||compareJoplixVersions(v,best.version)>0||(compareJoplixVersions(v,best.version)===0&&releaseChannel(rel)==='main'&&releaseChannel(best.release)==='beta'))best={release:rel,version:v};}return best;}
 function joplixIsAdmin(){const app=document.getElementById('joplix-app');return !!(app&&app.dataset&&app.dataset.joplixIsAdmin==='1');}
 function setBrandUpdate(update){const el=$('jp-brand-update');if(!el)return;if(!joplixIsAdmin()){el.textContent='';el.hidden=true;el.removeAttribute('href');return;}if(update&&update.version){el.textContent=update.version.text+' Neues Update!';const url=releaseUrl(update.release);if(url)el.href=url;else el.href=normalizeCodebergRepoUrlInput((currentLocalSettings().update_repo_url)||'https://codeberg.org/Stoneubi/joplix/releases');el.hidden=false;el.title='Codeberg Release öffnen';}else{el.textContent='';el.hidden=true;el.removeAttribute('href');}}
-async function checkUpdateOnStart(){try{if(!joplixIsAdmin())return;const local=currentLocalSettings();if(!local.is_admin)return;if((local.update_source||'codeberg')!=='codeberg')return;const repo=normalizeCodebergRepoUrlInput(local.update_repo_url||'https://codeberg.org/Stoneubi/joplix/releases');const channel=local.update_channel||'main';const data=await api('/api/updates/releases?repo_url='+encodeURIComponent(repo)+'&channel='+encodeURIComponent(channel)+'&installed_version='+encodeURIComponent(getInstalledVersion()));const upd=newestUpdateFromReleases(data);setBrandUpdate(upd);}catch(e){console.warn('Joplix Update Startprüfung fehlgeschlagen:',e.message);}}
+async function checkUpdateOnStart(){try{if(!joplixIsAdmin())return;const local=currentLocalSettings();if(!local.is_admin)return;if((local.update_source||'codeberg')!=='codeberg')return;const data=await api('/api/updates/releases');const upd=newestUpdateFromReleases(data);setBrandUpdate(upd);}catch(e){console.warn('Joplix Update Startprüfung fehlgeschlagen:',e.message);}}
 function syncUpdateUi(){const local=currentLocalSettings();syncInstalledVersionUi();if($('jp-update-repo-url'))$('jp-update-repo-url').value=normalizeCodebergRepoUrlInput(local.update_repo_url||'https://codeberg.org/Stoneubi/joplix/releases');if($('jp-update-channel'))$('jp-update-channel').value=local.update_channel||'main';}
 function updateStatus(txt,cls=''){const el=$('jp-update-status');if(el){el.textContent=txt;el.className='jp-update-status '+cls;}}
 function isInstallableJoplixAsset(asset){const n=String((asset&&asset.name)||'').trim().replace(/\s+/g,'');return /^JoplixNC_v\d+\.\d+\.\d+(?:-beta)?\.zip$/i.test(n);}
 function releaseIsNewer(rel,installed){return isAllowedUpdateTransition(rel,installed);}
 function renderUpdateList(data){const box=$('jp-update-list');if(!box)return;box.innerHTML='';syncInstalledVersionUi();const installed=parseJoplixVersionText(getInstalledVersion());let rels=((data&&data.releases)||[]).filter(rel=>releaseIsNewer(rel,installed));rels=rels.filter(rel=>((rel.assets||[]).some(isInstallableJoplixAsset)));if(!rels.length){box.innerHTML='<p>Keine neuere Version für diesen Channel gefunden. Aktuell installiert: Joplix '+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').</p>';return;}rels.sort((a,b)=>{const c=compareJoplixVersions(releaseVersion(b),releaseVersion(a));if(c!==0)return c;return releaseChannel(a)==='main'?-1:1;});rels.forEach(rel=>{const card=document.createElement('div');card.className='jp-update-release';const h=document.createElement('div');h.className='jp-update-release-head';h.innerHTML='<strong></strong><span></span>';h.querySelector('strong').textContent=(rel.name||rel.tag||'Release')+' ['+(releaseChannel(rel)==='beta'?'Beta':'Main')+']';h.querySelector('span').textContent=rel.published_at||'';card.appendChild(h);(rel.assets||[]).filter(isInstallableJoplixAsset).forEach(asset=>{const row=document.createElement('div');row.className='jp-update-asset';const name=document.createElement('span');name.textContent=asset.name;const btn=document.createElement('button');btn.type='button';btn.textContent='Installieren';btn.onclick=()=>installUpdateAsset(asset,rel);row.appendChild(name);row.appendChild(btn);card.appendChild(row);});box.appendChild(card);});}
-async function persistUpdateSettings(){const repo=normalizeCodebergRepoUrlInput($('jp-update-repo-url')?$('jp-update-repo-url').value:'https://codeberg.org/Stoneubi/joplix/releases');const channel=$('jp-update-channel')?$('jp-update-channel').value:'main';const local=storage.get('settings',{});Object.assign(local,{update_source:'codeberg',update_repo_url:repo,update_channel:channel});storage.set('settings',local);state.settings=Object.assign({},state.settings||{},local);try{await persistSettings({update_source:'codeberg',update_repo_url:repo,update_channel:channel});}catch(e){console.warn('Joplix: Update-Einstellungen lokal gespeichert, Server-Speicherung fehlgeschlagen:',e.message);}}
-async function checkUpdates(){try{if(!joplixIsAdmin())throw new Error('Administratorrechte erforderlich.');await persistUpdateSettings();updateStatus('Update-Liste wird von Codeberg geladen...','warning');const repo=normalizeCodebergRepoUrlInput($('jp-update-repo-url')?$('jp-update-repo-url').value:'https://codeberg.org/Stoneubi/joplix/releases');const channel=$('jp-update-channel')?$('jp-update-channel').value:'main';const data=await api('/api/updates/releases?repo_url='+encodeURIComponent(repo)+'&channel='+encodeURIComponent(channel)+'&installed_version='+encodeURIComponent(getInstalledVersion()));renderUpdateList(data);const shown=((data.releases||[]).filter(rel=>releaseIsNewer(rel,parseJoplixVersionText(getInstalledVersion()))&&((rel.assets||[]).some(isInstallableJoplixAsset)))).length;const upd=newestUpdateFromReleases(data);setBrandUpdate(upd);updateStatus(shown+' installierbare Release(s) gefunden.'+(upd?' Neues Update: '+upd.version.text+' ['+(releaseChannel(upd.release)==='beta'?'Beta':'Main')+']':'')+' Aktuell installiert: Joplix '+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').','ok');}catch(e){updateStatus('Update-Prüfung fehlgeschlagen: '+e.message,'error');}}
-async function installUpdateAsset(asset,rel){if(!asset||!asset.url)return;const backupEnabled=currentLocalSettings().update_backup_enabled==='yes';if(!confirm('Joplix Update jetzt installieren?\n\n'+asset.name+'\n\n'+(backupEnabled?'Vor dem Update wird ein optionales App-Backup erstellt.':'Es wird kein App-Backup erstellt. Bitte stellen Sie sicher, dass ein vollständiges Nextcloud-Backup vorhanden ist.')))return;try{updateStatus('Update wird heruntergeladen und installiert...','warning');const r=await api('/api/updates/install',{method:'POST',body:{asset_url:asset.url,asset_name:asset.name}});const ch=releaseChannel(rel||{});storage.set('installed_channel',ch);const settings=storage.get('settings',{});settings.installed_channel=ch;storage.set('settings',settings);updateStatus((r.message||'Update installiert. Bitte Seite neu laden.')+' Version: '+(r.version||''),'ok');alert((r.message||'Update installiert. Bitte Seite neu laden.')+(r.backup?'\n\nBackup: '+r.backup:'')+'\nVersion: '+(r.version||''));}catch(e){updateStatus('Update-Installation fehlgeschlagen: '+e.message,'error');alert('Update-Installation fehlgeschlagen:\n'+e.message);}}
+async function persistUpdateSettings(){
+  const repo=normalizeCodebergRepoUrlInput($('jp-update-repo-url')?.value||'https://codeberg.org/Stoneubi/joplix/releases');
+  const channel=$('jp-update-channel')?.value||'main';
+  await api('/api/settings',{method:'POST',body:{update_source:'codeberg',update_repo_url:repo,update_channel:channel}});
+  const updates={update_source:'codeberg',update_repo_url:repo,update_channel:channel};
+  storage.set('settings',Object.assign(storage.get('settings',{}),updates));
+  state.settings=Object.assign({},state.settings||{},updates);
+}
+async function checkUpdates(){
+  try{
+    if(!joplixIsAdmin())throw new Error('Administratorrechte erforderlich.');
+    await persistUpdateSettings();
+    updateStatus('Update-Liste wird von Codeberg geladen...','warning');
+    const data=await api('/api/updates/releases');
+    renderUpdateList(data);
+    const shown=(data.releases||[]).filter(rel=>releaseIsNewer(rel,parseJoplixVersionText(getInstalledVersion()))&&(rel.assets||[]).some(isInstallableJoplixAsset)).length;
+    const update=newestUpdateFromReleases(data);
+    setBrandUpdate(update);
+    updateStatus(shown+' installierbare Release(s) gefunden.'+(update?' Neues Update: '+update.version.text+' ['+(releaseChannel(update.release)==='beta'?'Beta':'Main')+']':'')+' Aktuell installiert: Joplix '+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').','ok');
+  }catch(e){
+    updateStatus('Update-Prüfung fehlgeschlagen: '+e.message,'error');
+  }
+}
+async function installUpdateAsset(asset,rel){if(!asset?.id||!rel?.id)return;const backupEnabled=currentLocalSettings().update_backup_enabled==='yes';if(!confirm('Joplix Update jetzt installieren?\n\n'+asset.name+'\n\n'+(backupEnabled?'Vor dem Update wird ein optionales App-Backup erstellt.':'Es wird kein App-Backup erstellt. Bitte stellen Sie sicher, dass ein vollständiges Nextcloud-Backup vorhanden ist.')))return;try{updateStatus('Update wird heruntergeladen und installiert...','warning');const r=await api('/api/updates/install',{method:'POST',body:{release_id:rel.id,asset_id:asset.id}});const ch=releaseChannel(rel||{});storage.set('installed_channel',ch);const settings=storage.get('settings',{});settings.installed_channel=ch;storage.set('settings',settings);updateStatus((r.message||'Update installiert. Bitte Seite neu laden.')+' Version: '+(r.version||''),'ok');alert((r.message||'Update installiert. Bitte Seite neu laden.')+(r.backup?'\n\nBackup: '+r.backup:'')+'\nVersion: '+(r.version||''));}catch(e){updateStatus('Update-Installation fehlgeschlagen: '+e.message,'error');alert('Update-Installation fehlgeschlagen:\n'+e.message);}}
 
 
 const JP_EN={
@@ -1161,8 +1204,8 @@ function setupSettings(){
   const reset=$('jp-layout-reset'); if(reset)reset.addEventListener('click',()=>{storage.del('columnWidths');applyColumnWidths({left:300,right:360});});
   const rebuild=$('jp-settings-rebuild'); if(rebuild)rebuild.addEventListener('click',()=>rebuildAndRestore().catch(e=>alert(e.message)));
   const upd=$('jp-update-check'); if(upd)upd.addEventListener('click',()=>checkUpdates());
-  const updChannel=$('jp-update-channel'); if(updChannel)updChannel.addEventListener('change',()=>persistUpdateSettings().then(()=>updateStatus('Update-Einstellungen lokal gespeichert.','ok')).catch(e=>updateStatus('Update-Einstellungen konnten nicht gespeichert werden: '+e.message,'error')));
-  const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeCodebergRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus('Update-Einstellungen lokal gespeichert.','ok')).catch(e=>updateStatus('Update-Einstellungen konnten nicht gespeichert werden: '+e.message,'error'));});
+  const updChannel=$('jp-update-channel'); if(updChannel)updChannel.addEventListener('change',()=>persistUpdateSettings().then(()=>updateStatus('Update-Einstellungen gespeichert.','ok')).catch(e=>updateStatus('Update-Einstellungen konnten nicht gespeichert werden: '+e.message,'error')));
+  const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeCodebergRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus('Update-Einstellungen gespeichert.','ok')).catch(e=>updateStatus('Update-Einstellungen konnten nicht gespeichert werden: '+e.message,'error'));});
   syncSettingsUi();
 }
 document.addEventListener('DOMContentLoaded',()=>{

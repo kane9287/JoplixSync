@@ -2,8 +2,8 @@
   "schema": 1,
   "app_id": "joplix",
   "channel": "beta",
-  "version": "2026.09.63",
-  "tag": "JoplixNC_v2026.09.63-beta",
-  "asset": "JoplixNC_v2026.09.63-beta.zip",
-  "sha256": "6c4b7bfb69db6ebf763990614ee64ba93d29f78a5128365626dcd162394cb404"
+  "version": "2026.11.65",
+  "tag": "JoplixNC_v2026.11.65-beta",
+  "asset": "JoplixNC_v2026.11.65-beta.zip",
+  "sha256": "91ba6d51a43f0b8d2843a9222a097ee283d5e0e857b63c97c7591fdf9a31e784"
 }

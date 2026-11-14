@@ -5,14 +5,14 @@ use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP
 class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager;
  public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager){parent::__construct($AppName,$request);$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
  private function uid(): string{$u=$this->userSession->getUser();if($u===null)throw new \RuntimeException('Nicht angemeldet');return $u->getUID();}
- private function isAdmin(): bool{return $this->groupManager->isAdmin($this->uid());} private function requireAdmin(): void{if(!$this->isAdmin())throw new \RuntimeException('Administratorrechte erforderlich.');} private function setting(string $k,string $d=''): string{return $this->config->getUserValue($this->uid(),Application::APP_ID,$k,$d);} private function setSetting(string $k,string $v): void{$this->config->setUserValue($this->uid(),Application::APP_ID,$k,$v);} private function userFolder(): Folder{return $this->rootFolder->getUserFolder($this->uid());}
+ private function isAdmin(): bool{return $this->groupManager->isAdmin($this->uid());} private function setting(string $k,string $d=''): string{return $this->config->getUserValue($this->uid(),Application::APP_ID,$k,$d);} private function setSetting(string $k,string $v): void{$this->config->setUserValue($this->uid(),Application::APP_ID,$k,$v);} private function userFolder(): Folder{return $this->rootFolder->getUserFolder($this->uid());}
  private function joplinPath(): string{$p=$this->setting('joplin_path','/JoplinV2');$p='/'.trim($p,'/');return $p==='/'?'/JoplinV2':$p;} private function joplinFolder(): Folder{$rel=trim($this->joplinPath(),'/');$uf=$this->userFolder();$n=$rel===''?$uf:$uf->get($rel);if(!$n instanceof Folder)throw new \RuntimeException('Joplix-Pfad ist kein Ordner: '.$this->joplinPath());return $n;}
- private function workspace(): JoplixWorkspaceService{return new JoplixWorkspaceService($this->rootFolder,$this->config,$this->uid());} private function model(): JoplixModelService{return new JoplixModelService($this->joplinFolder());} private function indexSvc(): JoplixIndexService{return new JoplixIndexService($this->userFolder(),$this->joplinPath());} private function devSvc(): JoplixDevUpdateService{$this->workspace()->ensureAndMigrate();return new JoplixDevUpdateService($this->userFolder(),$this->setting('dev_folder','/.joplix/updates'),$this->config,$this->setting('update_backup_enabled','no')==='yes');} private function writer(): JoplixWriteService{return new JoplixWriteService($this->model());} private function err(\Throwable $e,int $s=400): JSONResponse{return new JSONResponse(['error'=>$e->getMessage()],$s);}
+ private function workspace(): JoplixWorkspaceService{return new JoplixWorkspaceService($this->rootFolder,$this->config,$this->uid());} private function model(): JoplixModelService{return new JoplixModelService($this->joplinFolder());} private function indexSvc(): JoplixIndexService{return new JoplixIndexService($this->userFolder(),$this->joplinPath());} private function devSvc(): JoplixDevUpdateService{return new JoplixDevUpdateService($this->userFolder(),$this->setting('dev_folder','/.joplix/updates'),$this->config,$this->setting('update_backup_enabled','no')==='yes');} private function writer(): JoplixWriteService{return new JoplixWriteService($this->model());} private function err(\Throwable $e,int $s=400): JSONResponse{return new JSONResponse(['error'=>$e->getMessage()],$s);}
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function getSettings(): JSONResponse{$this->workspace()->ensureAndMigrate();return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->setting('dev_enabled','no'),'dev_folder'=>$this->setting('dev_folder','/.joplix/updates'),'first_run_completed'=>$this->setting('first_run_completed','no'),'update_source'=>$this->setting('update_source','codeberg'),'update_repo_url'=>$this->setting('update_repo_url','https://codeberg.org/Stoneubi/joplix/releases'),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'language'=>$this->setting('language','system'),'is_admin'=>$this->isAdmin()]);}
+ public function getSettings(): JSONResponse{$this->workspace()->ensureWorkspace();return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_source'=>$this->setting('update_source','codeberg'),'update_repo_url'=>$this->setting('update_repo_url','https://codeberg.org/Stoneubi/joplix/releases'),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'language'=>$this->setting('language','system'),'is_admin'=>$this->isAdmin()]);}
  /**
   * @NoAdminRequired
   */
@@ -24,14 +24,44 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  public function folders(): JSONResponse{try{$out=[];$walk=function($folder,$path,$depth) use (&$walk,&$out){if($depth>4)return;foreach($folder->getDirectoryListing() as $node){if($node instanceof Folder){$p=$path.'/'.$node->getName();$out[]=$p;$walk($node,$p,$depth+1);}}};$walk($this->userFolder(),'',0);sort($out,SORT_NATURAL|SORT_FLAG_CASE);return new JSONResponse(['folders'=>$out,'current'=>$this->joplinPath()]);}catch(\Throwable $e){return $this->err($e);}}
  /**
   * @NoAdminRequired
-  * @NoCSRFRequired
   */
- public function saveSettings(): JSONResponse{try{$keys=['joplin_path','sort_order','remember_last_location','dev_enabled','dev_folder','first_run_completed','office_open_mode','language'];if($this->isAdmin())$keys=array_merge($keys,['update_source','update_repo_url','update_channel','update_backup_enabled']);foreach($keys as $k)$this->setSetting($k,(string)$this->request->getParam($k,$this->setting($k,'')));if($this->setting('dev_folder','')===''||$this->setting('dev_folder','')==='/JoplixUpdates')$this->setSetting('dev_folder','/.joplix/updates');$this->workspace()->ensureAndMigrate();return new JSONResponse(['ok'=>true]);}catch(\Throwable $e){return $this->err($e);}}
+ public function saveSettings(): JSONResponse {
+     try {
+         $keys = ['joplin_path', 'sort_order', 'remember_last_location', 'first_run_completed', 'office_open_mode', 'language'];
+         $isAdmin = $this->isAdmin();
+         if ($isAdmin) {
+             $keys = array_merge($keys, ['dev_enabled', 'dev_folder', 'update_source', 'update_repo_url', 'update_channel', 'update_backup_enabled']);
+         }
+         $values = [];
+         foreach ($keys as $key) {
+             $value = $this->request->getParam($key);
+             if ($value !== null) {
+                 $values[$key] = (string)$value;
+             }
+         }
+         if (isset($values['update_repo_url'])) {
+             $values['update_repo_url'] = JoplixDevUpdateService::normalizeRepo($values['update_repo_url'])['url'];
+         }
+         if (isset($values['update_channel']) && !in_array($values['update_channel'], ['main', 'beta'], true)) {
+             throw new \RuntimeException('Ungueltiger Update-Kanal.');
+         }
+         foreach ($values as $key => $value) {
+             $this->setSetting($key, $value);
+         }
+         if ($isAdmin && in_array($this->setting('dev_folder', ''), ['', '/JoplixUpdates'], true)) {
+             $this->setSetting('dev_folder', '/.joplix/updates');
+         }
+         $this->workspace()->ensureWorkspace();
+         return new JSONResponse(['ok' => true]);
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function index(): JSONResponse{try{$this->workspace()->ensureAndMigrate();$idx=$this->indexSvc()->read(); if(!$idx){$m=$this->model();$idx=$m->fullIndex($this->setting('sort_order','updated_desc'));$this->indexSvc()->write($idx);$idx['built_now']=true;$idx['stale']=false;} else {$idx['stale']=false;$idx['fast_loaded']=true;} return new JSONResponse($idx);}catch(\Throwable $e){return $this->err($e);}}
+ public function index(): JSONResponse{try{$this->workspace()->ensureWorkspace();$idx=$this->indexSvc()->read(); if(!$idx){$m=$this->model();$idx=$m->fullIndex($this->setting('sort_order','updated_desc'));$this->indexSvc()->write($idx);$idx['built_now']=true;$idx['stale']=false;} else {$idx['stale']=false;$idx['fast_loaded']=true;} return new JSONResponse($idx);}catch(\Throwable $e){return $this->err($e);}}
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
@@ -92,30 +122,95 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  
 
 
-/**
- * @NoAdminRequired
- * @NoCSRFRequired
- */
- public function updateReleases(): JSONResponse{try{$this->requireAdmin();$repo=(string)$this->request->getParam('repo_url',$this->setting('update_repo_url','https://codeberg.org/Stoneubi/joplix/releases'));$channel=(string)$this->request->getParam('channel',$this->setting('update_channel','main'));$this->setSetting('update_source','codeberg');$this->setSetting('update_repo_url',$repo);$this->setSetting('update_channel',$channel);$installed=(string)$this->request->getParam('installed_version','');return new JSONResponse($this->devSvc()->remoteReleases($repo,$channel,$installed));}catch(\Throwable $e){return $this->err($e);}}
-/**
- * @NoAdminRequired
- * @NoCSRFRequired
- */
- public function updateInstall(): JSONResponse{try{$this->requireAdmin();if($this->setting('update_source','codeberg')!=='codeberg')throw new \RuntimeException('Aktuell wird nur Codeberg als Update-Quelle unterstuetzt');$url=(string)$this->request->getParam('asset_url','');$name=(string)$this->request->getParam('asset_name','');return new JSONResponse($this->devSvc()->installRemoteAsset($url,$name));}catch(\Throwable $e){return $this->err($e);}}
+ public function updateReleases(): JSONResponse {
+     try {
+         if (!$this->isAdmin()) {
+             return new JSONResponse(['error' => 'Administratorrechte erforderlich.'], 403);
+         }
+         $service = $this->devSvc();
+         return new JSONResponse($service->remoteReleases(
+             $this->setting('update_repo_url', ''),
+             $this->setting('update_channel', 'main'),
+             $service->installedVersion()
+         ));
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
 
-/**
- * @NoAdminRequired
- * @NoCSRFRequired
- */
- public function devPackages(): JSONResponse{try{if($this->setting('dev_enabled','no')!=='yes')return new JSONResponse(['enabled'=>false,'packages'=>[]]);return new JSONResponse(['enabled'=>true,'folder'=>$this->setting('dev_folder','/.joplix/updates'),'packages'=>$this->devSvc()->listPackages()]);}catch(\Throwable $e){return $this->err($e);}}
-/**
- * @NoAdminRequired
- */
- public function devDeletePackage(): JSONResponse{try{if($this->setting('dev_enabled','no')!=='yes')throw new \RuntimeException('Entwicklungsumgebung ist nicht aktiviert');return new JSONResponse($this->devSvc()->deletePackage((string)$this->request->getParam('name','')));}catch(\Throwable $e){return $this->err($e);}}
-/**
- * @NoAdminRequired
- */
- public function devInstallPackage(): JSONResponse{try{if($this->setting('dev_enabled','no')!=='yes')throw new \RuntimeException('Entwicklungsumgebung ist nicht aktiviert');return new JSONResponse($this->devSvc()->installPackage((string)$this->request->getParam('name','')));}catch(\Throwable $e){return $this->err($e);}}
+ public function updateInstall(): JSONResponse {
+     try {
+         if (!$this->isAdmin()) {
+             return new JSONResponse(['error' => 'Administratorrechte erforderlich.'], 403);
+         }
+         if (!in_array($this->setting('update_source', 'codeberg'), ['', 'codeberg'], true)) {
+             throw new \RuntimeException('Aktuell wird nur Codeberg als Update-Quelle unterstuetzt');
+         }
+         $releaseId = filter_var($this->request->getParam('release_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+         $assetId = filter_var($this->request->getParam('asset_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+         if ($releaseId === false || $assetId === false) {
+             throw new \RuntimeException('Bitte die Release-Liste neu laden und ein Paket auswaehlen.');
+         }
+         return new JSONResponse($this->devSvc()->installRemoteAsset(
+             $this->setting('update_repo_url', ''),
+             $this->setting('update_channel', 'main'),
+             $releaseId,
+             $assetId
+         ));
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
+
+ public function devPackages(): JSONResponse {
+     try {
+         if (!$this->isAdmin()) {
+             return new JSONResponse(['error' => 'Administratorrechte erforderlich.'], 403);
+         }
+         if ($this->setting('dev_enabled', 'no') !== 'yes') {
+             return new JSONResponse(['enabled' => false, 'packages' => []]);
+         }
+         $this->workspace()->ensureWorkspace();
+         return new JSONResponse([
+             'enabled' => true,
+             'folder' => $this->setting('dev_folder', '/.joplix/updates'),
+             'packages' => $this->devSvc()->listPackages(),
+         ]);
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
+
+ public function devDeletePackage(): JSONResponse {
+     try {
+         if (!$this->isAdmin()) {
+             return new JSONResponse(['error' => 'Administratorrechte erforderlich.'], 403);
+         }
+         if ($this->setting('dev_enabled', 'no') !== 'yes') {
+             throw new \RuntimeException('Entwicklungsumgebung ist nicht aktiviert');
+         }
+         $this->workspace()->ensureWorkspace();
+         return new JSONResponse($this->devSvc()->deletePackage((string)$this->request->getParam('name', '')));
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
+
+ public function devInstallPackage(): JSONResponse {
+     try {
+         if (!$this->isAdmin()) {
+             return new JSONResponse(['error' => 'Administratorrechte erforderlich.'], 403);
+         }
+         if ($this->setting('dev_enabled', 'no') !== 'yes') {
+             throw new \RuntimeException('Entwicklungsumgebung ist nicht aktiviert');
+         }
+         $this->workspace()->ensureWorkspace();
+         return new JSONResponse($this->devSvc()->installPackage((string)$this->request->getParam('name', '')));
+     } catch (\Throwable $e) {
+         return $this->err($e);
+     }
+ }
+
 /**
  * @NoAdminRequired
  * @NoCSRFRequired

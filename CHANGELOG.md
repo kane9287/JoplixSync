@@ -1,3 +1,17 @@
+# Joplix 2026.11.65-beta
+
+- Resolves the selected release and ZIP server-side from the saved Codeberg repository and channel.
+- Validates archive paths, app identity, version and Nextcloud compatibility before activation.
+- Serializes installations and restores the previous app files on activation or upgrade failure.
+- Keeps the release ZIP compatible with the Beta 64 updater.
+
+# Joplix 2026.09.64-beta
+
+- Restricts package management and installation to Nextcloud administrators and requires CSRF tokens for update and settings requests.
+- Keeps integrated Codeberg updates available. Listing releases no longer writes settings or changes the workspace.
+- Stops automatic migration and deletion of legacy folders in the user's files.
+- Preserves note text ending in lines such as `source: …` and saves newly inserted attachment links.
+
 # Joplix 2026.09.63-beta
 
 ## Test release

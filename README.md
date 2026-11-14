@@ -16,6 +16,8 @@ A particularly important feature is online access: **Joplix is currently the onl
 
 ## Installation
 
+Nextcloud administrators can update Joplix through its integrated updater and remove it from the Nextcloud Apps administration. Manual ZIP installations require access to the Nextcloud host. To remove the app while keeping user files, use Nextcloud Apps administration and avoid the separate legacy purge script.
+
 ### One-Step Installation
 
 Joplix can be installed on your own server using the **Easy One-Step Installer**. Run the following command as root:

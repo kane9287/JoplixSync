@@ -10,6 +10,14 @@ In both cases the version in the tag (for example `joplix-2026.11.67` or `v2026.
 
 Both scripts use Nextcloud’s configured `apps_paths`, including `custom_apps` when configured. Set `NC_DIR` to the Nextcloud root if it lives outside `/var/www` or more than one instance is found. Set `WEBUSER` if the PHP service account differs from the detected account.
 
+Both variables go after `sudo`, so they reach the script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo NC_DIR=/var/www/nextcloud bash
+```
+
+If several Nextcloud instances are found, the installer lists them and stops; pick one with `NC_DIR`.
+
 ---
 
 # Stable Installation

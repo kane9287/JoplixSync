@@ -1,3 +1,11 @@
+# Joplix 2026.11.74
+
+- Links to other notes (`[Title](:/id)`, as Joplin's "Copy Markdown link" creates them) no longer appear under Attachments as "application/octet-stream · File missing", and they no longer count as attachments in the note list or search.
+- Clicking a note link in the preview opens the linked note, also when it is in another notebook. A link to a note in the trash says so instead. Links to notebooks open the notebook.
+- New editor button "Link to note": search for a note and insert a link to it at the cursor. Selected text becomes the link text; otherwise the note title is used. The link is written exactly as Joplin writes it, so it works in the Joplin desktop and mobile apps.
+- Link texts with escaped brackets (`\[`, `\]`) are shown correctly in the preview.
+- The index is rebuilt once automatically after the update.
+
 # Joplix 2026.11.73
 
 - Notes and notebooks deleted in a Joplin app no longer stay in the note list. Joplin moves deleted items to its trash, which keeps the file on the server with a deletion mark; Joplix ignored that mark for notes.

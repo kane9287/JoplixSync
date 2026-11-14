@@ -61,7 +61,8 @@ function jpSettingsOpen(){const o=document.getElementById('jp-settings-overlay')
 function jpDialogOpen(){return !!document.querySelector('.jp-dialog-overlay');}
 // One modal for every question. opts: title, message, input (string => text field), select ([{value,label}])
 // with value, buttons ([{label,value,primary,danger,submit}]; submit resolves with the field value) and
-// cancelValue (resolved on Escape or a click on the backdrop).
+// cancelValue (resolved on Escape or a click on the backdrop). mount(modal,finish): adds custom content
+// after the message, may resolve the dialog through finish(value), returns the element to focus.
 function jpDialog(opts){
   opts=opts||{};
   return new Promise(resolve=>{
@@ -75,6 +76,8 @@ function jpDialog(opts){
     if(opts.select){field=document.createElement('select');opts.select.forEach(o=>{const el=document.createElement('option');el.value=o.value;el.textContent=o.label;field.appendChild(el);});if(opts.value!==undefined)field.value=opts.value;}
     else if(opts.input!==undefined){field=document.createElement('input');field.type='text';field.value=String(opts.input||'');}
     if(field){field.setAttribute('aria-label',opts.title||opts.message||'');modal.appendChild(field);}
+    let mounted=null;
+    if(opts.mount)mounted=opts.mount(modal,value=>finish(value));
     const actions=document.createElement('div');actions.className='jp-modal-actions';modal.appendChild(actions);
     const buttons=opts.buttons||[{label:t('OK'),value:true,primary:true}];
     const cancelValue=opts.cancelValue!==undefined?opts.cancelValue:null;
@@ -95,7 +98,7 @@ function jpDialog(opts){
     document.addEventListener('keydown',onKey,true);
     backdrop.onclick=()=>finish(cancelValue);
     overlay.appendChild(backdrop);overlay.appendChild(modal);jpRoot().appendChild(overlay);
-    const focusTarget=field||defaultBtn||actions.querySelector('button');
+    const focusTarget=field||mounted||defaultBtn||actions.querySelector('button');
     if(focusTarget){focusTarget.focus();if(field&&field.select)field.select();}
   });
 }
@@ -301,7 +304,7 @@ function setupResizableColumns(){
 }
 function isEmptyIndex(idx){return !idx||(!(idx.tree||[]).length&&!(idx.notebooks||[]).length&&!(idx.notes||[]).length);}
 function hasFullTextIndex(idx){return !!(idx&&idx.search_version>=1&&(idx.notes||[]).every(n=>Object.prototype.hasOwnProperty.call(n,'search_text')));}
-function hasCurrentCountIndex(idx){return !!(idx&&idx.count_version>=4);}
+function hasCurrentCountIndex(idx){return !!(idx&&idx.count_version>=5);}
 function visibleNoteCountForNotebook(id){return ((state.index&&state.index.notes)||[]).filter(n=>n.notebook_id===id).length;}
 function notebookTitleWithCount(n){const c=visibleNoteCountForNotebook(n.id);return (n.title||'')+(c>0?' ('+c+')':'');}
 function normalizeSearchText(v){return String(v||'').toLocaleLowerCase();}
@@ -335,7 +338,8 @@ function jpInlineMarkdown(src){
   s=s.replace(/`([^`]+)`/g,(m,c)=>keep('<code>'+jpEscapeHtml(c)+'</code>'));
   s=jpEscapeHtml(s);
   s=s.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+[^)]*)?\)/g,(m,alt,u)=>{const tg=target(u);if(!tg)return m;if(tg.res)return keep('<img class="jp-md-res" data-jp-res="'+tg.res+'" alt="'+plain(alt)+'">');return keep('<a href="'+tg.url+'" target="_blank" rel="noopener noreferrer">')+(alt||tg.url)+keep('</a>');});
-  s=s.replace(/\[([^\]]+)\]\(\s*([^)\s]+)(?:\s+[^)]*)?\)/g,(m,text,u)=>{const tg=target(u);if(!tg)return m;return keep(tg.res?'<a href="#" data-jp-res-link="'+tg.res+'">':'<a href="'+tg.url+'" target="_blank" rel="noopener noreferrer">')+text+keep('</a>');});
+  // Link text may contain backslash-escaped brackets: Joplin writes note titles as [A \[draft\]](:/id).
+  s=s.replace(/\[((?:[^\]\\]|\\.)+)\]\(\s*([^)\s]+)(?:\s+[^)]*)?\)/g,(m,text,u)=>{const tg=target(u);if(!tg)return m;return keep(tg.res?'<a href="#" data-jp-res-link="'+tg.res+'">':'<a href="'+tg.url+'" target="_blank" rel="noopener noreferrer">')+text.replace(/\\([\[\]])/g,'$1')+keep('</a>');});
   s=s.replace(/(^|[\s(]|&lt;)(https?:\/\/(?:(?!&gt;|&lt;|&quot;)\S)+)/g,(m,pre,u)=>{const tail=(u.match(/[.,;:!?)\]]+$/)||[''])[0];const url=tail?u.slice(0,-tail.length):u;return pre+keep('<a href="'+url+'" target="_blank" rel="noopener noreferrer">'+url+'</a>')+tail;});
   s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/(^|[^\w])__([^_]+)__(?!\w)/g,'$1<strong>$2</strong>')
      .replace(/\*([^*\s][^*]*)\*/g,'<em>$1</em>').replace(/(^|[^\w])_([^_\s][^_]*)_(?!\w)/g,'$1<em>$2</em>')
@@ -438,7 +442,43 @@ function hydratePreviewResources(root){
     if(known.mime&&!String(known.mime).toLowerCase().startsWith('image/')){img.classList.add('jp-md-missing');return;}
     resourceData(img.dataset.jpRes).then(p=>{if(p&&/^data:image\//i.test(String(p.data_url||'')))img.src=p.data_url;else img.classList.add('jp-md-missing');}).catch(()=>img.classList.add('jp-md-missing'));
   });
-  root.querySelectorAll('a[data-jp-res-link]').forEach(a=>a.addEventListener('click',ev=>{ev.preventDefault();openResourceExternal(findResource(a.dataset.jpResLink)).catch(e=>jpAlert(e.message));}));
+  root.querySelectorAll('a[data-jp-res-link]').forEach(a=>{
+    const id=a.dataset.jpResLink;
+    const linked=findNoteLink(id);
+    if(linked){a.classList.add('jp-md-note-link');a.title=linked.title||'';}
+    a.addEventListener('click',ev=>{
+      ev.preventDefault();
+      if(findNoteLink(id)){openLinkedNote(id).catch(e=>jpAlert(e.message));return;}
+      const nb=((state.index&&state.index.notebooks)||[]).find(n=>String(n.id).toLowerCase()===String(id).toLowerCase());
+      if(nb){handleDirtyBeforeNoteChange('').then(ok=>{if(ok)selectNotebook(nb.id);});return;}
+      openResourceExternal(findResource(id)).catch(e=>jpAlert(e.message));
+    });
+  });
+}
+// Joplin links notes with the same ":/<id>" form as attachments. The server lists the targets that are notes
+// in note.note_links; the index covers notes linked from text typed since the note was loaded.
+function findNoteLink(id){
+  id=String(id||'').toLowerCase();
+  const own=((state.note&&state.note.note_links)||[]).find(l=>String(l.id).toLowerCase()===id);
+  if(own)return own;
+  const meta=findNoteMeta(id);
+  return meta.id?{id:meta.id,title:meta.title,notebook_id:meta.notebook_id,is_deleted:false}:null;
+}
+async function openLinkedNote(id){
+  id=String(id||'').toLowerCase();
+  const meta=findNoteMeta(id);
+  if(!meta.id){
+    // Not in the loaded index: open it anyway if the server knows it as an active note (index not refreshed yet).
+    const link=findNoteLink(id);
+    if(link&&!link.is_deleted)return openNote(id);
+    jpToast(t('Verlinkte Notiz nicht gefunden'),'error');return;
+  }
+  if(meta.notebook_id&&meta.notebook_id!==state.notebookId){
+    // Resolve unsaved changes before the list switches, so a cancel leaves everything where it was.
+    if(!(await handleDirtyBeforeNoteChange(id)))return;
+    selectNotebook(meta.notebook_id,{keepNote:true});
+  }
+  return openNote(id);
 }
 function renderDisplayMode(){const d=$('jp-note-display'),ta=$('jp-body');if(!d||!ta)return;d.innerHTML=jpRenderMarkdown(ta.value||'');d.querySelectorAll('.jp-md-checkbox[data-line]').forEach(cb=>cb.addEventListener('change',onDisplayCheckboxChange));hydratePreviewResources(d);updateSaveButton();}
 function setNoteMode(mode){state.displayMode=mode==='edit'?'edit':'view';const app=$('joplix-app');if(app){app.classList.toggle('jp-edit-mode',state.displayMode==='edit');app.classList.toggle('jp-view-mode',state.displayMode!=='edit');}if(state.displayMode!=='edit')renderDisplayMode();}
@@ -1372,9 +1412,54 @@ function applyEditorValue(value,pos){const ta=$('jp-body');if(!ta)return;ta.valu
 function editorUndo(){const ta=$('jp-body');if(!ta)return;const h=state.editorHistory||(state.editorHistory={undo:[],last:ta.value||'',max:80});if(!h.undo.length)return;const prev=h.undo.pop();applyEditorValue(prev,prev.length);}
 function jpReplaceSelection(before,after='',placeholder=''){const ta=$('jp-body');if(!ta)return;const start=ta.selectionStart||0,end=ta.selectionEnd||0;const val=ta.value||'';pushEditorUndo(val);const sel=val.slice(start,end)||placeholder;const next=val.slice(0,start)+before+sel+after+val.slice(end);const pos=start+before.length+sel.length+after.length;applyEditorValue(next,pos);}
 function jpInsertAtCursor(text){const ta=$('jp-body');if(!ta)return;const start=ta.selectionStart||0,end=ta.selectionEnd||0,val=ta.value||'';pushEditorUndo(val);const next=val.slice(0,start)+text+val.slice(end);const pos=start+text.length;applyEditorValue(next,pos);}
+// Note picker for the "link note" tool. Resolves with an index note entry or null.
+function jpPickNote(){
+  const all=((state.index&&state.index.notes)||[]).filter(n=>n.id!==state.noteId);
+  return jpDialog({title:t('Notiz verlinken'),cancelValue:null,buttons:[{label:t('Abbrechen'),value:null}],mount:(modal,finish)=>{
+    const input=document.createElement('input');input.type='search';input.className='jp-note-picker-search';input.placeholder=t('Notiz suchen');input.setAttribute('aria-label',t('Notiz suchen'));
+    const list=document.createElement('div');list.className='jp-note-picker-list';list.setAttribute('role','listbox');
+    modal.appendChild(input);modal.appendChild(list);
+    let shown=[],active=0;
+    const mark=()=>list.querySelectorAll('.jp-note-picker-item').forEach((el,i)=>{el.classList.toggle('active',i===active);el.setAttribute('aria-selected',i===active?'true':'false');if(i===active)el.scrollIntoView({block:'nearest'});});
+    const render=()=>{
+      const q=normalizeSearchText(input.value).trim();
+      shown=all.filter(n=>noteMatchesQuery(n,q)).sort((a,b)=>String(b.updated_time||'').localeCompare(String(a.updated_time||''))).slice(0,50);
+      active=0;list.innerHTML='';
+      if(!shown.length){const p=document.createElement('p');p.className='jp-muted';p.textContent=t('Keine Treffer');list.appendChild(p);return;}
+      shown.forEach((n,i)=>{
+        const b=document.createElement('button');b.type='button';b.className='jp-note-picker-item';b.setAttribute('role','option');b.tabIndex=-1;
+        const title=document.createElement('strong');title.textContent=n.title||t('(ohne Titel)');
+        const nb=document.createElement('span');nb.textContent=n.notebook_title||'';
+        b.appendChild(title);b.appendChild(nb);
+        b.onclick=()=>finish(n);b.onmouseenter=()=>{active=i;mark();};
+        list.appendChild(b);
+      });
+      mark();
+    };
+    input.addEventListener('input',render);
+    input.addEventListener('keydown',ev=>{
+      if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();if(!shown.length)return;active=(active+(ev.key==='ArrowDown'?1:shown.length-1))%shown.length;mark();}
+      else if(ev.key==='Enter'){ev.preventDefault();if(shown[active])finish(shown[active]);}
+    });
+    render();
+    return input;
+  }});
+}
+// Same escaping as Joplin's markdownUtils.escapeTitleText, so the link text matches what Joplin writes.
+function jpEscapeLinkTitle(title){return String(title||'').replace(/(\[|\])/g,'\\$1');}
+async function insertNoteLink(){
+  const ta=$('jp-body');if(!ta)return;
+  const start=ta.selectionStart||0,end=ta.selectionEnd||0;
+  const n=await jpPickNote();
+  if(!n)return;
+  ta.focus();ta.setSelectionRange(start,end);
+  // Selected text becomes the link text; it replaces the selection like every other format tool.
+  const sel=(ta.value||'').slice(start,end);
+  jpInsertAtCursor('['+jpEscapeLinkTitle(sel||n.title||'')+'](:/'+String(n.id).toLowerCase()+')');
+}
 function jpFormatDateTime(){const d=new Date();try{return new Intl.DateTimeFormat('de-AT',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(d).replace(',', '');}catch(e){return d.toLocaleString();}}
 function continueMarkdownList(ev){const ta=$('jp-body');if(!ta||ev.key!=='Enter'||ev.shiftKey||ev.altKey||ev.ctrlKey||ev.metaKey)return;const val=ta.value||'',pos=ta.selectionStart||0;if(pos!==ta.selectionEnd)return;const lineStart=val.lastIndexOf('\n',pos-1)+1;const line=val.slice(lineStart,pos);const indent=(line.match(/^\s*/)||[''])[0];let marker='';if(/^\s*- \[ \]\s*$/.test(line)||/^\s*-\s*$/.test(line)||/^\s*\d+\.\s*$/.test(line)){ev.preventDefault();pushEditorUndo(val);applyEditorValue(val.slice(0,lineStart)+val.slice(pos),lineStart);return;}if(/^\s*- \[ \] /.test(line))marker=indent+'- [ ] ';else if(/^\s*- /.test(line))marker=indent+'- ';else{const m=line.match(/^(\s*)(\d+)\. /);if(m)marker=m[1]+(parseInt(m[2],10)+1)+'. ';}if(marker){ev.preventDefault();jpInsertAtCursor('\n'+marker);}}
-function handleEditorTool(action){const ta=$('jp-body');if(!ta)return;if(action==='undo'){editorUndo();return;}if(action==='bold')return jpReplaceSelection('**','**','Text');if(action==='italic')return jpReplaceSelection('*','*','Text');if(action==='link')return jpReplaceSelection('[','](https://)',t('Linktext'));if(action==='code')return jpReplaceSelection('`','`','code');if(action==='resource'){const f=$('jp-resource-file');if(f)f.click();return;}if(action==='ul')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- ');if(action==='ol')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'1. ');if(action==='todo')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- [ ] ');if(action==='h2')return jpInsertAtCursor('\n## ');if(action==='hr')return jpInsertAtCursor('\n\n---\n\n');if(action==='datetime')return jpInsertAtCursor(jpFormatDateTime());if(action==='marker')return jpReplaceSelection('==','==',t('Markierung'));}
+function handleEditorTool(action){const ta=$('jp-body');if(!ta)return;if(action==='undo'){editorUndo();return;}if(action==='bold')return jpReplaceSelection('**','**','Text');if(action==='italic')return jpReplaceSelection('*','*','Text');if(action==='link')return jpReplaceSelection('[','](https://)',t('Linktext'));if(action==='code')return jpReplaceSelection('`','`','code');if(action==='notelink'){insertNoteLink().catch(e=>jpAlert(e.message));return;}if(action==='resource'){const f=$('jp-resource-file');if(f)f.click();return;}if(action==='ul')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- ');if(action==='ol')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'1. ');if(action==='todo')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- [ ] ');if(action==='h2')return jpInsertAtCursor('\n## ');if(action==='hr')return jpInsertAtCursor('\n\n---\n\n');if(action==='datetime')return jpInsertAtCursor(jpFormatDateTime());if(action==='marker')return jpReplaceSelection('==','==',t('Markierung'));}
 function setupEditorFormatbar(){document.querySelectorAll('[data-jp-editor]').forEach(b=>b.addEventListener('click',ev=>{ev.preventDefault();handleEditorTool(b.dataset.jpEditor);}));const ta=$('jp-body');if(ta){resetEditorHistory(ta.value||'');ta.addEventListener('keydown',continueMarkdownList);ta.addEventListener('input',()=>{const h=state.editorHistory||(state.editorHistory={undo:[],last:'',max:80});if(h.last!==ta.value){h.undo.push(h.last);while(h.undo.length>(h.max||80))h.undo.shift();h.last=ta.value;}});}}
 
 function getInstalledVersion(){const app=document.getElementById('joplix-app');const v=(app&&app.dataset&&app.dataset.joplixVersion)||'';return parseJoplixVersionText(v)?parseJoplixVersionText(v).text:v||'0.0.0';}
@@ -1551,6 +1636,11 @@ const JP_EN={
 'Abspielen':'Play',
 'Anhänge':'Attachments',
 'Datei fehlt':'File missing',
+'Notiz verlinken':'Link to note',
+'Notiz suchen':'Search notes',
+'Keine Treffer':'No matches',
+'(ohne Titel)':'(untitled)',
+'Verlinkte Notiz nicht gefunden':'Linked note not found',
 'Bild':'Image',
 'Bitte Notizbuch auswaehlen.':'Please select a notebook.',
 'Bitte Notizbuch auswählen.':'Please select a notebook.',

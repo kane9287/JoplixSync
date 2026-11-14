@@ -103,6 +103,7 @@ if (is_readable($infoXml)) {
             <button type="button" data-jp-editor="hr" title="Trennlinie" aria-label="Trennlinie"><span class="jp-icon" data-icon="minus"></span></button>
             <span class="jp-editor-separator"></span>
             <button type="button" data-jp-editor="link" title="Link einfügen" aria-label="Link einfügen"><span class="jp-icon" data-icon="link"></span></button>
+            <button type="button" data-jp-editor="notelink" title="Notiz verlinken" aria-label="Notiz verlinken"><span class="jp-icon" data-icon="note"></span></button>
             <button type="button" data-jp-editor="resource" title="Ressource anhängen" aria-label="Ressource anhängen"><span class="jp-icon" data-icon="paperclip"></span></button>
             <button type="button" data-jp-editor="datetime" title="Aktuelles Datum und Uhrzeit einfügen" aria-label="Aktuelles Datum und Uhrzeit einfügen"><span class="jp-icon" data-icon="clock"></span></button>
           </div>

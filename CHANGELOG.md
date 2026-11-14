@@ -1,3 +1,13 @@
+# Joplix 2026.11.69
+
+- The interface now follows the Nextcloud design: colours, radii and control sizes come from the active Nextcloud theme, so light, dark, high-contrast and custom accent colours all apply. Emoji buttons are replaced by icons.
+- Column order is now notebooks, note list, note (as in Nextcloud Mail and Notes). Column widths can still be dragged; saved widths from the old layout are reset once.
+- One toolbar per note: Preview/Edit switch, Save, and a menu with attach file, rebuild index and delete note. Saving keeps the current mode. Ctrl/Cmd+S saves.
+- The preview renders tables, block quotes, nested lists, strikethrough, highlights, headings up to level 6, plain links, and images and attachment links that point to Joplin resources.
+- Browser pop-ups (alert, confirm, prompt) are replaced by in-app dialogs; moving a note offers a notebook list instead of asking for a number. Saving shows a short notification.
+- On narrow windows one column is shown at a time, with back buttons.
+- Unchanged: the editor is still the Markdown source, and a note is saved exactly as typed. The preview never rewrites a note; ticking a checkbox changes only that line.
+
 # Joplix 2026.11.68
 
 - Declares compatibility with Nextcloud 35 (supported range is now 32 to 35).

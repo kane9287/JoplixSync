@@ -2,7 +2,6 @@
 script('joplix','app');
 style('joplix','style');
 $iconUrl = image_path('joplix','app.svg');
-$iconDarkUrl = image_path('joplix','app-dark.svg');
 $faviconUrl = image_path('joplix','favicon.svg');
 $joplixVersion = 'unknown';
 $isAdmin = (bool)($_['isAdmin'] ?? false);
@@ -13,84 +12,121 @@ if (is_readable($infoXml)) {
         $joplixVersion = trim($m[1]);
     }
 }
+/*
+ * Markup notes:
+ * - #joplix wraps the app and every overlay; css/style.css scopes all rules to it, and menus/dialogs
+ *   created by js/app.js are appended to it.
+ * - <span class="jp-icon" data-icon="name"> is filled with an inline SVG by hydrateIcons() in js/app.js.
+ * - Element ids are the contract with js/app.js. Text is German; English comes from JP_EN in js/app.js.
+ */
 ?>
 <link rel="icon" type="image/svg+xml" href="<?php p($faviconUrl); ?>">
-<div id="joplix-app" data-joplix-version="<?php p($joplixVersion); ?>" data-joplix-is-admin="<?php p($isAdmin ? '1' : '0'); ?>">
-  <aside class="jp-sidebar" data-jp-col="left">
+<div id="joplix">
+<div id="joplix-app" class="jp-view-mode jp-no-note" data-pane="nav" data-joplix-version="<?php p($joplixVersion); ?>" data-joplix-is-admin="<?php p($isAdmin ? '1' : '0'); ?>">
+  <aside class="jp-sidebar" data-jp-col="nav">
     <div class="jp-brand">
-      <img class="jp-logo-img jp-logo-img-light" src="<?php p($iconUrl); ?>" alt="">
-      <img class="jp-logo-img jp-logo-img-dark" src="<?php p($iconDarkUrl); ?>" alt="">
-      <div class="jp-brand-text"><strong>Joplix <?php p($joplixVersion); ?></strong><?php if ($isAdmin): ?><a id="jp-brand-update" class="jp-brand-update" href="#" target="_blank" rel="noopener" hidden></a><?php endif; ?></div>
+      <img class="jp-logo-img" src="<?php p($iconUrl); ?>" alt="">
+      <div class="jp-brand-text"><strong>Joplix</strong><?php if ($isAdmin): ?><a id="jp-brand-update" class="jp-brand-update" href="#" target="_blank" rel="noopener" hidden></a><?php endif; ?></div>
     </div>
-    <button class="jp-action" id="jp-new-root">+ Notizbuch</button>
-    <div class="jp-nav-section">
-    </div>
+    <button class="jp-action" id="jp-new-root" type="button"><span class="jp-icon" data-icon="plus"></span><span>Neues Notizbuch</span></button>
     <div class="jp-nav-title">Notizbücher</div>
     <div id="jp-tree" class="jp-tree"></div>
-    <button class="jp-settings-button" id="jp-open-settings" title="Einstellungen">⚙ Einstellungen</button>
+    <button class="jp-settings-button" id="jp-open-settings" type="button"><span class="jp-icon" data-icon="cog"></span><span>Einstellungen</span></button>
   </aside>
 
-  <div class="jp-resizer" id="jp-resize-left" data-resize="left" title="Spaltenbreite ändern"></div>
+  <div class="jp-resizer" id="jp-resize-left" data-resize="nav" title="Spaltenbreite ändern"></div>
 
-  <main class="jp-content" data-jp-col="middle">
+  <section class="jp-list" data-jp-col="list">
+    <div class="jp-list-head">
+      <button id="jp-back-to-nav" class="jp-icon-btn jp-back" type="button" title="Notizbücher" aria-label="Notizbücher"><span class="jp-icon" data-icon="arrowLeft"></span></button>
+      <div class="jp-search-wrap"><span class="jp-icon" data-icon="magnify"></span><input id="jp-search" type="search" placeholder="Notizen durchsuchen …" aria-label="Notizen durchsuchen …"></div>
+      <button id="jp-sort-button" class="jp-icon-btn" type="button" title="Sortierung umkehren" aria-label="Sortierung umkehren"><span class="jp-icon" data-icon="sort"></span></button>
+      <button id="jp-new-note-main" class="jp-icon-btn primary" type="button" title="Neue Notiz" aria-label="Neue Notiz"><span class="jp-icon" data-icon="plus"></span></button>
+    </div>
+    <div id="jp-breadcrumb" class="jp-breadcrumb">Bitte Notizbuch auswählen</div>
+    <div id="jp-notes" class="jp-notes"><p>Bitte links ein Notizbuch auswählen.</p></div>
+    <div id="jp-index-status" class="jp-index-status">Index wird geladen...</div>
+  </section>
+
+  <div class="jp-resizer" id="jp-resize-right" data-resize="list" title="Spaltenbreite ändern"></div>
+
+  <main class="jp-content" data-jp-col="note">
     <section id="jp-editor-view" class="jp-editor-view">
       <div class="jp-toolbar">
-        <div id="jp-breadcrumb" class="jp-breadcrumb">Bitte Notizbuch auswählen</div>
-        <div class="jp-toolbar-actions"><button id="jp-sync-now" type="button" hidden>Synchronisieren</button><button id="jp-rebuild-index">Index neu</button><button id="jp-new-note-main">+ Notiz</button></div>
+        <button id="jp-back-to-list" class="jp-icon-btn jp-back" type="button" title="Zurück" aria-label="Zurück"><span class="jp-icon" data-icon="arrowLeft"></span></button>
+        <div id="jp-note-path" class="jp-note-path">Keine Notiz geöffnet</div>
+        <div class="jp-toolbar-actions">
+          <button id="jp-sync-now" class="jp-btn-tertiary" type="button" hidden><span class="jp-icon" data-icon="sync"></span><span>Synchronisieren</span></button>
+          <div class="jp-segment jp-note-only" role="group">
+            <button id="jp-cancel-edit" type="button"><span class="jp-icon" data-icon="eye"></span><span>Vorschau</span></button>
+            <button id="jp-edit-note" type="button"><span class="jp-icon" data-icon="pencil"></span><span>Bearbeiten</span></button>
+          </div>
+          <button id="jp-save-note" class="primary jp-note-only" type="button" disabled><span class="jp-icon" data-icon="save"></span><span>Speichern</span></button>
+          <div class="jp-more">
+            <button id="jp-more-button" class="jp-icon-btn" type="button" title="Weitere Aktionen" aria-label="Weitere Aktionen" aria-haspopup="menu" aria-expanded="false"><span class="jp-icon" data-icon="dots"></span></button>
+            <div id="jp-more-menu" class="jp-menu" role="menu" hidden>
+              <label class="jp-menu-item jp-upload jp-note-only"><span class="jp-icon" data-icon="paperclip"></span><span>Datei anhängen</span><input id="jp-resource-file" type="file"></label>
+              <button id="jp-rebuild-index" class="jp-menu-item" type="button" role="menuitem"><span class="jp-icon" data-icon="refresh"></span><span>Index neu aufbauen</span></button>
+              <button id="jp-delete-note" class="jp-menu-item danger jp-note-only" type="button" role="menuitem"><span class="jp-icon" data-icon="delete"></span><span>Notiz löschen</span></button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="jp-note-modebar"><button id="jp-edit-note" type="button" class="jp-mode-edit">Bearbeiten</button><button id="jp-save-note-top" type="button" class="primary jp-save-note-top" disabled>Speichern</button><button id="jp-cancel-edit" type="button" class="jp-mode-cancel">Anzeige</button></div>
-      <input id="jp-title" class="jp-title" placeholder="Titel">
-      <div id="jp-note-path" class="jp-note-path">Keine Notiz geöffnet</div>
-      <div id="jp-editor-formatbar" class="jp-editor-formatbar" aria-label="Editor-Werkzeuge">
-        <button type="button" data-jp-editor="undo" title="Rückgängig">‹</button>
-        <span class="jp-editor-separator"></span>
-        <button type="button" data-jp-editor="bold" title="Fett"><strong>B</strong></button>
-        <button type="button" data-jp-editor="italic" title="Kursiv"><em>I</em></button>
-        <button type="button" data-jp-editor="link" title="Link einfügen">🔗</button>
-        <button type="button" data-jp-editor="code" title="Code einfügen">{}</button>
-        <button type="button" data-jp-editor="resource" title="Ressource anhängen">📎</button>
-        <button type="button" data-jp-editor="ul" title="Aufzählung">≡</button>
-        <button type="button" data-jp-editor="ol" title="Nummerierte Liste">☰</button>
-        <button type="button" data-jp-editor="todo" title="Checkliste">☑</button>
-        <button type="button" data-jp-editor="h2" title="Überschrift">H</button>
-        <button type="button" data-jp-editor="hr" title="Trennlinie">•••</button>
-        <button type="button" data-jp-editor="datetime" title="Aktuelles Datum und Uhrzeit einfügen">📅</button>
-        <button type="button" data-jp-editor="marker" title="Markierung einfügen">🖌</button>
+
+      <div class="jp-empty">
+        <span class="jp-icon" data-icon="note"></span>
+        <strong>Keine Notiz geöffnet</strong>
+        <span>Wähle eine Notiz aus der Liste oder lege eine neue an.</span>
       </div>
-      <div id="jp-meta" class="jp-meta"></div>
-      <div id="jp-tags" class="jp-tags"></div>
-      <div id="jp-note-display" class="jp-note-display" aria-live="polite"></div>
-      <textarea id="jp-body" class="jp-body" placeholder="Notizinhalt"></textarea>
-      <div class="jp-editor-actions"><button id="jp-save-note" class="primary" disabled>Speichern</button><button id="jp-delete-note">Löschen</button><label class="jp-upload">📎 Ressource<input id="jp-resource-file" type="file"></label></div>
-      <div id="jp-resources" class="jp-resources"></div>
+
+      <div class="jp-note-area">
+        <div class="jp-note-inner">
+          <input id="jp-title" class="jp-title" placeholder="Titel" aria-label="Titel">
+          <div id="jp-meta" class="jp-meta"></div>
+          <div id="jp-tags" class="jp-tags"></div>
+          <div id="jp-editor-formatbar" class="jp-editor-formatbar" role="toolbar" aria-label="Editor-Werkzeuge">
+            <button type="button" data-jp-editor="undo" title="Rückgängig" aria-label="Rückgängig"><span class="jp-icon" data-icon="undo"></span></button>
+            <span class="jp-editor-separator"></span>
+            <button type="button" data-jp-editor="bold" title="Fett" aria-label="Fett"><span class="jp-icon" data-icon="bold"></span></button>
+            <button type="button" data-jp-editor="italic" title="Kursiv" aria-label="Kursiv"><span class="jp-icon" data-icon="italic"></span></button>
+            <button type="button" data-jp-editor="marker" title="Markierung einfügen" aria-label="Markierung einfügen"><span class="jp-icon" data-icon="marker"></span></button>
+            <button type="button" data-jp-editor="code" title="Code einfügen" aria-label="Code einfügen"><span class="jp-icon" data-icon="code"></span></button>
+            <span class="jp-editor-separator"></span>
+            <button type="button" data-jp-editor="h2" title="Überschrift" aria-label="Überschrift"><span class="jp-icon" data-icon="heading"></span></button>
+            <button type="button" data-jp-editor="ul" title="Aufzählung" aria-label="Aufzählung"><span class="jp-icon" data-icon="listBulleted"></span></button>
+            <button type="button" data-jp-editor="ol" title="Nummerierte Liste" aria-label="Nummerierte Liste"><span class="jp-icon" data-icon="listNumbered"></span></button>
+            <button type="button" data-jp-editor="todo" title="Checkliste" aria-label="Checkliste"><span class="jp-icon" data-icon="checkbox"></span></button>
+            <button type="button" data-jp-editor="hr" title="Trennlinie" aria-label="Trennlinie"><span class="jp-icon" data-icon="minus"></span></button>
+            <span class="jp-editor-separator"></span>
+            <button type="button" data-jp-editor="link" title="Link einfügen" aria-label="Link einfügen"><span class="jp-icon" data-icon="link"></span></button>
+            <button type="button" data-jp-editor="resource" title="Ressource anhängen" aria-label="Ressource anhängen"><span class="jp-icon" data-icon="paperclip"></span></button>
+            <button type="button" data-jp-editor="datetime" title="Aktuelles Datum und Uhrzeit einfügen" aria-label="Aktuelles Datum und Uhrzeit einfügen"><span class="jp-icon" data-icon="clock"></span></button>
+          </div>
+          <div id="jp-note-display" class="jp-note-display" aria-live="polite"></div>
+          <textarea id="jp-body" class="jp-body" placeholder="Notizinhalt" aria-label="Notizinhalt" spellcheck="true"></textarea>
+          <div id="jp-resources" class="jp-resources"></div>
+        </div>
+      </div>
     </section>
   </main>
-
-  <div class="jp-resizer" id="jp-resize-right" data-resize="right" title="Spaltenbreite ändern"></div>
-
-  <section class="jp-list" data-jp-col="right">
-    <div class="jp-list-head"><input id="jp-search" placeholder="Volltextsuche..."><button id="jp-sort-button">⇅</button></div>
-    <div id="jp-index-status" class="jp-index-status">Index wird geladen...</div>
-    <div id="jp-notes" class="jp-notes"><p>Bitte links ein Notizbuch auswählen.</p></div>
-  </section>
 </div>
 
-<div id="jp-settings-overlay" class="jp-settings-overlay" aria-hidden="true">
-  <div class="jp-settings-backdrop" id="jp-settings-backdrop"></div>
+<div id="jp-settings-overlay" class="jp-settings-overlay jp-overlay" aria-hidden="true">
+  <div class="jp-settings-backdrop jp-backdrop" id="jp-settings-backdrop"></div>
   <section class="jp-settings-modal" role="dialog" aria-modal="true" aria-labelledby="jp-settings-title">
     <aside class="jp-settings-menu">
-      <h2 id="jp-settings-title">Joplix-<br>Einstellungen</h2>
-      <button class="active" data-settings-tab="general">Allgemein</button>
-      <button data-settings-tab="view">Aussehen</button>
-      <button data-settings-tab="index">Index</button>
-      <button data-settings-tab="sync">Synchronisation</button>
-      <?php if ($isAdmin): ?><button data-settings-tab="update">Update</button><?php endif; ?>
-      <button data-settings-tab="language">Sprache</button>
-      <button data-settings-tab="privacy">Datenschutz</button>
-      <button data-settings-tab="about">Über</button>
+      <h2 id="jp-settings-title">Joplix-Einstellungen</h2>
+      <button class="active" type="button" data-settings-tab="general">Allgemein</button>
+      <button type="button" data-settings-tab="view">Aussehen</button>
+      <button type="button" data-settings-tab="index">Index</button>
+      <button type="button" data-settings-tab="sync">Synchronisation</button>
+      <?php if ($isAdmin): ?><button type="button" data-settings-tab="update">Update</button><?php endif; ?>
+      <button type="button" data-settings-tab="language">Sprache</button>
+      <button type="button" data-settings-tab="privacy">Datenschutz</button>
+      <button type="button" data-settings-tab="about">Über</button>
     </aside>
     <div class="jp-settings-panel-area">
-      <button id="jp-close-settings" class="jp-settings-close" type="button" aria-label="Einstellungen schließen">×</button>
+      <button id="jp-close-settings" class="jp-settings-close jp-icon-btn" type="button" title="Einstellungen schließen" aria-label="Einstellungen schließen"><span class="jp-icon" data-icon="close"></span></button>
       <section class="jp-settings-pane active" data-settings-section="general">
         <h3>Allgemein</h3>
         <div class="jp-setting-card jp-setting-card-path">
@@ -115,7 +151,7 @@ if (is_readable($infoXml)) {
             <option value="tab">Neuer Tab</option>
           </select>
         </div>
-        <?php if ($isAdmin): ?><div class="jp-setting-row">
+        <?php if ($isAdmin): ?><div class="jp-setting-card">
           <label for="jp-setting-update-backup"><strong>Automatische App-Backups</strong><span>Standardmäßig werden keine App-Backups erstellt. Vollständige Nextcloud-Backups bleiben Aufgabe des Administrators.</span></label>
           <select id="jp-setting-update-backup">
             <option value="no">Keine Backups (empfohlen)</option>
@@ -129,10 +165,9 @@ if (is_readable($infoXml)) {
           <label><strong>Letzte Position merken</strong><span>Beim Öffnen wieder zum zuletzt verwendeten Notizbuch springen</span></label>
           <button id="jp-setting-remember-toggle" class="jp-switch" type="button" role="switch" aria-checked="true"><span></span></button>
         </div>
-        <h4>Layout</h4>
-        <div class="jp-segmented">
-          <button id="jp-layout-vertical" class="active" type="button">▣ Vertikale Aufteilung</button>
-          <button id="jp-layout-reset" type="button">↺ Spalten zurücksetzen</button>
+        <div class="jp-setting-card jp-setting-card-action">
+          <div><strong>Spaltenbreiten</strong><span>Setzt die Breite der Spalten auf den Standard zurück.</span></div>
+          <button id="jp-layout-reset" type="button">Zurücksetzen</button>
         </div>
       </section>
       <section class="jp-settings-pane" data-settings-section="index">
@@ -179,18 +214,12 @@ if (is_readable($infoXml)) {
 <?php if ($isAdmin): ?>
       <section class="jp-settings-pane" data-settings-section="update">
         <h3>Update</h3>
-        <div class="jp-setting-card jp-setting-card-static">
-          <div><strong>Update-Quelle</strong><span>GitHub-Repository für Joplix-Updates</span></div>
-          <div class="jp-segmented jp-update-source">
-            <button id="jp-update-source-codeberg" class="active" type="button">GitHub</button>
-          </div>
-        </div>
         <div class="jp-setting-card jp-setting-card-static jp-update-current-version">
           <div><strong>Aktuell installierte Version</strong><span id="jp-update-installed-version">Joplix <?php p($joplixVersion); ?></span></div>
         </div>
         <div class="jp-setting-card jp-setting-card-path">
           <label for="jp-update-repo-url"><strong>GitHub-Adresse</strong><span>Standard: https://github.com/kane9287/joplix-xsync/releases</span></label>
-          <input id="jp-update-repo-url" value="https://github.com/kane9287/joplix-xsync/releases" autocomplete="off">
+          <div class="jp-path-control"><input id="jp-update-repo-url" value="https://github.com/kane9287/joplix-xsync/releases" autocomplete="off" spellcheck="false"></div>
         </div>
         <div class="jp-setting-card">
           <label for="jp-update-channel"><strong>Release Channel</strong><span>Main zeigt reguläre GitHub-Releases, Beta zeigt Vorabversionen (Pre-releases).</span></label>
@@ -227,8 +256,9 @@ if (is_readable($infoXml)) {
       <section class="jp-settings-pane" data-settings-section="about">
         <h3>Über</h3>
         <div class="jp-setting-card jp-setting-card-static jp-about-card">
-          <div><strong>Joplix <?php p($joplixVersion); ?></strong><span>Nextcloud-App für deine Joplix-Daten.</span></div>
-          <p class="jp-about-created">Created with <span class="jp-heart" aria-label="love">♥</span> by STONEUBI from Tirol / Austria.</p>
+          <img class="jp-logo-img" src="<?php p($iconUrl); ?>" alt="">
+          <div><strong>Joplix <?php p($joplixVersion); ?></strong><span>Nextcloud-App für deine Joplix-Daten.</span>
+          <p class="jp-about-created">Created with <span class="jp-heart" aria-label="love">♥</span> by STONEUBI from Tirol / Austria.</p></div>
         </div>
       </section>
     </div>
@@ -236,11 +266,11 @@ if (is_readable($infoXml)) {
 </div>
 
 
-<div id="jp-welcome-overlay" class="jp-welcome-overlay" aria-hidden="true">
-  <div class="jp-welcome-backdrop"></div>
-  <section class="jp-welcome-modal" role="dialog" aria-modal="true" aria-labelledby="jp-welcome-title">
-    <button id="jp-welcome-close" class="jp-welcome-close" type="button" aria-label="Willkommen schließen">×</button>
-    <div class="jp-welcome-icon">📝</div>
+<div id="jp-welcome-overlay" class="jp-welcome-overlay jp-overlay" aria-hidden="true">
+  <div class="jp-welcome-backdrop jp-backdrop"></div>
+  <section class="jp-welcome-modal jp-modal" role="dialog" aria-modal="true" aria-labelledby="jp-welcome-title">
+    <button id="jp-welcome-close" class="jp-welcome-close jp-icon-btn" type="button" title="Willkommen schließen" aria-label="Willkommen schließen"><span class="jp-icon" data-icon="close"></span></button>
+    <img class="jp-welcome-icon" src="<?php p($iconUrl); ?>" alt="">
     <h2 id="jp-welcome-title">Willkommen bei Joplix</h2>
     <p>Joplix zeigt deine synchronisierten Notizen direkt in Nextcloud an. Für die erste Nutzung muss der Joplix-Ordner korrekt gesetzt und der Index aufgebaut sein. Unter Einstellungen › Synchronisation kann Joplix den Ordner selbst mit einem Joplin Server abgleichen.</p>
     <ol class="jp-welcome-steps">
@@ -248,17 +278,17 @@ if (is_readable($infoXml)) {
       <li><strong>Index aufbauen</strong><span>Wenn Notizen fehlen, in den Einstellungen unter Index den Neuaufbau starten.</span></li>
       <li><strong>Notizen bearbeiten</strong><span>Der Speichern-Button wird nur aktiv, wenn es Änderungen gibt.</span></li>
     </ol>
-    <div class="jp-welcome-actions">
+    <div class="jp-modal-actions">
       <button id="jp-welcome-settings" type="button">Einstellungen öffnen</button>
       <button id="jp-welcome-done" class="primary" type="button">Loslegen</button>
     </div>
   </section>
 </div>
 
-<div id="jp-note-context-menu" class="jp-note-context-menu" aria-hidden="true"></div>
+<div id="jp-note-context-menu" class="jp-note-context-menu jp-menu" role="menu" aria-hidden="true"></div>
 
-<div id="jp-pdf-viewer-overlay" class="jp-pdf-viewer-overlay" aria-hidden="true">
-  <div class="jp-pdf-viewer-backdrop" id="jp-pdf-viewer-backdrop"></div>
+<div id="jp-pdf-viewer-overlay" class="jp-pdf-viewer-overlay jp-overlay" aria-hidden="true">
+  <div class="jp-pdf-viewer-backdrop jp-backdrop" id="jp-pdf-viewer-backdrop"></div>
   <section class="jp-pdf-viewer-modal" role="dialog" aria-modal="true" aria-labelledby="jp-pdf-viewer-title">
     <header class="jp-pdf-viewer-head">
       <div>
@@ -267,10 +297,10 @@ if (is_readable($infoXml)) {
       </div>
       <div class="jp-pdf-viewer-actions">
         <a id="jp-pdf-viewer-open" href="#" target="_blank" rel="noopener">Extern öffnen</a>
-        <button id="jp-pdf-viewer-close" type="button" aria-label="PDF schließen">×</button>
+        <button id="jp-pdf-viewer-close" class="jp-icon-btn" type="button" title="PDF schließen" aria-label="PDF schließen"><span class="jp-icon" data-icon="close"></span></button>
       </div>
     </header>
     <iframe id="jp-pdf-viewer-frame" title="PDF-Anzeige"></iframe>
   </section>
 </div>
-
+</div>

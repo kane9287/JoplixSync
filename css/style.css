@@ -1,1477 +1,423 @@
-#joplix-app{--blue:#00679e;--blue-dark:#005c87;--nav:#d9edf6;--nav2:#c1ddea;--active:#005c87;--border:#d9d9d9;display:grid;grid-template-columns:310px minmax(0,1fr)370px;height:calc(100vh - 50px);overflow:hidden;background:#fff;color:#202124}#joplix-app button{font:inherit}.jp-sidebar{background:var(--nav);display:flex;flex-direction:column;overflow:auto;padding:18px}.jp-brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}.jp-logo,.jp-about-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--blue);color:#fff;font-weight:700}.jp-brand small{display:block;color:#5f6368}.jp-action,.jp-nav-static,.jp-settings-button,.jp-tree-item{width:100%;border:0;background:transparent;text-align:left;border-radius:10px;padding:10px;cursor:pointer}.jp-action{background:#fff;color:var(--blue);font-weight:700}.jp-nav-section{border-bottom:1px solid #c9e4ef;margin-bottom:12px;padding-bottom:10px}.jp-nav-title{font-weight:700;margin:12px 0 8px;display:flex;justify-content:space-between}.jp-nav-title button{border:0;background:#fff;border-radius:50%;width:28px;height:28px}.jp-tree{flex:1;overflow:auto}.jp-tree-item:hover,.jp-nav-static:hover,.jp-settings-button:hover{background:var(--nav2)}.jp-tree-item.active{background:#a9d3e3;box-shadow:inset 4px 0 0 #0082c9}.jp-settings-button{margin-top:auto;background:#c9e4ef}.jp-content{overflow:auto;padding:22px 28px;border-left:1px solid var(--border);border-right:1px solid var(--border)}.jp-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center}.jp-breadcrumb{color:#5f6368;font-size:14px}.jp-title{width:100%;border:0;font-size:30px;font-weight:700;margin:16px 0 6px;padding:8px 0}.jp-meta{color:#5f6368;border-bottom:1px solid var(--border);padding-bottom:10px}.jp-tags{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.jp-tags span{background:#e9f2f8;border-radius:14px;padding:5px 10px}.jp-tags button{border:1px solid #ccd;border-radius:14px;background:#fff;padding:5px 10px}.jp-body{width:100%;min-height:380px;border:1px solid #ddd;border-radius:12px;padding:14px;line-height:1.45;font-family:system-ui;font-size:15px}.jp-editor-actions{display:flex;gap:10px;margin:12px 0}.primary{background:var(--blue)!important;color:#fff!important;border:0!important}.jp-editor-actions button,.jp-toolbar button,.jp-upload{border:1px solid #ccd;background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}.jp-upload input{display:none}.jp-list{overflow:auto;padding:18px;background:#fff}.jp-list-head{display:flex;gap:8px}.jp-list-head input{flex:1;border:2px solid #888;border-radius:9px;padding:9px}.jp-index-status{font-size:12px;color:#5f6368;margin:10px 0}.jp-note-item{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #edf0f2;background:#fff;border-radius:10px;padding:12px;margin-bottom:4px;cursor:pointer}.jp-note-item strong,.jp-note-item span,.jp-note-item small{display:block}.jp-note-item span,.jp-note-item small{color:#5f6368}.jp-note-item:hover{background:#f7f9fb}.jp-note-item.active{background:var(--active);color:#fff}.jp-note-item.active span,.jp-note-item.active small{color:#fff}.jp-resources{margin-top:16px}.jp-resource{border:1px solid var(--border);border-radius:12px;padding:10px;margin:10px 0;background:#fff}.jp-resource img{max-width:100%;border-radius:8px;margin-top:8px}.jp-resource iframe{width:100%;height:520px;border:1px solid #ddd;border-radius:8px;margin-top:8px}.jp-dialog{border:0;border-radius:14px;box-shadow:0 12px 30px #0004;min-width:820px;padding:0}.jp-dialog-head{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--border)}.jp-dialog-head button{border:0;background:transparent;font-size:28px}.jp-dialog-grid{display:grid;grid-template-columns:210px 1fr}.jp-tabs{background:#f6f7f8;padding:18px;border-right:1px solid var(--border)}.jp-tabs button{display:block;width:100%;border:0;background:transparent;text-align:left;padding:12px;border-radius:9px}.jp-tabs button.active,.jp-tabs button:hover{background:#d9edf6;color:var(--blue);font-weight:700}.jp-tab-content{padding:22px}.jp-tab{display:none}.jp-tab.active{display:block}.jp-tab label{display:block;margin:14px 0}.jp-tab input,.jp-tab select{display:block;width:100%;box-sizing:border-box;padding:9px;margin-top:5px}.jp-check input{display:inline;width:auto}.jp-about{display:flex;gap:16px}.jp-dialog-actions{display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--border)}.jp-dialog-actions button{padding:9px 16px;border-radius:8px;border:1px solid #ccd;background:#fff}@media(max-width:1100px){#joplix-app{grid-template-columns:1fr;height:auto}.jp-sidebar,.jp-content,.jp-list{min-height:420px}}
-/* Joplix 1.0.1 notebook action menu */
-.jp-tree-row{display:flex;align-items:center;gap:4px;border-radius:10px;margin:1px 0}.jp-tree-row:hover{background:#c1ddea}.jp-tree-row.active{background:#a9d3e3;box-shadow:inset 4px 0 0 #0082c9}.jp-tree-row .jp-tree-item{flex:1;box-shadow:none!important;background:transparent!important}.jp-tree-menu{width:34px;height:34px;border:0;border-radius:10px;background:transparent;cursor:pointer;font-size:22px;line-height:1}.jp-tree-menu:hover{background:rgba(255,255,255,.75)}.jp-context-menu{position:fixed;z-index:10000;width:190px;background:#fff;border:1px solid #d9d9d9;border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:6px}.jp-context-menu button{display:block;width:100%;border:0;background:#fff;text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer}.jp-context-menu button:hover{background:#eef6fb}.jp-context-menu button.danger{color:#b00020}.jp-context-menu button.danger:hover{background:#fff1f2}
-/* Joplix 1.0.2 icon integration */
-.jp-logo-img{width:46px;height:46px;border-radius:14px;box-shadow:0 4px 12px rgba(0,59,102,.22);background:#00679e;flex:0 0 auto}.jp-about-icon-img{width:70px;height:70px;border-radius:18px;box-shadow:0 4px 16px rgba(0,59,102,.2);background:#00679e;flex:0 0 auto}.jp-logo{display:none!important}
-/* Joplix 1.0.3 Entwicklungsumgebung */
-.jp-dev-hint{background:#f7f9fb;border:1px solid #d9d9d9;border-radius:10px;padding:10px;line-height:1.4}.jp-dev-actions{margin:12px 0}.jp-dev-package{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid #d9d9d9;border-radius:10px;padding:10px;margin:8px 0;background:#fff}.jp-dev-package.invalid{opacity:.65}.jp-dev-package small{display:block;color:#5f6368}.jp-dev-buttons{display:flex;gap:8px}.jp-dev-buttons button{border:1px solid #ccd;background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}.jp-dev-buttons .install{background:#00679e;color:#fff;border-color:#00679e}.jp-dev-buttons .delete{color:#b00020}.jp-dev-buttons button:disabled{background:#eee;color:#999;border-color:#ddd;cursor:not-allowed}.error{color:#b00020}
-/* Joplix 1.0.5 welcome dialog */
-.jp-welcome-dialog{max-width:560px;min-width:0}.jp-welcome-body{padding:22px;text-align:left}.jp-welcome-icon{width:82px;height:82px;border-radius:20px;display:block;margin:0 auto 14px;background:#00679e;box-shadow:0 8px 22px rgba(0,59,102,.22)}.jp-welcome-body ul{margin:12px 0 0 22px}.jp-welcome-body li{margin:6px 0}.jp-dialog-head button:focus,.jp-dialog-actions button:focus{outline:2px solid #00679e;outline-offset:2px}
+/*
+ * Joplix stylesheet.
+ *
+ * Conventions (keep them when adding rules):
+ * - Every selector starts at #joplix, the wrapper around the app, the overlays and all menus/dialogs that
+ *   js/app.js creates. The id gives enough specificity to beat Nextcloud's global button/input rules
+ *   without !important.
+ * - Colours come only from Nextcloud theme variables (--color-*), so light, dark, high-contrast and custom
+ *   accent colours work without theme-specific selectors. Do not add fixed colour values.
+ * - Sizes use the --jp-* aliases below, which map to Nextcloud's own metrics.
+ * - Sections: 1 base · 2 layout · 3 navigation · 4 note list · 5 editor · 6 rendered note · 7 attachments
+ *   · 8 menus · 9 dialogs and overlays · 10 settings · 11 small screens
+ */
 
-/* Joplix 1.0.6 Hotfix: settings and welcome disabled */
-#jp-welcome-dialog{display:none!important;visibility:hidden!important;pointer-events:none!important}
-
-/* Joplix 1.0.7 full-page, resizable 3-column layout */
-html, body { height: 100%; }
-body { overflow: hidden; }
-#content, #app-content, #app-content-vue, .app-content, main.content, .content.app-joplix {
-  height: calc(100vh - 50px) !important;
-  min-height: calc(100vh - 50px) !important;
-  overflow: hidden !important;
-}
-#joplix-app {
-  --jp-left: 300px;
-  --jp-middle: 1fr;
-  --jp-right: 360px;
-  display: grid !important;
-  grid-template-columns: var(--jp-left) 8px minmax(360px, var(--jp-middle)) 8px var(--jp-right) !important;
-  width: 100% !important;
-  height: calc(100vh - 50px) !important;
-  min-height: calc(100vh - 50px) !important;
-  max-height: calc(100vh - 50px) !important;
-  overflow: hidden !important;
-  box-sizing: border-box !important;
-}
-.jp-sidebar, .jp-content, .jp-list {
-  min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  overflow: auto !important;
-  box-sizing: border-box !important;
-}
-.jp-content {
-  display: flex !important;
-  flex-direction: column !important;
-  min-width: 360px !important;
-}
-.jp-body {
-  flex: 1 1 auto !important;
-  min-height: 240px !important;
-  resize: none !important;
-}
-.jp-list { min-width: 260px !important; }
-.jp-sidebar { min-width: 220px !important; }
-.jp-resizer {
-  width: 8px;
+/* 1 — base ------------------------------------------------------------------------------------------- */
+#content.app-joplix { overflow: hidden; }
+#joplix {
+  --jp-h: var(--default-clickable-area, 34px);
+  --jp-gap: calc(var(--default-grid-baseline, 4px) * 2);
+  --jp-radius: var(--border-radius-element, var(--border-radius, 8px));
+  --jp-radius-lg: var(--border-radius-container, var(--border-radius-large, 12px));
+  --jp-muted: var(--color-text-maxcontrast);
+  --jp-shadow: 0 2px 10px var(--color-box-shadow);
+  width: 100%; flex: 1 1 auto; min-width: 0;
   height: 100%;
-  cursor: col-resize;
-  background: linear-gradient(to right, transparent 0, transparent 2px, rgba(0,103,158,.25) 3px, rgba(0,103,158,.25) 5px, transparent 6px);
-  z-index: 20;
-  user-select: none;
-  touch-action: none;
+  color: var(--color-main-text);
 }
-.jp-resizer:hover, .jp-resizer.dragging {
-  background: rgba(0,103,158,.28);
-}
-body.jp-resizing { cursor: col-resize !important; user-select: none !important; }
-.jp-index-status.warning { color: #8a5a00; background: #fff6db; border-color: #f3d27a; }
-.jp-index-status.ok { color: #146b2d; background: #edf9ef; border-color: #a8d6ad; }
-.jp-index-status.error { color: #a50000; background: #fff0f0; border-color: #e6a0a0; }
+#joplix *, #joplix *::before, #joplix *::after { box-sizing: border-box; }
+#joplix [hidden] { display: none !important; }
 
-/* Joplix 1.0.8 settings dialog */
-.jp-dialog{border:0;border-radius:14px;padding:0;box-shadow:0 20px 70px rgba(0,0,0,.28);max-width:760px;width:min(760px,92vw);max-height:88vh;background:#fff;color:#222}.jp-dialog::backdrop{background:rgba(0,0,0,.35)}.jp-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e9ef}.jp-dialog-head h2{margin:0;font-size:20px}.jp-dialog-head button{border:0;background:transparent;font-size:28px;line-height:1;cursor:pointer}.jp-settings-content{padding:18px 20px;overflow:auto;max-height:62vh;display:grid;gap:16px}.jp-settings-panel{border:1px solid #e3e8ef;border-radius:12px;padding:14px;background:#fbfdff}.jp-settings-panel h3{margin:0 0 12px}.jp-settings-panel label{display:flex;flex-direction:column;gap:6px;margin:10px 0}.jp-settings-panel input,.jp-settings-panel select{border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px}.jp-check{flex-direction:row!important;align-items:center}.jp-hint{color:#5b6472;font-size:13px;line-height:1.4}.jp-dialog-actions{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid #e5e9ef}.jp-dialog-actions button,.jp-settings-panel button{border:1px solid #cbd5e1;border-radius:8px;background:#fff;padding:8px 12px;cursor:pointer}.jp-dialog-actions .primary{background:#00679e;color:#fff;border-color:#00679e}
+#joplix .jp-icon { display: inline-flex; flex: 0 0 auto; width: 20px; height: 20px; }
+#joplix .jp-icon svg { width: 100%; height: 100%; fill: currentColor; }
 
-/* Joplix 1.0.10 Mail-App-like inline settings view, no dialog */
-.jp-editor-view, .jp-settings-view {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+/* Buttons: secondary by default, plus .primary, .danger, .jp-btn-tertiary and .jp-icon-btn. */
+#joplix button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--jp-h); margin: 0; padding: 0 12px;
+  border: 0; border-radius: var(--jp-radius);
+  background: var(--color-primary-element-light); color: var(--color-primary-element-light-text);
+  font: inherit; font-weight: bold; line-height: 1.2; cursor: pointer; white-space: nowrap;
+  box-shadow: none; opacity: 1;
 }
-.jp-settings-view { display: none; overflow: hidden; background: #fff; }
-#joplix-app.jp-settings-mode .jp-editor-view { display: none !important; }
-#joplix-app.jp-settings-mode .jp-settings-view { display: flex !important; }
-#joplix-app.jp-settings-mode .jp-list { opacity: .42; }
-.jp-settings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 22px;
-  border-bottom: 1px solid #e5e9ef;
-  background: #f8fbff;
+#joplix button:hover { background: var(--color-primary-element-light-hover); }
+#joplix button:focus-visible,
+#joplix .jp-upload:focus-within {
+  outline: 2px solid var(--color-main-text); outline-offset: 0;
+  box-shadow: 0 0 0 4px var(--color-main-background);
 }
-.jp-settings-header h2 { margin: 0 0 4px; font-size: 22px; }
-.jp-settings-header p { margin: 0; color: #5f6c7b; }
-.jp-settings-header button, .jp-settings-main button {
-  border: 1px solid #cbd5e1;
-  border-radius: 9px;
-  background: #fff;
-  padding: 8px 13px;
-  cursor: pointer;
-}
-.jp-settings-layout {
-  min-height: 0;
-  flex: 1;
-  display: grid;
-  grid-template-columns: 220px minmax(0,1fr);
-  overflow: hidden;
-}
-.jp-settings-nav {
-  border-right: 1px solid #e5e9ef;
-  background: #f3f8ff;
-  padding: 14px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow: auto;
-}
-.jp-settings-nav button {
-  text-align: left;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  padding: 10px 12px;
-  cursor: pointer;
-}
-.jp-settings-nav button.active, .jp-settings-nav button:hover {
-  background: #dcefff;
-  color: #005a8d;
-}
-.jp-settings-main {
-  overflow: auto;
-  padding: 24px;
-}
-.jp-settings-section { display: none; max-width: 760px; }
-.jp-settings-section.active { display: block; }
-.jp-settings-section h3 { margin: 0 0 16px; font-size: 19px; }
-.jp-settings-section label { display: flex; flex-direction: column; gap: 7px; margin: 12px 0; }
-.jp-settings-section input, .jp-settings-section select {
-  border: 1px solid #cbd5e1;
-  border-radius: 9px;
-  padding: 9px 11px;
-  background: #fff;
-}
-.jp-settings-section input[readonly] { background: #f7fafc; color: #596579; }
-.jp-settings-section .primary { background: #00679e; color: #fff; border-color: #00679e; }
-.jp-settings-section .jp-check { flex-direction: row; align-items: center; }
-.jp-settings-section .jp-hint { color: #5f6c7b; line-height: 1.45; }
-.jp-dialog { display: none !important; }
+#joplix button:disabled { opacity: .5; cursor: default; }
+#joplix button.primary { background: var(--color-primary-element); color: var(--color-primary-element-text); }
+#joplix button.primary:hover:not(:disabled) { background: var(--color-primary-element-hover); }
+#joplix button.danger { background: var(--color-error); color: var(--color-primary-element-text); }
+#joplix button.danger:hover { background: var(--color-error-hover, var(--color-error)); }
+#joplix button.jp-btn-tertiary,
+#joplix button.jp-icon-btn { background: transparent; color: var(--color-main-text); }
+#joplix button.jp-btn-tertiary:hover,
+#joplix button.jp-icon-btn:hover { background: var(--color-background-hover); }
+#joplix button.jp-icon-btn { width: var(--jp-h); padding: 0; flex: 0 0 auto; }
+#joplix button.jp-icon-btn.primary { background: var(--color-primary-element); color: var(--color-primary-element-text); }
+#joplix button.jp-icon-btn.primary:hover { background: var(--color-primary-element-hover); }
 
-/* Joplix 1.0.11 polished Mail/Calendar-like settings overlay, no native dialog */
-.jp-settings-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  display: none;
-  align-items: center;
-  justify-content: center;
+/* :where() keeps these defaults at id-only specificity so component rules such as .jp-title can override them. */
+#joplix :where(input:not([type=checkbox]):not([type=file]), select, textarea) {
+  min-height: var(--jp-h); margin: 0; padding: 0 12px;
+  border: 1px solid var(--color-border-maxcontrast); border-radius: var(--jp-radius);
+  background: var(--color-main-background); color: var(--color-main-text);
+  font: inherit; box-shadow: none; outline: 0;
 }
-.jp-settings-overlay.open { display: flex; }
-.jp-settings-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(20, 28, 36, .58);
-  backdrop-filter: blur(1px);
-}
-.jp-settings-modal {
-  position: relative;
-  z-index: 1;
-  width: min(1080px, calc(100vw - 56px));
-  height: min(830px, calc(100vh - 72px));
-  border-radius: 14px;
-  overflow: hidden;
-  background: #f8fbff;
-  box-shadow: 0 24px 90px rgba(0,0,0,.34);
-  display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-}
-.jp-settings-menu {
-  background: #f3f8fc;
-  border-right: 1px solid #d8e2ec;
-  padding: 22px 8px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.jp-settings-menu h2 {
-  margin: 0 8px 22px;
-  font-size: 25px;
-  line-height: 1.34;
-  font-weight: 700;
-  color: #1f2933;
-}
-.jp-settings-menu button {
-  border: 0;
-  background: transparent;
-  border-radius: 9px;
-  text-align: left;
-  padding: 10px 12px;
-  font-size: 15px;
-  cursor: pointer;
-  color: #222b35;
-}
-.jp-settings-menu button.active,
-.jp-settings-menu button:hover {
-  background: #e1edf5;
-}
-.jp-settings-panel-area {
-  position: relative;
-  overflow: auto;
-  padding: 20px 32px 32px;
-  background: #fff;
-}
-.jp-settings-close {
-  position: absolute;
-  right: 18px;
-  top: 14px;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  font-size: 32px;
-  line-height: 32px;
-  cursor: pointer;
-  color: #222;
-}
-.jp-settings-close:hover { background: #eef3f8; }
-.jp-settings-pane { display: none; max-width: 880px; padding-right: 36px; }
-.jp-settings-pane.active { display: block; }
-.jp-settings-pane h3 {
-  margin: 0 0 14px;
-  font-size: 24px;
-  line-height: 1.35;
-  color: #20252c;
-}
-.jp-settings-pane h4 {
-  margin: 24px 0 9px;
-  font-size: 15px;
-  color: #2d3640;
-}
-.jp-setting-card {
-  min-height: 54px;
-  margin: 10px 0 14px;
-  padding: 12px 14px;
-  border: 1px solid #d8e3ed;
-  border-radius: 9px;
-  background: #f7fafc;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-.jp-setting-card strong { display: block; font-size: 15px; font-weight: 600; color: #1f2933; }
-.jp-setting-card span { display: block; margin-top: 2px; color: #6a737d; line-height: 1.35; }
-.jp-setting-card select {
-  min-width: 220px;
-  border: 1px solid #cdd8e4;
-  border-radius: 8px;
-  background: #fff;
-  padding: 8px 10px;
-}
-.jp-setting-card-action button,
-.jp-segmented button {
-  border: 1px solid #cdd8e4;
-  border-radius: 8px;
-  background: #e6f1f8;
-  color: #00354d;
-  padding: 9px 14px;
-  cursor: pointer;
-}
-.jp-setting-card-action button:hover,
-.jp-segmented button:hover { background: #d7ebf7; }
-.jp-segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0 14px; }
-.jp-segmented .active { background: #0077aa; color: #fff; border-color: #0077aa; }
-.jp-switch {
-  width: 42px;
-  height: 24px;
-  border: 0;
-  border-radius: 999px;
-  background: #7b8086;
-  padding: 3px;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-}
-.jp-switch span {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  transform: translateX(0);
-  transition: transform .16s ease;
-}
-.jp-switch.active { background: #0077aa; }
-.jp-switch.active span { transform: translateX(18px); }
-.jp-dialog, .jp-settings-view { display: none !important; }
+#joplix :where(input:not([type=checkbox]):not([type=file]), select):hover { border-color: var(--color-main-text); }
+#joplix :where(input:not([type=checkbox]):not([type=file]), select):focus { border-color: var(--color-main-text); box-shadow: inset 0 0 0 1px var(--color-main-text); }
+#joplix ::placeholder { color: var(--jp-muted); opacity: 1; }
 
-/* Joplix 1.0.13 editable Joplin path */
-.jp-path-control { min-width: 260px; width: min(420px, 48vw); }
-.jp-path-control input {
-  width: 100%;
-  border: 1px solid #cdd8e4;
-  border-radius: 8px;
-  background: #fff;
-  padding: 9px 10px;
-  font-size: 14px;
-}
-.jp-setting-card-path { align-items: flex-start; }
-
-
-/* Joplix 1.0.16 usability improvements */
-#jp-save-note.primary:disabled,
-#jp-save-note.primary[disabled] {
-  background: #e6ebf1 !important;
-  border-color: #d5dde7 !important;
-  color: #7d8794 !important;
-  cursor: not-allowed !important;
-  box-shadow: none !important;
-  opacity: 1 !important;
-}
-#jp-save-note.primary.is-dirty:not(:disabled) {
-  background: #00679e !important;
-  border-color: #00679e !important;
-  color: #fff !important;
-  box-shadow: 0 0 0 3px rgba(0,103,158,.16);
-}
-.jp-note-context-menu {
-  position: fixed;
-  z-index: 10050;
-  min-width: 220px;
-  display: none;
-  padding: 6px;
-  border: 1px solid #d8e0ea;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 18px 50px rgba(15,23,42,.22);
-}
-.jp-note-context-menu.open { display: grid; gap: 4px; }
-.jp-note-context-menu button {
-  width: 100%;
-  text-align: left;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  padding: 9px 10px;
-  cursor: pointer;
-  color: #1e293b;
-}
-.jp-note-context-menu button:hover { background: #eef7fc; }
-.jp-note-context-menu button.danger { color: #a50000; }
-.jp-note-context-menu button.danger:hover { background: #fff0f0; }
-.jp-welcome-overlay { position: fixed; inset: 0; z-index: 10040; display: none; }
-.jp-welcome-overlay.open { display: block; }
-.jp-welcome-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.38); }
-.jp-welcome-modal {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%,-50%);
-  width: min(620px, calc(100vw - 32px));
-  max-height: calc(100vh - 48px);
-  overflow: auto;
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 28px 90px rgba(0,0,0,.32);
-  padding: 26px 30px 24px;
-}
-.jp-welcome-close { position: absolute; right: 14px; top: 10px; border: 0; background: transparent; font-size: 28px; cursor: pointer; }
-.jp-welcome-icon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 16px; background: #e8f5fc; font-size: 30px; margin-bottom: 12px; }
-.jp-welcome-modal h2 { margin: 0 0 10px; font-size: 25px; }
-.jp-welcome-modal p { color: #475569; line-height: 1.5; }
-.jp-welcome-steps { display: grid; gap: 10px; padding-left: 22px; margin: 18px 0; }
-.jp-welcome-steps li { padding-left: 4px; }
-.jp-welcome-steps span { display: block; color: #64748b; margin-top: 3px; }
-.jp-welcome-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
-.jp-welcome-actions button { border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; padding: 9px 14px; cursor: pointer; }
-.jp-welcome-actions button.primary { background: #00679e; color: #fff; border-color: #00679e; }
-
-
-/* Joplix 1.0.17 PDF viewer */
-.jp-resources-head {
-  font-weight: 700;
-  color: #334155;
-  margin: 12px 0 6px;
-}
-.jp-resource {
-  border: 1px solid #dbe4ef;
-  border-radius: 12px;
-  background: #fbfdff;
-  padding: 10px 12px;
-  margin: 8px 0;
-  display: grid;
-  gap: 6px;
-}
-.jp-resource > strong { color: #0f172a; }
-.jp-resource > span { color: #64748b; font-size: 12px; }
-.jp-resource-pdf { border-color: #bfdbfe; background: #f8fbff; }
-.jp-resource-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.jp-resource-actions button {
-  border: 1px solid #b9c7d8;
-  border-radius: 9px;
-  background: #fff;
-  padding: 7px 10px;
-  cursor: pointer;
-}
-.jp-resource-actions button:first-child {
-  background: #00679e;
-  border-color: #00679e;
-  color: #fff;
-}
-.jp-pdf-inline { display: none; height: 520px; border: 1px solid #d7e0ea; border-radius: 12px; overflow: hidden; background: #f8fafc; }
-.jp-pdf-inline.open { display: block; }
-.jp-pdf-inline iframe { width: 100%; height: 100%; border: 0; background: #fff; }
-.jp-pdf-viewer-overlay { position: fixed; inset: 0; z-index: 10070; display: none; }
-.jp-pdf-viewer-overlay.open { display: block; }
-.jp-pdf-viewer-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.45); }
-.jp-pdf-viewer-modal {
-  position: absolute;
-  inset: 32px;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 28px 90px rgba(0,0,0,.34);
-  display: grid;
-  grid-template-rows: auto 1fr;
-  overflow: hidden;
-}
-.jp-pdf-viewer-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
-}
-.jp-pdf-viewer-head strong { display: block; font-size: 16px; }
-.jp-pdf-viewer-head span { display: block; color: #64748b; font-size: 12px; margin-top: 2px; }
-.jp-pdf-viewer-actions { display: flex; align-items: center; gap: 10px; }
-.jp-pdf-viewer-actions a {
-  border: 1px solid #b9c7d8;
-  border-radius: 9px;
-  padding: 7px 10px;
-  text-decoration: none;
-  color: #00679e;
-  background: #fff;
-}
-.jp-pdf-viewer-actions button {
-  border: 0;
-  background: transparent;
-  font-size: 30px;
-  line-height: 1;
-  cursor: pointer;
-  color: #334155;
-}
-#jp-pdf-viewer-frame { width: 100%; height: 100%; border: 0; background: #fff; }
-
-
-/* Joplix 1.0.18 full text search */
-.jp-list-head input#jp-search {
-  background: #fff;
-}
-.jp-list-head input#jp-search:focus {
-  border-color: #00679e;
-  box-shadow: 0 0 0 3px rgba(0,103,158,.12);
-}
-
-
-/* Joplix 1.0.19 external file opening */
-.jp-resource-office {
-  border-color: #c7d2fe;
-  background: #f8f9ff;
-}
-.jp-pdf-inline { display: none !important; }
-.jp-resource-actions button[title] {
-  white-space: nowrap;
-}
-
-
-/* Joplix 1.0.21 update settings */
-.jp-update-status { margin: 10px 0; padding: 9px 12px; border-radius: 10px; background: #eef6fb; color: #1f3b4d; }
-.jp-update-status.ok { background: #e6f7ed; color: #126b35; }
-.jp-update-status.warning { background: #fff6db; color: #7a5200; }
-.jp-update-status.error { background: #fdecec; color: #8a1f1f; }
-.jp-update-list { display: grid; gap: 10px; }
-.jp-update-release { border: 1px solid #d8e4ec; border-radius: 12px; background: #fff; padding: 12px; }
-.jp-update-release-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
-.jp-update-release-head span { color: #667; font-size: 12px; }
-.jp-update-asset { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px; border-radius: 9px; background: #f7f9fb; }
-.jp-update-asset span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.jp-update-source button.active { background: #00679e; color: #fff; }
-
-
-/* Joplix 1.0.22 note path and editor format bar */
-.jp-note-path {
-  padding: 8px 10px 6px 10px;
-  font-weight: 700;
-  color: #1f2d3d;
-  border-bottom: 1px solid #e0e7ee;
-  background: #fff;
-}
-.jp-editor-formatbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 8px;
-  background: #f2f3f5;
-  border-bottom: 1px solid #dfe5ea;
-  min-height: 34px;
-  flex-wrap: wrap;
-}
-.jp-editor-formatbar button {
-  border: 0;
-  background: transparent;
-  color: #4d6e8e;
-  min-width: 26px;
-  min-height: 26px;
-  border-radius: 6px;
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-}
-.jp-editor-formatbar button:hover {
-  background: #e1e8ef;
-  color: #124f7a;
-}
-.jp-editor-formatbar button:active {
-  background: #d2e0ea;
-}
-.jp-editor-separator {
-  width: 1px;
-  height: 22px;
-  background: #d4dce4;
-  margin: 0 3px;
-}
-.jp-body {
-  border-top: 0;
-}
-
-
-/* Joplix 1.0.24: schneller Notiz-Ladezustand */
-.jp-body.jp-note-loading {
-  background: linear-gradient(90deg,#f8fafc 0%,#eef6fb 50%,#f8fafc 100%);
-  color: #5f6368;
-}
-.jp-note-loading-card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #f7fbfe;
-  color: #52606d;
-  padding: 14px;
-  margin-top: 12px;
-}
-.jp-note-loading-dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #0082c9;
-  margin-right: 8px;
-  animation: jpPulse 1.1s infinite ease-in-out;
-}
-@keyframes jpPulse {
-  0%, 100% { opacity: .35; transform: scale(.9); }
-  50% { opacity: 1; transform: scale(1.15); }
-}
-
-/* Joplix 1.0.25: explicit five-column layout and reliable resize handles */
-.jp-resizer { grid-row: 1; min-width: 8px; align-self: stretch; position: relative; }
-.jp-resizer::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: rgba(0,103,158,.28); }
-.jp-editor-formatbar [data-jp-editor="redo"], .jp-editor-formatbar [data-jp-editor="open"] { display: none !important; }
-
-/* Joplix 1.0.26: harden five-column placement so the middle editor column cannot disappear */
+/* 2 — layout ------------------------------------------------------------------------------------------ */
 #joplix-app {
-  display: grid !important;
-  grid-template-columns: 310px 8px minmax(520px,1fr) 8px 370px !important;
-  grid-auto-flow: column !important;
+  display: grid;
+  grid-template-columns: var(--jp-nav-width, 300px) 1px var(--jp-list-width, 340px) 1px minmax(0, 1fr);
+  height: 100%; min-height: 0; overflow: hidden;
+  background: var(--color-main-background);
 }
-#joplix-app > .jp-sidebar { grid-column: 1 !important; grid-row: 1 !important; min-width: 240px !important; max-width: 420px !important; }
-#joplix-app > #jp-resize-left { grid-column: 2 !important; grid-row: 1 !important; }
-#joplix-app > .jp-content { grid-column: 3 !important; grid-row: 1 !important; min-width: 420px !important; display: block !important; visibility: visible !important; }
-#joplix-app > #jp-resize-right { grid-column: 4 !important; grid-row: 1 !important; }
-#joplix-app > .jp-list { grid-column: 5 !important; grid-row: 1 !important; min-width: 300px !important; max-width: 520px !important; }
-#jp-editor-view { display: block !important; min-height: 100%; }
-@media(max-width:1250px){#joplix-app{grid-template-columns:260px 8px minmax(420px,1fr) 8px 320px !important}}
-@media(max-width:980px){#joplix-app{grid-template-columns:1fr !important; overflow:auto !important}#joplix-app>.jp-sidebar,#joplix-app>.jp-content,#joplix-app>.jp-list{grid-column:1!important;grid-row:auto!important;max-width:none!important}.jp-resizer{display:none!important}}
+#joplix .jp-sidebar,
+#joplix .jp-list,
+#joplix .jp-content { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+#joplix .jp-resizer { position: relative; z-index: 5; background: var(--color-border); touch-action: none; user-select: none; }
+#joplix .jp-resizer::before { content: ''; position: absolute; inset: 0 -4px; cursor: col-resize; }
+#joplix .jp-resizer:hover,
+#joplix .jp-resizer.dragging { background: var(--color-primary-element); box-shadow: 0 0 0 1px var(--color-primary-element); }
+body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-select: none !important; }
+#joplix .jp-back { display: none; }
 
-/* Joplix 1.0.27: Kontextmenue darf am unteren Rand der linken Spalte nicht abgeschnitten werden. */
-.jp-context-menu {
-  position: fixed !important;
-  z-index: 2147483647 !important;
-  min-width: 190px;
-  max-width: min(260px, calc(100vw - 16px));
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
+/* 3 — navigation -------------------------------------------------------------------------------------- */
+#joplix .jp-sidebar { padding: var(--jp-gap); gap: 4px; }
+#joplix .jp-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 8px; }
+#joplix .jp-logo-img { width: 28px; height: 28px; border-radius: 7px; flex: 0 0 auto; }
+#joplix .jp-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+#joplix .jp-brand-text strong { font-size: 16px; }
+#joplix .jp-brand-update { color: var(--color-primary-element); font-size: 12px; font-weight: bold; text-decoration: none; }
+#joplix .jp-brand-update:hover { text-decoration: underline; }
+#joplix button.jp-action { justify-content: flex-start; width: 100%; padding: 0 10px; }
+#joplix .jp-nav-title { margin: 12px 0 2px; padding: 0 10px; color: var(--jp-muted); font-size: 13px; font-weight: bold; }
+#joplix .jp-tree { flex: 1 1 auto; min-height: 0; overflow: auto; padding-bottom: 24px; }
+#joplix .jp-tree-row { display: flex; align-items: center; min-height: var(--jp-h); margin: 2px 0; border-radius: var(--jp-radius); }
+#joplix .jp-tree-row:hover,
+#joplix .jp-tree-row:focus-within { background: var(--color-background-hover); }
+#joplix .jp-tree-row.active { background: var(--color-primary-element); color: var(--color-primary-element-text); }
+#joplix button.jp-tree-item {
+  flex: 1 1 auto; justify-content: flex-start; gap: 8px; min-width: 0; padding: 0 6px;
+  background: transparent; color: inherit; font-weight: normal; text-align: left;
 }
+#joplix .jp-tree-row.active button.jp-tree-item { font-weight: bold; }
+#joplix .jp-folder-icon {
+  flex: 0 0 18px; width: 18px; height: 18px; background: currentColor;
+  -webkit-mask: url('../img/folder.svg') center / contain no-repeat; mask: url('../img/folder.svg') center / contain no-repeat;
+}
+#joplix .jp-tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#joplix button.jp-tree-menu { flex: 0 0 auto; width: var(--jp-h); padding: 0; background: transparent; color: inherit; opacity: 0; }
+#joplix .jp-tree-row:hover button.jp-tree-menu,
+#joplix .jp-tree-row:focus-within button.jp-tree-menu,
+#joplix .jp-tree-row.active button.jp-tree-menu { opacity: 1; }
+#joplix button.jp-tree-menu:hover { background: var(--color-background-hover); color: var(--color-main-text); }
+#joplix button.jp-settings-button {
+  justify-content: flex-start; gap: 8px; width: 100%; margin-top: 4px; padding: 0 8px;
+  background: transparent; color: var(--color-main-text); font-weight: normal;
+}
+#joplix button.jp-settings-button:hover { background: var(--color-background-hover); }
 
-/* Joplix 1.0.28: optisch sauberes Kontextmenue fuer Notizbuecher/Kapitel. */
-.jp-tree-context-menu {
-  position: fixed !important;
-  z-index: 2147483647 !important;
-  width: 220px !important;
-  min-width: 220px !important;
-  max-width: calc(100vw - 24px) !important;
-  padding: 8px !important;
-  border: 1px solid rgba(0,0,0,.10) !important;
-  border-radius: 16px !important;
-  background: #fff !important;
-  box-shadow: 0 16px 44px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.10) !important;
-  overflow: visible !important;
-  box-sizing: border-box !important;
+/* 4 — note list --------------------------------------------------------------------------------------- */
+#joplix .jp-list-head { display: flex; align-items: center; gap: 4px; padding: var(--jp-gap); }
+#joplix .jp-search-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+#joplix .jp-search-wrap .jp-icon { position: absolute; left: 9px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--jp-muted); pointer-events: none; }
+#joplix .jp-search-wrap input { width: 100%; padding-left: 34px; }
+#joplix .jp-breadcrumb { padding: 2px 16px 6px; color: var(--jp-muted); font-size: 13px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#joplix .jp-notes { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 var(--jp-gap) var(--jp-gap); }
+#joplix .jp-notes > p { margin: 24px 8px; color: var(--jp-muted); text-align: center; }
+#joplix button.jp-note-item {
+  display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 2px;
+  width: 100%; min-height: 52px; margin: 2px 0; padding: 7px 12px;
+  background: transparent; color: var(--color-main-text); font-weight: normal; text-align: left; white-space: normal;
 }
-.jp-tree-context-menu::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%) rotate(45deg);
-  width: 12px;
-  height: 12px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,.10);
-  box-shadow: 2px -2px 4px rgba(0,0,0,.04);
+#joplix button.jp-note-item:hover { background: var(--color-background-hover); }
+#joplix button.jp-note-item.active { background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); }
+#joplix .jp-note-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#joplix .jp-note-sub { display: flex; align-items: center; gap: 10px; color: var(--jp-muted); font-size: 13px; }
+#joplix .jp-note-item.active .jp-note-sub { color: inherit; }
+#joplix .jp-note-sub time { flex: 1 1 auto; }
+#joplix .jp-note-count { display: inline-flex; align-items: center; gap: 2px; }
+#joplix .jp-note-count .jp-icon { width: 14px; height: 14px; }
+#joplix .jp-index-status {
+  display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 16px;
+  border-top: 1px solid var(--color-border); color: var(--jp-muted); font-size: 12px; line-height: 1.3;
 }
-.jp-tree-context-menu[data-placement='left']::after {
-  right: -7px;
-  border-left: 0;
-  border-bottom: 0;
-}
-.jp-tree-context-menu[data-placement='right']::after {
-  left: -7px;
-  border-right: 0;
-  border-top: 0;
-}
-.jp-tree-context-menu[data-placement='inside']::after { display: none; }
-.jp-tree-context-menu button {
-  position: relative;
-  z-index: 1;
-  display: flex !important;
-  align-items: center;
-  width: 100% !important;
-  min-height: 42px;
-  padding: 0 12px !important;
-  margin: 0 !important;
-  border: 0 !important;
-  border-radius: 10px !important;
-  background: transparent !important;
-  color: #0b1f33 !important;
-  font-weight: 650 !important;
-  text-align: left !important;
-  line-height: 1.25 !important;
-  cursor: pointer !important;
-}
-.jp-tree-context-menu button:hover,
-.jp-tree-context-menu button:focus-visible {
-  background: #eef7fb !important;
-  outline: none !important;
-}
-.jp-tree-context-menu button.danger {
-  color: #b00020 !important;
-}
-.jp-tree-context-menu button.danger:hover,
-.jp-tree-context-menu button.danger:focus-visible {
-  background: #fff1f2 !important;
-}
-.jp-tree { padding-bottom: 88px !important; }
+#joplix .jp-index-status::before { content: ''; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-border-maxcontrast); }
+#joplix .jp-index-status.ok::before { background: var(--color-success); }
+#joplix .jp-index-status.warning::before { background: var(--color-warning); animation: jp-pulse 1.1s infinite ease-in-out; }
+#joplix .jp-index-status.error { color: var(--color-error-text, var(--color-error)); }
+#joplix .jp-index-status.error::before { background: var(--color-error); }
 
+/* 5 — editor ------------------------------------------------------------------------------------------ */
+#joplix .jp-editor-view { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+#joplix .jp-toolbar { display: flex; align-items: center; gap: var(--jp-gap); min-height: calc(var(--jp-h) + var(--jp-gap) * 2); padding: var(--jp-gap) 12px; border-bottom: 1px solid var(--color-border); }
+#joplix .jp-note-path { flex: 1 1 auto; min-width: 0; padding-left: 4px; color: var(--jp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#joplix .jp-toolbar-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+#joplix .jp-segment { display: inline-flex; padding: 2px; border-radius: var(--jp-radius); background: var(--color-background-dark); }
+#joplix .jp-segment button { min-height: calc(var(--jp-h) - 4px); background: transparent; color: var(--jp-muted); font-weight: normal; }
+#joplix .jp-segment button:hover { color: var(--color-main-text); }
+#joplix-app.jp-view-mode #jp-cancel-edit,
+#joplix-app.jp-edit-mode #jp-edit-note { background: var(--color-main-background); color: var(--color-main-text); font-weight: bold; box-shadow: 0 1px 3px var(--color-box-shadow); }
+#joplix .jp-more { position: relative; }
+#joplix .jp-more .jp-menu { position: absolute; top: calc(100% + 4px); right: 0; }
 
-/* Joplix 1.0.32 update settings: wider Codeberg URL and Codeberg main/beta channels */
-.jp-settings-pane[data-settings-section="update"] .jp-setting-card{grid-template-columns:minmax(280px,1fr) minmax(340px,46%) !important;}
-.jp-settings-pane[data-settings-section="update"] #jp-update-repo-url{width:100% !important;min-width:520px !important;max-width:100% !important;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
-.jp-setting-card-path{grid-template-columns:minmax(260px,1fr) minmax(520px,58%) !important;}
-@media(max-width:1000px){.jp-settings-pane[data-settings-section="update"] .jp-setting-card,.jp-setting-card-path{grid-template-columns:1fr !important}.jp-settings-pane[data-settings-section="update"] #jp-update-repo-url{min-width:0 !important}}
+#joplix-app.jp-no-note .jp-note-only,
+#joplix-app.jp-no-note .jp-note-area { display: none; }
+#joplix .jp-empty { display: none; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; color: var(--jp-muted); text-align: center; }
+#joplix-app.jp-no-note .jp-empty { display: flex; }
+#joplix .jp-empty .jp-icon { width: 64px; height: 64px; opacity: .5; }
+#joplix .jp-empty strong { color: var(--color-main-text); font-size: 18px; }
 
+#joplix .jp-note-area { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 24px; }
+#joplix .jp-note-inner { display: flex; flex-direction: column; max-width: 860px; min-height: 100%; margin: 0 auto; padding: 16px 0 32px; }
+#joplix input.jp-title { width: 100%; min-height: 48px; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 28px; font-weight: bold; box-shadow: none; }
+#joplix input.jp-title:hover,
+#joplix input.jp-title:focus { border: 0; box-shadow: none; }
+#joplix-app.jp-view-mode input.jp-title { pointer-events: none; }
+#joplix .jp-meta { display: flex; align-items: center; color: var(--jp-muted); font-size: 13px; }
+#joplix .jp-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 12px; }
+#joplix .jp-tag-chip { display: inline-flex; align-items: center; gap: 2px; min-height: 26px; padding: 0 4px 0 10px; border-radius: var(--border-radius-pill, 100px); background: var(--color-background-dark); font-size: 13px; }
+#joplix button.jp-tag-remove { width: 20px; min-height: 20px; padding: 0; border-radius: 50%; background: transparent; color: var(--jp-muted); }
+#joplix button.jp-tag-remove .jp-icon { width: 14px; height: 14px; }
+#joplix button.jp-tag-remove:hover { background: var(--color-error); color: var(--color-primary-element-text); }
+#joplix button.jp-tag-add { min-height: 26px; padding: 0 10px 0 6px; gap: 2px; border-radius: var(--border-radius-pill, 100px); background: transparent; color: var(--jp-muted); font-size: 13px; font-weight: normal; }
+#joplix button.jp-tag-add:hover { background: var(--color-background-hover); color: var(--color-main-text); }
+#joplix button.jp-tag-add .jp-icon { width: 16px; height: 16px; }
 
-/* Joplix 1.0.44: Header-Version und Update-Hinweis */
-.jp-brand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
-.jp-brand-text strong{font-size:16px;line-height:1.15;color:#1f2933}
-.jp-brand-update{display:block;color:#005c87;text-decoration:none;font-size:12px;line-height:1.2;font-weight:600;white-space:normal}
-.jp-brand-update:hover{text-decoration:underline}
-.jp-about-created{margin:10px 0 0;color:#5f6368;font-size:13px}.jp-heart{color:#d00;font-weight:700;font-size:15px}
+#joplix .jp-editor-formatbar {
+  position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+  margin: 0 -6px; padding: 4px 6px; border-bottom: 1px solid var(--color-border); background: var(--color-main-background);
+}
+#joplix .jp-editor-formatbar button { width: var(--jp-h); padding: 0; background: transparent; color: var(--color-main-text); }
+#joplix .jp-editor-formatbar button:hover { background: var(--color-background-hover); }
+#joplix .jp-editor-separator { width: 1px; height: 20px; margin: 0 4px; background: var(--color-border); }
+#joplix textarea.jp-body {
+  flex: 1 1 auto; width: 100%; min-height: 320px; padding: 16px 0; border: 0; border-radius: 0; resize: none;
+  background: transparent; font-size: 15px; line-height: 1.6; box-shadow: none;
+}
+#joplix textarea.jp-body.jp-note-loading { color: var(--jp-muted); }
+#joplix-app.jp-view-mode .jp-editor-formatbar,
+#joplix-app.jp-view-mode textarea.jp-body,
+#joplix-app.jp-edit-mode .jp-note-display { display: none; }
 
+#joplix .jp-saving-spinner { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border: 2px solid var(--color-border); border-top-color: var(--color-primary-element); border-radius: 50%; animation: jp-spin .7s linear infinite; }
+#joplix .jp-note-loading-dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--color-primary-element); animation: jp-pulse 1.1s infinite ease-in-out; }
+#joplix .jp-note-loading-card { padding: 12px 0; color: var(--jp-muted); }
+@keyframes jp-spin { to { transform: rotate(360deg); } }
+@keyframes jp-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 
-/* Joplix 1.0.59 Beta: Anzeige-/Bearbeiten-Modus */
-.jp-note-modebar{display:flex;gap:8px;justify-content:flex-end;margin:4px 0 0}.jp-note-modebar button{border:1px solid #ccd;background:#fff;border-radius:9px;padding:7px 12px;cursor:pointer}.jp-note-modebar .jp-mode-edit{background:var(--blue);color:#fff;border-color:var(--blue)}.jp-note-display{min-height:340px;border:1px solid #e1e5ea;border-radius:12px;padding:16px;line-height:1.55;background:#fff;font-size:15px;overflow:auto}.jp-note-display h1,.jp-note-display h2,.jp-note-display h3{margin:.6em 0 .35em}.jp-note-display p{margin:.45em 0}.jp-note-display pre{background:#f6f7f8;border:1px solid #e1e5ea;border-radius:9px;padding:10px;overflow:auto}.jp-note-display code{background:#f1f3f4;border-radius:4px;padding:1px 4px}.jp-note-display a{color:var(--blue)}.jp-md-list{margin:.35em 0 .6em 1.4em}.jp-view-mode .jp-editor-formatbar,.jp-view-mode .jp-body,.jp-view-mode .jp-editor-actions button#jp-save-note,.jp-view-mode .jp-editor-actions button#jp-delete-note,.jp-view-mode .jp-upload,.jp-view-mode #jp-cancel-edit{display:none!important}.jp-edit-mode .jp-note-display,.jp-edit-mode #jp-edit-note{display:none!important}.jp-view-mode .jp-title{pointer-events:none;background:transparent}.jp-muted{color:#6b7280;font-style:italic}
-@media(max-width:900px){#joplix-app{grid-template-columns:1fr}.jp-sidebar,.jp-list{display:none}.jp-content{border:0;padding:16px}.jp-note-display{min-height:300px}}
+/* 6 — rendered note (preview; never written back) ---------------------------------------------------- */
+#joplix .jp-note-display { flex: 1 1 auto; padding: 8px 0 16px; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+#joplix .jp-note-display > :first-child { margin-top: 0; }
+#joplix .jp-note-display p { margin: 0 0 .75em; }
+#joplix .jp-note-display h1,
+#joplix .jp-note-display h2,
+#joplix .jp-note-display h3,
+#joplix .jp-note-display h4,
+#joplix .jp-note-display h5,
+#joplix .jp-note-display h6 { margin: 1.2em 0 .4em; font-weight: bold; line-height: 1.25; color: var(--color-main-text); }
+#joplix .jp-note-display h1 { font-size: 1.7em; }
+#joplix .jp-note-display h2 { font-size: 1.4em; }
+#joplix .jp-note-display h3 { font-size: 1.2em; }
+#joplix .jp-note-display h4,
+#joplix .jp-note-display h5,
+#joplix .jp-note-display h6 { font-size: 1em; }
+#joplix .jp-note-display a { color: var(--color-primary-element); text-decoration: underline; }
+#joplix .jp-note-display strong { font-weight: bold; }
+#joplix .jp-note-display em { font-style: italic; }
+#joplix .jp-note-display del { text-decoration: line-through; }
+#joplix .jp-note-display mark { padding: 0 2px; border-radius: 3px; background: color-mix(in srgb, var(--color-warning) 40%, transparent); color: inherit; }
+#joplix .jp-note-display code { padding: 1px 5px; border-radius: 4px; background: var(--color-background-dark); font-family: var(--font-face-monospace, ui-monospace, Menlo, Consolas, monospace); font-size: .9em; }
+#joplix .jp-note-display pre { margin: 0 0 .9em; padding: 10px 12px; border-radius: var(--jp-radius); background: var(--color-background-dark); overflow: auto; white-space: pre; }
+#joplix .jp-note-display pre code { padding: 0; background: transparent; }
+#joplix .jp-note-display blockquote { margin: 0 0 .9em; padding: 2px 0 2px 14px; border-left: 4px solid var(--color-border-maxcontrast); color: var(--jp-muted); }
+#joplix .jp-note-display blockquote > :last-child { margin-bottom: 0; }
+#joplix .jp-note-display hr { height: 1px; margin: 1.2em 0; border: 0; background: var(--color-border-dark, var(--color-border)); }
+#joplix .jp-note-display img { max-width: 100%; height: auto; border-radius: var(--jp-radius); vertical-align: middle; }
+#joplix .jp-note-display img.jp-md-missing { display: inline-block; min-width: 120px; min-height: 32px; padding: 6px 10px; background: var(--color-background-dark); color: var(--jp-muted); font-size: 13px; }
+#joplix .jp-md-table-wrap { margin: 0 0 .9em; overflow-x: auto; }
+#joplix .jp-note-display table { border-collapse: collapse; white-space: normal; }
+#joplix .jp-note-display th,
+#joplix .jp-note-display td { padding: 6px 10px; border: 1px solid var(--color-border-dark, var(--color-border)); text-align: left; vertical-align: top; }
+#joplix .jp-note-display th { background: var(--color-background-dark); font-weight: bold; }
+#joplix .jp-note-display ul.jp-md-list,
+#joplix .jp-note-display ol.jp-md-list { margin: 0 0 .75em; padding-left: 1.6em; }
+#joplix .jp-note-display ul.jp-md-list { list-style: disc outside; }
+#joplix .jp-note-display ol.jp-md-list { list-style: decimal outside; }
+#joplix .jp-note-display .jp-md-list .jp-md-list { margin-bottom: 0; }
+#joplix .jp-note-display ul.jp-md-task-list { list-style: none; padding-left: .2em; }
+#joplix .jp-note-display ul.jp-md-task-list ul.jp-md-task-list { padding-left: 1.6em; }
+#joplix .jp-note-display li.jp-md-task { padding: 1px 0; }
+#joplix .jp-note-display label.jp-md-task-label { display: flex; align-items: flex-start; gap: 8px; margin: 0; cursor: pointer; }
+/* The preview draws its own checkbox from theme colours: the native control follows the browser's colour
+   scheme rather than the Nextcloud theme, and Nextcloud restyles checkboxes globally (hence !important). */
+#joplix .jp-note-display input.jp-md-checkbox {
+  -webkit-appearance: none !important; appearance: none !important; position: static !important;
+  display: inline-grid !important; place-content: center; flex: 0 0 16px;
+  width: 16px !important; height: 16px !important; min-height: 16px !important;
+  margin: .3em 0 0 !important; padding: 0 !important; opacity: 1 !important;
+  border: 2px solid var(--color-text-maxcontrast) !important; border-radius: 3px !important;
+  background: var(--color-main-background) !important; box-shadow: none !important; cursor: pointer;
+}
+#joplix .jp-note-display input.jp-md-checkbox:checked { border-color: var(--color-primary-element) !important; background: var(--color-primary-element) !important; }
+#joplix .jp-note-display input.jp-md-checkbox:checked::after {
+  content: ''; width: 9px; height: 5px; border: solid var(--color-primary-element-text); border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg);
+}
+#joplix .jp-note-display input.jp-md-checkbox:focus-visible { outline: 2px solid var(--color-main-text); outline-offset: 2px; }
+#joplix .jp-note-display input.jp-md-checkbox:disabled { opacity: .5 !important; cursor: default; }
+#joplix .jp-note-display .jp-md-task-text { flex: 1 1 auto; min-width: 0; }
+#joplix .jp-note-display input.jp-md-checkbox:checked + .jp-md-task-text { opacity: .6; }
+#joplix .jp-note-display .jp-md-center { text-align: center; }
+#joplix .jp-note-display .jp-md-right { text-align: right; }
+#joplix .jp-muted { color: var(--jp-muted); font-style: italic; }
 
+/* 7 — attachments ------------------------------------------------------------------------------------- */
+#joplix .jp-resources { margin-top: 8px; }
+#joplix .jp-resources-head { margin: 8px 0 4px; padding-top: 12px; border-top: 1px solid var(--color-border); color: var(--jp-muted); font-size: 13px; font-weight: bold; }
+#joplix .jp-resource { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 8px; margin: 0 -8px; border-radius: var(--jp-radius); }
+#joplix .jp-resource:hover { background: var(--color-background-hover); }
+#joplix .jp-resource > .jp-icon { width: 24px; height: 24px; color: var(--jp-muted); }
+#joplix .jp-resource-main { display: flex; flex-direction: column; flex: 1 1 160px; min-width: 0; line-height: 1.3; }
+#joplix .jp-resource-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: normal; }
+#joplix .jp-resource-main span { color: var(--jp-muted); font-size: 12px; }
+#joplix .jp-resource-actions { display: flex; gap: 6px; }
+#joplix .jp-resource-edit-status { flex: 1 0 100%; padding-left: 36px; color: var(--jp-muted); font-size: 13px; }
+#joplix .jp-resource-edit-status:empty { display: none; }
+#joplix .jp-resource-edit-status.ok { color: var(--color-success-text, var(--color-success)); }
+#joplix .jp-resource-edit-status.warning { color: var(--color-warning-text, var(--color-warning)); }
+#joplix .jp-resource-edit-status.error { color: var(--color-error-text, var(--color-error)); }
+#joplix .jp-resource-edit-status.busy::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border: 2px solid var(--color-border); border-top-color: var(--color-primary-element); border-radius: 50%; vertical-align: -2px; animation: jp-spin .8s linear infinite; }
 
-/* Joplix 1.0.61: sichtbarer Speichern-Button bei Checkbox-Aenderungen im Anzeige-Modus */
-.jp-save-note-top{display:none;border:1px solid var(--blue)!important;border-radius:9px!important;padding:7px 12px!important;cursor:pointer!important;background:var(--blue)!important;color:#fff!important;font-weight:650!important}
-.jp-note-dirty.jp-view-mode .jp-save-note-top{display:inline-flex!important;align-items:center;gap:6px}
-.jp-note-dirty.jp-view-mode .jp-editor-actions button#jp-save-note{display:inline-flex!important;align-items:center;gap:6px}
-.jp-note-dirty.jp-view-mode .jp-editor-actions{display:flex!important;justify-content:flex-end;margin-top:12px}
-.jp-note-dirty.jp-view-mode .jp-save-note-top::before,.jp-note-dirty.jp-view-mode #jp-save-note::before{content:'✓'}
-.jp-note-dirty.jp-view-mode .jp-note-display{border-color:#0b70b7;box-shadow:0 0 0 2px rgba(11,112,183,.08)}
+/* 8 — menus (notebook actions, note context menu, "more" menu) --------------------------------------- */
+#joplix .jp-menu {
+  position: fixed; z-index: 10050; display: none; flex-direction: column; gap: 2px;
+  min-width: 200px; max-width: min(300px, calc(100vw - 16px)); max-height: calc(100vh - 16px); padding: 4px; overflow-y: auto;
+  border-radius: var(--jp-radius-lg); background: var(--color-main-background); color: var(--color-main-text);
+  box-shadow: var(--jp-shadow); border: 1px solid var(--color-border);
+}
+#joplix .jp-menu.open,
+#joplix .jp-menu:not([hidden]):not(.jp-note-context-menu) { display: flex; }
+#joplix .jp-menu button,
+#joplix .jp-menu .jp-menu-item {
+  display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: var(--jp-h);
+  padding: 0 12px 0 8px; border-radius: var(--jp-radius); background: transparent; color: var(--color-main-text);
+  font-weight: normal; text-align: left; cursor: pointer; white-space: nowrap;
+}
+#joplix .jp-menu button:hover,
+#joplix .jp-menu .jp-menu-item:hover { background: var(--color-background-hover); }
+#joplix .jp-menu button.danger { background: transparent; color: var(--color-error-text, var(--color-error)); }
+#joplix .jp-menu button.danger:hover { background: var(--color-background-hover); }
+#joplix .jp-upload input { display: none; }
 
+/* 9 — dialogs and overlays ---------------------------------------------------------------------------- */
+#joplix .jp-overlay { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; padding: 16px; }
+#joplix .jp-overlay.open { display: flex; }
+#joplix .jp-dialog-overlay { z-index: 10100; }
+#joplix .jp-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .5); }
+#joplix .jp-modal {
+  position: relative; display: flex; flex-direction: column; gap: 12px;
+  width: min(480px, 100%); max-height: 100%; padding: 20px 24px; overflow: auto;
+  border-radius: var(--jp-radius-lg); background: var(--color-main-background); color: var(--color-main-text); box-shadow: var(--jp-shadow);
+}
+#joplix .jp-modal h2 { margin: 0; padding-right: 32px; font-size: 20px; font-weight: bold; line-height: 1.3; }
+#joplix .jp-modal p { margin: 0; line-height: 1.5; }
+#joplix .jp-dialog-message { white-space: pre-line; overflow-wrap: anywhere; }
+#joplix .jp-modal input,
+#joplix .jp-modal select { width: 100%; }
+#joplix .jp-modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 
-/* Joplix 2.0.1: sichtbarer Speicherstatus. */
-.jp-saving-spinner{
-  display:inline-block;
-  width:15px;
-  height:15px;
-  margin-right:7px;
-  border:2px solid rgba(0,103,158,.22);
-  border-top-color:#00679e;
-  border-radius:50%;
-  animation:jp-spin .7s linear infinite;
-  vertical-align:-2px;
-}
-.jp-saving #jp-meta{display:flex;align-items:center;color:#075a9b;font-weight:600;}
-.jp-saving .jp-note-item{cursor:progress;}
-@keyframes jp-spin{to{transform:rotate(360deg)}}
+#joplix .jp-welcome-modal { width: min(560px, 100%); }
+#joplix .jp-welcome-close { position: absolute; top: 12px; right: 12px; }
+#joplix .jp-welcome-icon { width: 48px; height: 48px; border-radius: 12px; }
+#joplix .jp-welcome-modal p { color: var(--jp-muted); }
+#joplix .jp-welcome-steps { display: grid; gap: 10px; margin: 4px 0; padding-left: 22px; list-style: decimal outside; }
+#joplix .jp-welcome-steps strong { display: block; }
+#joplix .jp-welcome-steps span { color: var(--jp-muted); }
+#joplix .jp-welcome-steps code { padding: 1px 5px; border-radius: 4px; background: var(--color-background-dark); }
 
+#joplix .jp-pdf-viewer-modal { position: relative; display: grid; grid-template-rows: auto 1fr; width: 100%; height: 100%; overflow: hidden; border-radius: var(--jp-radius-lg); background: var(--color-main-background); box-shadow: var(--jp-shadow); }
+#joplix .jp-pdf-viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 16px; border-bottom: 1px solid var(--color-border); }
+#joplix .jp-pdf-viewer-head span { display: block; color: var(--jp-muted); font-size: 12px; }
+#joplix .jp-pdf-viewer-actions { display: flex; align-items: center; gap: 8px; }
+#joplix .jp-pdf-viewer-actions a { color: var(--color-primary-element); }
+#joplix #jp-pdf-viewer-frame { width: 100%; height: 100%; border: 0; }
 
-/* Joplix 2.0.2: authoritative task-list reset.
- * This is the only checkbox layout block. It neutralizes Nextcloud/browser
- * list, label and checkbox defaults without affecting ordinary lists. */
-.jp-note-display > ul.jp-md-task-list,
-.jp-note-display ul.jp-md-task-list {
-  display: block !important;
-  list-style: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100% !important;
+/* 10 — settings --------------------------------------------------------------------------------------- */
+#joplix .jp-settings-modal {
+  position: relative; display: grid; grid-template-columns: 220px minmax(0, 1fr);
+  width: min(920px, 100%); height: min(700px, 100%); overflow: hidden;
+  border-radius: var(--jp-radius-lg); background: var(--color-main-background); color: var(--color-main-text); box-shadow: var(--jp-shadow);
 }
-.jp-note-display ul.jp-md-task-list > li.jp-md-task {
-  display: block !important;
-  list-style: none !important;
-  min-height: 0 !important;
-  height: auto !important;
-  margin: 0 !important;
-  padding: 2px 0 !important;
-  line-height: 1.45 !important;
-}
-.jp-note-display ul.jp-md-task-list > li.jp-md-task::before,
-.jp-note-display ul.jp-md-task-list > li.jp-md-task::marker {
-  content: none !important;
-  display: none !important;
-}
-.jp-note-display ul.jp-md-task-list > li.jp-md-task > label.jp-md-task-label {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  gap: 8px !important;
-  width: 100% !important;
-  min-height: 0 !important;
-  height: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-  line-height: 1.45 !important;
-  cursor: pointer !important;
-  box-sizing: border-box !important;
-}
-.jp-note-display ul.jp-md-task-list > li.jp-md-task > label.jp-md-task-label > input.jp-md-checkbox {
-  -webkit-appearance: checkbox !important;
-  appearance: auto !important;
-  position: static !important;
-  display: inline-block !important;
-  flex: 0 0 16px !important;
-  width: 16px !important;
-  height: 16px !important;
-  min-width: 16px !important;
-  min-height: 16px !important;
-  max-width: 16px !important;
-  max-height: 16px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border-radius: 3px !important;
-  transform: none !important;
-  vertical-align: middle !important;
-  box-sizing: border-box !important;
-}
-.jp-note-display ul.jp-md-task-list > li.jp-md-task > label.jp-md-task-label > span.jp-md-task-text {
-  display: inline !important;
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  line-height: 1.45 !important;
-  overflow-wrap: anywhere !important;
-}
+#joplix .jp-settings-menu { display: flex; flex-direction: column; gap: 2px; padding: 16px 8px; overflow: auto; border-right: 1px solid var(--color-border); }
+#joplix .jp-settings-menu h2 { margin: 0 8px 14px; font-size: 18px; font-weight: bold; line-height: 1.3; }
+#joplix .jp-settings-menu button { justify-content: flex-start; width: 100%; padding: 0 12px; background: transparent; color: var(--color-main-text); font-weight: normal; }
+#joplix .jp-settings-menu button:hover { background: var(--color-background-hover); }
+#joplix .jp-settings-menu button.active { background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); font-weight: bold; }
+#joplix .jp-settings-panel-area { position: relative; padding: 16px 28px 28px; overflow: auto; }
+#joplix .jp-settings-close { position: absolute; top: 12px; right: 12px; z-index: 1; }
+#joplix .jp-settings-pane { display: none; }
+#joplix .jp-settings-pane.active { display: block; }
+#joplix .jp-settings-pane h3 { margin: 4px 40px 8px 0; font-size: 20px; font-weight: bold; line-height: 1.4; }
+#joplix .jp-setting-card { display: flex; align-items: center; justify-content: space-between; gap: 8px 20px; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
+#joplix .jp-setting-card > label,
+#joplix .jp-setting-card > div:first-child { flex: 1 1 auto; min-width: 0; margin: 0; }
+#joplix .jp-setting-card strong { display: block; font-weight: bold; }
+#joplix .jp-setting-card label span,
+#joplix .jp-setting-card > div > span { display: block; margin-top: 2px; color: var(--jp-muted); line-height: 1.4; }
+#joplix .jp-setting-card select { flex: 0 0 auto; min-width: 200px; }
+#joplix .jp-setting-card > button { flex: 0 0 auto; }
+#joplix .jp-setting-card-path { flex-direction: column; align-items: stretch; }
+#joplix .jp-path-control input { width: 100%; }
+#joplix button.jp-switch { flex: 0 0 auto; justify-content: flex-start; width: 40px; min-height: 22px; height: 22px; padding: 3px; border-radius: 11px; background: var(--color-text-maxcontrast); }
+#joplix button.jp-switch:hover { background: var(--color-text-maxcontrast); }
+#joplix button.jp-switch span { width: 16px; height: 16px; border-radius: 50%; background: var(--color-main-background); transition: transform .15s ease; }
+#joplix button.jp-switch.active { background: var(--color-primary-element); }
+#joplix button.jp-switch.active span { transform: translateX(18px); background: var(--color-primary-element-text); }
+#joplix .jp-about-card { justify-content: flex-start; align-items: flex-start; }
+#joplix .jp-about-card .jp-logo-img { width: 48px; height: 48px; border-radius: 12px; }
+#joplix .jp-about-created { margin: 10px 0 0; color: var(--jp-muted); font-size: 13px; }
+#joplix .jp-heart { display: inline !important; color: var(--color-error); }
+#joplix .jp-sync-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+#joplix .jp-update-status { margin: 12px 0; padding: 8px 12px; border-left: 4px solid var(--color-border-maxcontrast); border-radius: var(--jp-radius); background: var(--color-background-dark); line-height: 1.4; overflow-wrap: anywhere; }
+#joplix .jp-update-status.ok { border-left-color: var(--color-success); }
+#joplix .jp-update-status.warning { border-left-color: var(--color-warning); }
+#joplix .jp-update-status.error { border-left-color: var(--color-error); }
+#joplix .jp-update-list { display: grid; gap: 8px; }
+#joplix .jp-update-list > p { color: var(--jp-muted); }
+#joplix .jp-update-release { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--jp-radius-lg); }
+#joplix .jp-update-release-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+#joplix .jp-update-release-head span { color: var(--jp-muted); font-size: 12px; }
+#joplix .jp-update-asset { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; }
+#joplix .jp-update-asset span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Joplix 2.1: Nextcloud Office attachment editing */
-.jp-resource-edit-status{margin-top:8px;font-size:13px;color:#64748b;line-height:1.4}
-.jp-resource-edit-status.busy{color:#075985}
-.jp-resource-edit-status.ok{color:#166534}
-.jp-resource-edit-status.warning{color:#92400e}
-.jp-resource-edit-status.error{color:#b91c1c}
-.jp-resource-edit-status.busy::before{content:'';display:inline-block;width:12px;height:12px;margin-right:7px;border:2px solid #bae6fd;border-top-color:#0369a1;border-radius:50%;vertical-align:-2px;animation:jp-spin .8s linear infinite}
-
-/* Joplix 2.2.0-beta.6 notebook folder icons */
-.jp-tree-row .jp-tree-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+/* 11 — small screens: one pane at a time, chosen by data-pane on #joplix-app (setPane() in js/app.js) --- */
+@media (max-width: 1024px) {
+  #joplix-app { grid-template-columns: minmax(0, 1fr); }
+  #joplix .jp-resizer,
+  #joplix-app > .jp-sidebar,
+  #joplix-app > .jp-list,
+  #joplix-app > .jp-content { display: none; }
+  #joplix-app[data-pane="nav"] > .jp-sidebar,
+  #joplix-app[data-pane="list"] > .jp-list,
+  #joplix-app[data-pane="note"] > .jp-content { display: flex; }
+  #joplix button.jp-back { display: inline-flex; }
+  #joplix button.jp-tree-menu { opacity: 1; }
+  #joplix .jp-note-area { padding: 0 16px; }
+  #joplix .jp-segment button span:not(.jp-icon),
+  #joplix #jp-sync-now span:not(.jp-icon),
+  #joplix #jp-save-note span:not(.jp-icon) { display: none; }
+  #joplix .jp-settings-modal { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  #joplix .jp-settings-menu { flex-direction: row; flex-wrap: wrap; padding: 12px 56px 8px 12px; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  #joplix .jp-settings-menu h2 { flex: 1 0 100%; margin: 0 0 6px; }
+  #joplix .jp-settings-menu button { width: auto; }
+  #joplix .jp-settings-panel-area { padding: 12px 16px 24px; }
+  #joplix .jp-settings-close { position: fixed; top: 24px; right: 24px; }
+  #joplix .jp-setting-card:not(.jp-about-card) { flex-wrap: wrap; }
 }
-.jp-folder-icon {
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
-  background: currentColor;
-  -webkit-mask: url('../img/folder.svg') center / contain no-repeat;
-  mask: url('../img/folder.svg') center / contain no-repeat;
-  opacity: .82;
-}
-.jp-tree-label {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.jp-tree-row.active .jp-folder-icon,
-.jp-tree-item:hover .jp-folder-icon {
-  opacity: 1;
-}
-
-
-/* Joplix 2.3.0-beta.2: native Nextcloud light/dark theme integration */
-#joplix-app {
-  --jp-bg: var(--color-main-background, #ffffff);
-  --jp-bg-secondary: var(--color-background-dark, #f5f5f5);
-  --jp-bg-hover: var(--color-background-hover, #eef2f4);
-  --jp-bg-card: var(--color-background-dark, #f7f9fb);
-  --jp-text: var(--color-main-text, #202124);
-  --jp-text-muted: var(--color-text-maxcontrast, #5f6368);
-  --jp-border: var(--color-border, #d9d9d9);
-  --jp-primary: var(--color-primary-element, #00679e);
-  --jp-primary-text: var(--color-primary-element-text, #ffffff);
-  --jp-error: var(--color-error, #b91c1c);
-  background: var(--jp-bg) !important;
-  color: var(--jp-text) !important;
-  color-scheme: light dark;
-}
-#joplix-app .jp-sidebar { background: var(--jp-bg-secondary) !important; color: var(--jp-text) !important; }
-#joplix-app .jp-content,
-#joplix-app .jp-list { background: var(--jp-bg) !important; color: var(--jp-text) !important; border-color: var(--jp-border) !important; }
-#joplix-app .jp-brand-text strong,
-#joplix-app .jp-nav-title,
-#joplix-app .jp-note-path,
-#joplix-app .jp-resources-head,
-#joplix-app .jp-resource strong { color: var(--jp-text) !important; }
-#joplix-app .jp-brand small,
-#joplix-app .jp-breadcrumb,
-#joplix-app .jp-meta,
-#joplix-app .jp-index-status,
-#joplix-app .jp-note-item span,
-#joplix-app .jp-note-item small,
-#joplix-app .jp-resource-edit-status,
-#joplix-app .jp-muted { color: var(--jp-text-muted) !important; }
-#joplix-app .jp-nav-section,
-#joplix-app .jp-content,
-#joplix-app .jp-list,
-#joplix-app .jp-meta,
-#joplix-app .jp-note-path { border-color: var(--jp-border) !important; }
-#joplix-app input,
-#joplix-app textarea,
-#joplix-app select,
-#joplix-app .jp-title,
-#joplix-app .jp-body,
-#joplix-app .jp-note-display,
-#joplix-app .jp-list-head input {
-  background: var(--jp-bg) !important;
-  color: var(--jp-text) !important;
-  border-color: var(--jp-border) !important;
-  caret-color: var(--jp-text) !important;
-}
-#joplix-app input::placeholder,
-#joplix-app textarea::placeholder { color: var(--jp-text-muted) !important; opacity: 1; }
-#joplix-app button,
-#joplix-app .jp-upload,
-#joplix-app .jp-tags button,
-#joplix-app .jp-dialog-actions button,
-#joplix-app .jp-dev-buttons button,
-#joplix-app .jp-resource-actions a,
-#joplix-app .jp-resource-actions button {
-  background: var(--jp-bg-secondary) !important;
-  color: var(--jp-text) !important;
-  border-color: var(--jp-border) !important;
-}
-#joplix-app button:hover,
-#joplix-app .jp-upload:hover,
-#joplix-app .jp-resource-actions a:hover { background: var(--jp-bg-hover) !important; }
-#joplix-app .primary,
-#joplix-app .jp-mode-edit,
-#joplix-app .jp-dev-buttons .install:first-child {
-  background: var(--jp-primary) !important;
-  color: var(--jp-primary-text) !important;
-  border-color: var(--jp-primary) !important;
-}
-#joplix-app .jp-action,
-#joplix-app .jp-settings-button { background: var(--jp-bg-hover) !important; color: var(--jp-text) !important; }
-#joplix-app .jp-tree-row:hover,
-#joplix-app .jp-tree-item:hover,
-#joplix-app .jp-nav-static:hover,
-#joplix-app .jp-settings-button:hover { background: var(--jp-bg-hover) !important; }
-#joplix-app .jp-tree-row.active,
-#joplix-app .jp-tree-item.active { background: color-mix(in srgb, var(--jp-primary) 24%, var(--jp-bg)) !important; box-shadow: inset 4px 0 0 var(--jp-primary) !important; color: var(--jp-text) !important; }
-#joplix-app .jp-note-item { background: var(--jp-bg-card) !important; color: var(--jp-text) !important; border-color: var(--jp-border) !important; }
-#joplix-app .jp-note-item:hover { background: var(--jp-bg-hover) !important; }
-#joplix-app .jp-note-item.active { background: var(--jp-primary) !important; color: var(--jp-primary-text) !important; }
-#joplix-app .jp-note-item.active span,
-#joplix-app .jp-note-item.active small { color: var(--jp-primary-text) !important; }
-#joplix-app .jp-tags span { background: var(--jp-bg-hover) !important; color: var(--jp-text) !important; }
-#joplix-app .jp-resource,
-#joplix-app .jp-dev-package,
-#joplix-app .jp-dev-hint,
-#joplix-app .jp-setting-card,
-#joplix-app .jp-update-release,
-#joplix-app .jp-note-loading-card { background: var(--jp-bg-card) !important; color: var(--jp-text) !important; border-color: var(--jp-border) !important; }
-#joplix-app .jp-context-menu,
-#joplix-app .jp-tree-context-menu,
-#joplix-app .jp-note-context-menu,
-.jp-dialog,
-.jp-settings-modal,
-.jp-welcome-modal,
-.jp-pdf-viewer-modal { background: var(--color-main-background, #fff) !important; color: var(--color-main-text, #202124) !important; border-color: var(--color-border, #d9d9d9) !important; }
-#joplix-app .jp-context-menu button,
-#joplix-app .jp-tree-context-menu button,
-#joplix-app .jp-note-context-menu button { background: transparent !important; color: var(--jp-text) !important; }
-#joplix-app .jp-context-menu button:hover,
-#joplix-app .jp-tree-context-menu button:hover,
-#joplix-app .jp-note-context-menu button:hover { background: var(--jp-bg-hover) !important; }
-.jp-settings-menu,
-.jp-tabs { background: var(--color-background-dark, #f6f7f8) !important; color: var(--color-main-text, #202124) !important; border-color: var(--color-border, #d9d9d9) !important; }
-.jp-settings-panel-area,
-.jp-tab-content,
-.jp-dialog-grid { background: var(--color-main-background, #fff) !important; color: var(--color-main-text, #202124) !important; }
-.jp-settings-menu button,
-.jp-tabs button { color: var(--color-main-text, #202124) !important; }
-.jp-settings-menu button.active,
-.jp-settings-menu button:hover,
-.jp-tabs button.active,
-.jp-tabs button:hover { background: var(--color-background-hover, #d9edf6) !important; color: var(--color-primary-element, #00679e) !important; }
-.jp-settings-backdrop,
-.jp-welcome-backdrop,
-.jp-pdf-viewer-backdrop { background: rgba(0,0,0,.62) !important; }
-#joplix-app .jp-editor-formatbar { background: var(--jp-bg-secondary) !important; border-color: var(--jp-border) !important; }
-#joplix-app .jp-editor-formatbar button { background: transparent !important; color: var(--jp-text) !important; }
-#joplix-app .jp-editor-separator { background: var(--jp-border) !important; }
-#joplix-app .jp-resizer { background: linear-gradient(to right, transparent 0, transparent 2px, color-mix(in srgb, var(--jp-primary) 45%, transparent) 3px, color-mix(in srgb, var(--jp-primary) 45%, transparent) 5px, transparent 6px) !important; }
-.jp-logo-img-dark { display: none; }
-
-/* Nextcloud can switch theme independently of the operating-system preference. */
-body.theme--dark .jp-logo-img-light,
-body[data-theme-dark] .jp-logo-img-light,
-html[data-theme="dark"] .jp-logo-img-light { display: none !important; }
-body.theme--dark .jp-logo-img-dark,
-body[data-theme-dark] .jp-logo-img-dark,
-html[data-theme="dark"] .jp-logo-img-dark { display: block !important; }
-
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) .jp-logo-img-light { display: none !important; }
-  html:not([data-theme="light"]) .jp-logo-img-dark { display: block !important; }
-  #joplix-app { --jp-bg:#181818; --jp-bg-secondary:#102731; --jp-bg-hover:#1f3944; --jp-bg-card:#10242d; --jp-text:#f1f5f7; --jp-text-muted:#a9b6bd; --jp-border:#40515a; --jp-primary:#087ead; --jp-primary-text:#fff; }
-  #joplix-app .jp-title,
-  #joplix-app .jp-body,
-  #joplix-app .jp-note-display,
-  #joplix-app input,
-  #joplix-app textarea,
-  #joplix-app select { box-shadow: none !important; }
-  #joplix-app .jp-logo-img-dark { box-shadow: 0 3px 10px rgba(0,0,0,.35); background: transparent; }
-  #joplix-app .jp-folder-icon { opacity: .9; }
-}
-
-/* Joplix 2.3.0-beta.3: theme polish for paths, index status and notebook rows */
-#joplix-app .jp-note-path {
-  background: transparent !important;
-  color: var(--jp-text) !important;
-  border-bottom: 1px solid var(--jp-border) !important;
-}
-
-#joplix-app .jp-index-status {
-  background: transparent !important;
-  color: var(--jp-text-muted) !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  padding: 2px 0 !important;
-}
-#joplix-app .jp-index-status.ok {
-  background: color-mix(in srgb, var(--color-success, #2d7d46) 12%, transparent) !important;
-  color: var(--color-success, #2d7d46) !important;
-  padding: 3px 6px !important;
-}
-#joplix-app .jp-index-status.warning {
-  background: color-mix(in srgb, var(--color-warning, #a66b00) 14%, transparent) !important;
-  color: var(--color-warning, #a66b00) !important;
-  padding: 3px 6px !important;
-}
-#joplix-app .jp-index-status.error {
-  background: color-mix(in srgb, var(--color-error, #b91c1c) 12%, transparent) !important;
-  color: var(--color-error, #b91c1c) !important;
-  padding: 3px 6px !important;
-}
-
-/* One visual container per notebook row. Child controls stay transparent. */
-#joplix-app .jp-tree-row {
-  border: 1px solid transparent !important;
-  border-radius: 10px !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  overflow: hidden;
-}
-#joplix-app .jp-tree-row .jp-tree-item,
-#joplix-app .jp-tree-row .jp-tree-menu,
-#joplix-app .jp-tree-row .jp-tree-item:hover,
-#joplix-app .jp-tree-row .jp-tree-item.active,
-#joplix-app .jp-tree-row .jp-tree-menu:hover {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  outline: 0 !important;
-}
-#joplix-app .jp-tree-row:hover {
-  background: var(--jp-bg-hover) !important;
-}
-#joplix-app .jp-tree-row.active {
-  background: color-mix(in srgb, var(--jp-primary) 20%, var(--jp-bg-secondary)) !important;
-  border-color: color-mix(in srgb, var(--jp-primary) 35%, transparent) !important;
-  box-shadow: inset 4px 0 0 var(--jp-primary) !important;
-  color: var(--jp-text) !important;
-}
-#joplix-app .jp-tree-row:focus-within {
-  border-color: color-mix(in srgb, var(--jp-primary) 55%, transparent) !important;
-}
-#joplix-app .jp-tree-row .jp-tree-menu:focus-visible,
-#joplix-app .jp-tree-row .jp-tree-item:focus-visible {
-  outline: 2px solid var(--jp-primary) !important;
-  outline-offset: -2px !important;
-}
-
-
-/* Joplix 2.3.0-beta.4: restored interactive column resizing. */
-#joplix-app > .jp-resizer {
-  display: block !important;
-  width: 8px !important;
-  min-width: 8px !important;
-  max-width: 8px !important;
-  cursor: col-resize !important;
-  pointer-events: auto !important;
-  touch-action: none !important;
-  z-index: 50 !important;
-}
-#joplix-app > .jp-resizer::before {
-  content: '';
-  position: absolute;
-  inset: 0 -3px;
-}
-#joplix-app > .jp-resizer:hover::after,
-#joplix-app > .jp-resizer.dragging::after {
-  width: 3px !important;
-  background: var(--jp-primary) !important;
-}
-body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; }
-
-
-/* Joplix 2.3.0-beta.6: readable, native-looking index feedback in both themes */
-#joplix-app .jp-list {
-  padding-top: 20px !important;
-}
-#joplix-app .jp-list-head {
-  gap: 10px !important;
-  align-items: center !important;
-}
-#joplix-app .jp-list-head input#jp-search {
-  min-height: 42px !important;
-  border-width: 2px !important;
-  border-radius: 11px !important;
-  padding: 9px 12px !important;
-}
-#joplix-app .jp-index-status {
-  display: flex !important;
-  align-items: center !important;
-  gap: 7px !important;
-  min-height: 30px !important;
-  box-sizing: border-box !important;
-  margin: 10px 0 12px !important;
-  padding: 6px 10px !important;
-  border: 1px solid var(--jp-border) !important;
-  border-radius: 9px !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  line-height: 1.35 !important;
-  background: var(--jp-bg-secondary) !important;
-  color: var(--jp-text) !important;
-}
-#joplix-app .jp-index-status::before {
-  content: "ℹ";
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 800;
-  color: currentColor;
-}
-#joplix-app .jp-index-status.ok {
-  background: color-mix(in srgb, #16833f 14%, var(--jp-bg)) !important;
-  color: color-mix(in srgb, #16833f 76%, var(--jp-text)) !important;
-  border-color: color-mix(in srgb, #16833f 40%, var(--jp-border)) !important;
-}
-#joplix-app .jp-index-status.ok::before { content: "✓"; }
-#joplix-app .jp-index-status.warning {
-  background: color-mix(in srgb, #c27a00 14%, var(--jp-bg)) !important;
-  color: color-mix(in srgb, #9b6200 72%, var(--jp-text)) !important;
-  border-color: color-mix(in srgb, #c27a00 42%, var(--jp-border)) !important;
-}
-#joplix-app .jp-index-status.warning::before { content: "↻"; }
-#joplix-app .jp-index-status.error {
-  background: color-mix(in srgb, #c73737 14%, var(--jp-bg)) !important;
-  color: color-mix(in srgb, #b32323 74%, var(--jp-text)) !important;
-  border-color: color-mix(in srgb, #c73737 42%, var(--jp-border)) !important;
-}
-#joplix-app .jp-index-status.error::before { content: "!"; }
-#joplix-app .jp-note-item:first-of-type { margin-top: 2px !important; }
-
-body.theme--dark #joplix-app .jp-index-status.ok,
-body[data-theme-dark] #joplix-app .jp-index-status.ok,
-html[data-theme="dark"] #joplix-app .jp-index-status.ok {
-  background: #173526 !important;
-  color: #a9e6bd !important;
-  border-color: #356448 !important;
-}
-body.theme--dark #joplix-app .jp-index-status.warning,
-body[data-theme-dark] #joplix-app .jp-index-status.warning,
-html[data-theme="dark"] #joplix-app .jp-index-status.warning {
-  background: #3b2d13 !important;
-  color: #f0ce83 !important;
-  border-color: #685024 !important;
-}
-body.theme--dark #joplix-app .jp-index-status.error,
-body[data-theme-dark] #joplix-app .jp-index-status.error,
-html[data-theme="dark"] #joplix-app .jp-index-status.error {
-  background: #3d2020 !important;
-  color: #f0abab !important;
-  border-color: #6d3939 !important;
-}
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) #joplix-app .jp-index-status.ok {
-    background: #173526 !important; color: #a9e6bd !important; border-color: #356448 !important;
-  }
-  html:not([data-theme="light"]) #joplix-app .jp-index-status.warning {
-    background: #3b2d13 !important; color: #f0ce83 !important; border-color: #685024 !important;
-  }
-  html:not([data-theme="light"]) #joplix-app .jp-index-status.error {
-    background: #3d2020 !important; color: #f0abab !important; border-color: #6d3939 !important;
-  }
-}
-
-
-/* Joplix 2.3.0-beta.7: removable note-tag chips */
-#joplix-app .jp-tags .jp-tag-chip {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-  padding: 4px 5px 4px 10px !important;
-  border-radius: 999px !important;
-  background: var(--jp-bg-hover) !important;
-  color: var(--jp-text) !important;
-}
-#joplix-app .jp-tags .jp-tag-chip .jp-tag-label {
-  padding: 0 !important;
-  background: transparent !important;
-  color: inherit !important;
-}
-#joplix-app .jp-tags .jp-tag-remove {
-  display: inline-grid !important;
-  place-items: center !important;
-  width: 22px !important;
-  height: 22px !important;
-  min-width: 22px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 50% !important;
-  background: transparent !important;
-  color: var(--jp-text-muted) !important;
-  font-size: 18px !important;
-  line-height: 1 !important;
-  cursor: pointer !important;
-}
-#joplix-app .jp-tags .jp-tag-remove:hover,
-#joplix-app .jp-tags .jp-tag-remove:focus-visible {
-  background: var(--jp-danger-bg, rgba(200, 40, 40, .16)) !important;
-  color: var(--color-error, #d32f2f) !important;
-  outline: none !important;
-}
-
-/* Joplix 2.3.0-beta.8: clearer attachment cards and actions in light mode */
-#joplix-app .jp-resource {
-  background: var(--color-main-background, #fff) !important;
-  border: 1px solid color-mix(in srgb, var(--jp-border) 82%, var(--jp-text) 18%) !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, .07) !important;
-  padding: 14px 16px !important;
-  gap: 8px !important;
-}
-#joplix-app .jp-resource-actions {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: center !important;
-  gap: 10px !important;
-  margin-top: 4px !important;
-}
-#joplix-app .jp-resource-actions .jp-resource-action {
-  min-height: 40px !important;
-  padding: 8px 16px !important;
-  border-radius: var(--border-radius-large, 10px) !important;
-  font-weight: 600 !important;
-  line-height: 1.2 !important;
-  cursor: pointer !important;
-  transition: background-color .14s ease, border-color .14s ease, box-shadow .14s ease, transform .08s ease !important;
-}
-#joplix-app .jp-resource-actions .jp-resource-action-primary {
-  background: var(--jp-primary) !important;
-  color: var(--jp-primary-text) !important;
-  border: 1px solid var(--jp-primary) !important;
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--jp-primary) 35%, transparent) !important;
-}
-#joplix-app .jp-resource-actions .jp-resource-action-primary:hover {
-  background: color-mix(in srgb, var(--jp-primary) 88%, #000 12%) !important;
-  border-color: color-mix(in srgb, var(--jp-primary) 82%, #000 18%) !important;
-}
-#joplix-app .jp-resource-actions .jp-resource-action-secondary {
-  background: var(--color-main-background, #fff) !important;
-  color: var(--jp-text) !important;
-  border: 1px solid color-mix(in srgb, var(--jp-border) 65%, var(--jp-text) 35%) !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .09) !important;
-}
-#joplix-app .jp-resource-actions .jp-resource-action-secondary:hover {
-  background: var(--jp-bg-hover) !important;
-  border-color: color-mix(in srgb, var(--jp-primary) 70%, var(--jp-border) 30%) !important;
-  color: var(--jp-text) !important;
-}
-#joplix-app .jp-resource-actions .jp-resource-action:active {
-  transform: translateY(1px) !important;
-  box-shadow: none !important;
-}
-#joplix-app .jp-resource-actions .jp-resource-action:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--jp-primary) 75%, transparent) !important;
-  outline-offset: 2px !important;
-}
-#joplix-app .jp-resource-actions .jp-resource-action:disabled {
-  opacity: .58 !important;
-  cursor: wait !important;
-}
-
-/* Preserve the already successful restrained dark appearance. */
-body.theme--dark #joplix-app .jp-resource,
-body[data-theme-dark] #joplix-app .jp-resource,
-html[data-theme="dark"] #joplix-app .jp-resource {
-  background: var(--jp-bg-card) !important;
-  border-color: var(--jp-border) !important;
-  box-shadow: none !important;
-}
-body.theme--dark #joplix-app .jp-resource-actions .jp-resource-action-secondary,
-body[data-theme-dark] #joplix-app .jp-resource-actions .jp-resource-action-secondary,
-html[data-theme="dark"] #joplix-app .jp-resource-actions .jp-resource-action-secondary {
-  background: transparent !important;
-  color: var(--jp-text) !important;
-  border-color: var(--jp-border) !important;
-  box-shadow: none !important;
-}
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) #joplix-app .jp-resource {
-    background: var(--jp-bg-card) !important;
-    border-color: var(--jp-border) !important;
-    box-shadow: none !important;
-  }
-  html:not([data-theme="light"]) #joplix-app .jp-resource-actions .jp-resource-action-secondary {
-    background: transparent !important;
-    color: var(--jp-text) !important;
-    border-color: var(--jp-border) !important;
-    box-shadow: none !important;
-  }
-}
-
-/* Joplix 2.3.0-beta.9: complete settings overlay theming */
-.jp-settings-overlay {
-  --jp-settings-bg: #ffffff;
-  --jp-settings-menu-bg: #f3f5f7;
-  --jp-settings-card-bg: #f7f9fb;
-  --jp-settings-card-border: #d8e0e8;
-  --jp-settings-text: #20252c;
-  --jp-settings-muted: #667381;
-  --jp-settings-input-bg: #ffffff;
-  --jp-settings-hover: #e7eef4;
-  --jp-settings-active-bg: #dcecf6;
-  --jp-settings-active-text: #00679e;
-  --jp-settings-shadow: rgba(0,0,0,.34);
-}
-
-.jp-settings-modal {
-  background: var(--jp-settings-bg) !important;
-  color: var(--jp-settings-text) !important;
-  border: 1px solid var(--jp-settings-card-border) !important;
-  box-shadow: 0 24px 90px var(--jp-settings-shadow) !important;
-}
-.jp-settings-menu {
-  background: var(--jp-settings-menu-bg) !important;
-  color: var(--jp-settings-text) !important;
-  border-color: var(--jp-settings-card-border) !important;
-}
-.jp-settings-menu h2,
-.jp-settings-pane h3,
-.jp-settings-pane h4,
-.jp-setting-card strong,
-.jp-setting-row strong {
-  color: var(--jp-settings-text) !important;
-}
-.jp-settings-menu button {
-  background: transparent !important;
-  color: var(--jp-settings-text) !important;
-}
-.jp-settings-menu button:hover,
-.jp-settings-menu button.active {
-  background: var(--jp-settings-hover) !important;
-  color: var(--jp-settings-active-text) !important;
-}
-.jp-settings-panel-area {
-  background: var(--jp-settings-bg) !important;
-  color: var(--jp-settings-text) !important;
-}
-.jp-settings-close {
-  background: transparent !important;
-  color: var(--jp-settings-text) !important;
-}
-.jp-settings-close:hover { background: var(--jp-settings-hover) !important; }
-.jp-setting-card,
-.jp-setting-row,
-.jp-update-status,
-.jp-update-release {
-  background: var(--jp-settings-card-bg) !important;
-  color: var(--jp-settings-text) !important;
-  border-color: var(--jp-settings-card-border) !important;
-}
-.jp-setting-card span,
-.jp-setting-row span,
-.jp-settings-pane .jp-hint,
-.jp-update-release small,
-.jp-update-release span {
-  color: var(--jp-settings-muted) !important;
-}
-.jp-setting-card input,
-.jp-setting-card select,
-.jp-setting-row input,
-.jp-setting-row select,
-.jp-settings-pane input,
-.jp-settings-pane select,
-.jp-settings-pane textarea {
-  background: var(--jp-settings-input-bg) !important;
-  color: var(--jp-settings-text) !important;
-  border-color: var(--jp-settings-card-border) !important;
-  box-shadow: none !important;
-}
-.jp-settings-pane input::placeholder,
-.jp-settings-pane textarea::placeholder {
-  color: var(--jp-settings-muted) !important;
-  opacity: 1;
-}
-.jp-settings-pane input[readonly],
-.jp-settings-pane select:disabled,
-.jp-settings-pane input:disabled {
-  background: var(--jp-settings-menu-bg) !important;
-  color: var(--jp-settings-muted) !important;
-  opacity: 1;
-}
-.jp-setting-card-action button,
-.jp-segmented button,
-.jp-settings-pane button:not(.jp-switch):not(.jp-settings-close) {
-  background: var(--jp-settings-menu-bg) !important;
-  color: var(--jp-settings-text) !important;
-  border-color: var(--jp-settings-card-border) !important;
-}
-.jp-setting-card-action button:hover,
-.jp-segmented button:hover,
-.jp-settings-pane button:not(.jp-switch):not(.jp-settings-close):hover {
-  background: var(--jp-settings-hover) !important;
-}
-.jp-segmented button.active,
-.jp-update-source button.active,
-.jp-settings-pane .primary {
-  background: var(--color-primary-element, #00679e) !important;
-  color: var(--color-primary-element-text, #fff) !important;
-  border-color: var(--color-primary-element, #00679e) !important;
-}
-.jp-update-status {
-  border: 1px solid var(--jp-settings-card-border) !important;
-  border-radius: 9px;
-  padding: 10px 12px;
-}
-
-body.theme--dark .jp-settings-overlay,
-body[data-theme-dark] .jp-settings-overlay,
-html[data-theme="dark"] .jp-settings-overlay {
-  --jp-settings-bg: #171717;
-  --jp-settings-menu-bg: #272727;
-  --jp-settings-card-bg: #202224;
-  --jp-settings-card-border: #46515a;
-  --jp-settings-text: #f1f4f6;
-  --jp-settings-muted: #aeb8c0;
-  --jp-settings-input-bg: #151617;
-  --jp-settings-hover: #33383c;
-  --jp-settings-active-bg: #17384a;
-  --jp-settings-active-text: #39b7f0;
-  --jp-settings-shadow: rgba(0,0,0,.72);
-}
-
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) .jp-settings-overlay {
-    --jp-settings-bg: #171717;
-    --jp-settings-menu-bg: #272727;
-    --jp-settings-card-bg: #202224;
-    --jp-settings-card-border: #46515a;
-    --jp-settings-text: #f1f4f6;
-    --jp-settings-muted: #aeb8c0;
-    --jp-settings-input-bg: #151617;
-    --jp-settings-hover: #33383c;
-    --jp-settings-active-bg: #17384a;
-    --jp-settings-active-text: #39b7f0;
-    --jp-settings-shadow: rgba(0,0,0,.72);
-  }
-}
-
-/* Joplix 2.3.0-beta.10: theme-aware update release assets */
-.jp-settings-pane .jp-update-asset {
-  background: var(--jp-settings-input-bg) !important;
-  color: var(--jp-settings-text) !important;
-  border: 1px solid var(--jp-settings-card-border) !important;
-  border-radius: 10px;
-  min-height: 48px;
-  padding: 8px 10px;
-  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
-}
-.jp-settings-pane .jp-update-asset:hover {
-  background: var(--jp-settings-hover) !important;
-  border-color: var(--color-primary-element, #0082c9) !important;
-}
-.jp-settings-pane .jp-update-asset span {
-  color: var(--jp-settings-text) !important;
-  font-weight: 500;
-}
-.jp-settings-pane .jp-update-asset button {
-  background: var(--color-primary-element, #0082c9) !important;
-  color: var(--color-primary-element-text, #fff) !important;
-  border: 1px solid var(--color-primary-element, #0082c9) !important;
-  border-radius: 9px;
-  min-height: 40px;
-  padding: 8px 14px;
-  font-weight: 700;
-  box-shadow: none !important;
-}
-.jp-settings-pane .jp-update-asset button:hover,
-.jp-settings-pane .jp-update-asset button:focus-visible {
-  filter: brightness(1.08);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-element, #0082c9) 30%, transparent) !important;
-}
-.jp-settings-pane .jp-update-asset button:active {
-  filter: brightness(.94);
-}
-
-/* Joplix 2026.09.60: reliable in-app notebook deletion confirmation */
-.jp-delete-notebook-overlay { position: fixed; inset: 0; z-index: 10050; display: none; align-items: center; justify-content: center; padding: 20px; }
-.jp-delete-notebook-overlay.open { display: flex; }
-.jp-delete-notebook-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.46); }
-.jp-delete-notebook-modal { position: relative; width: min(520px, calc(100vw - 40px)); padding: 24px; border: 1px solid var(--color-border, #d9d9d9); border-radius: 14px; background: var(--color-main-background, #fff); color: var(--color-main-text, #202124); box-shadow: 0 18px 50px rgba(0,0,0,.24); }
-.jp-delete-notebook-modal h2 { margin: 0 0 12px; font-size: 22px; }
-.jp-delete-notebook-modal p { margin: 0; line-height: 1.5; }
-.jp-delete-notebook-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-.jp-delete-notebook-actions button { min-width: 96px; }
-.jp-delete-notebook-actions button.danger { background: var(--color-error, #c62828); color: #fff; border-color: transparent; }
-
-/* Joplin Server synchronisation */
-.jp-sync-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
-.jp-settings-pane[data-settings-section="sync"] .jp-path-control input { width: 100%; box-sizing: border-box; }
-#jp-sync-now[disabled], .jp-sync-actions button[disabled] { opacity: .6; cursor: progress; }

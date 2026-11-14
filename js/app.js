@@ -2,6 +2,107 @@
 const state={index:null,settings:null,notebookId:'',noteId:'',note:null,sort:'updated_desc',loadingNoteId:'',backgroundBusy:false,noteLoading:false,noteMemCache:{},noteFetches:{},editorHistory:{undo:[],last:'',max:80},dirty:false,saving:false,saveAgain:false,savePromise:null,pendingNoteId:'',noteGenerations:{},officePollers:{},officeSyncs:{}};
 const $=id=>document.getElementById(id); const route=p=>OC.generateUrl('/apps/joplix'+p);
 
+// ---------------------------------------------------------------------------
+// UI helpers: icons, panes, dialogs, toasts.
+// - Icons are inline SVG (Material Design Icons paths, the set Nextcloud uses) so they follow the text
+//   colour of the theme. Template: <span class="jp-icon" data-icon="name"> filled by hydrateIcons().
+//   JS-built DOM: jpIconEl('name') or jpIcon('name') for an HTML string. Add new icons to JP_ICONS only.
+// - jpAlert / jpConfirm / jpPrompt / jpDialog replace the browser's alert/confirm/prompt. They return
+//   promises: confirm and prompt must be awaited, alert may be fired without waiting.
+// - Menus and dialogs are appended to jpRoot() (#joplix), which css/style.css scopes every rule to.
+// ---------------------------------------------------------------------------
+const JP_ICONS={
+plus:'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
+close:'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
+magnify:'M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z',
+cog:'M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z',
+pencil:'M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z',
+eye:'M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z',
+save:'M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z',
+delete:'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z',
+paperclip:'M16.5,6V17.5A4,4 0 0,1 12.5,21.5A4,4 0 0,1 8.5,17.5V5A2.5,2.5 0 0,1 11,2.5A2.5,2.5 0 0,1 13.5,5V15.5A1,1 0 0,1 12.5,16.5A1,1 0 0,1 11.5,15.5V6H10V15.5A2.5,2.5 0 0,0 12.5,18A2.5,2.5 0 0,0 15,15.5V5A4,4 0 0,0 11,1A4,4 0 0,0 7,5V17.5A5.5,5.5 0 0,0 12.5,23A5.5,5.5 0 0,0 18,17.5V6H16.5Z',
+bold:'M13.5,15.5H10V12.5H13.5A1.5,1.5 0 0,1 15,14A1.5,1.5 0 0,1 13.5,15.5M10,6.5H13A1.5,1.5 0 0,1 14.5,8A1.5,1.5 0 0,1 13,9.5H10M15.6,10.79C16.57,10.11 17.25,9 17.25,8C17.25,5.74 15.5,4 13.25,4H7V18H14.04C16.14,18 17.75,16.3 17.75,14.21C17.75,12.69 16.89,11.39 15.6,10.79Z',
+italic:'M10,4V7H12.21L8.79,15H6V18H14V15H11.79L15.21,7H18V4H10Z',
+link:'M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z',
+code:'M14.6,16.6L19.2,12L14.6,7.4L16,6L22,12L16,18L14.6,16.6M9.4,16.6L4.8,12L9.4,7.4L8,6L2,12L8,18L9.4,16.6Z',
+listBulleted:'M7,5H21V7H7V5M7,13V11H21V13H7M4,4.5A1.5,1.5 0 0,1 5.5,6A1.5,1.5 0 0,1 4,7.5A1.5,1.5 0 0,1 2.5,6A1.5,1.5 0 0,1 4,4.5M4,10.5A1.5,1.5 0 0,1 5.5,12A1.5,1.5 0 0,1 4,13.5A1.5,1.5 0 0,1 2.5,12A1.5,1.5 0 0,1 4,10.5M7,19V17H21V19H7M4,16.5A1.5,1.5 0 0,1 5.5,18A1.5,1.5 0 0,1 4,19.5A1.5,1.5 0 0,1 2.5,18A1.5,1.5 0 0,1 4,16.5Z',
+listNumbered:'M7,13V11H21V13H7M7,19V17H21V19H7M7,7V5H21V7H7M3,8V5H2V4H4V8H3M2,17V16H5V20H2V19H4V18.5H3V17.5H4V17H2M4.25,10A0.75,0.75 0 0,1 5,10.75C5,10.95 4.92,11.14 4.79,11.27L3.12,13H5V14H2V13.08L4,11H2V10H4.25Z',
+checkbox:'M19,19H5V5H15V3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V11H19M7.91,10.08L6.5,11.5L11,16L21,6L19.59,4.58L11,13.17L7.91,10.08Z',
+heading:'M5,4H8V10.5H16V4H19V20H16V13.5H8V20H5Z',
+minus:'M19,13H5V11H19V13Z',
+clock:'M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22C6.47,22 2,17.5 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z',
+marker:'M4,17L6.75,14.25L6.72,14.23C6.14,13.64 6.14,12.69 6.72,12.11L11.46,7.37L15.7,11.61L10.96,16.35C10.39,16.93 9.46,16.93 8.87,16.37L8.24,17H4M15.91,2.91C16.5,2.33 17.45,2.33 18.03,2.91L20.16,5.03C20.74,5.62 20.74,6.57 20.16,7.16L16.86,10.45L12.62,6.21L15.91,2.91M2,20H22V22H2Z',
+undo:'M12.5,8C9.85,8 7.45,9 5.6,10.6L2,7V16H11L7.38,12.38C8.77,11.22 10.54,10.5 12.5,10.5C16.04,10.5 19.05,12.81 20.1,16L22.47,15.22C21.08,11.03 17.15,8 12.5,8Z',
+dots:'M16,12A2,2 0 0,1 18,10A2,2 0 0,1 20,12A2,2 0 0,1 18,14A2,2 0 0,1 16,12M10,12A2,2 0 0,1 12,10A2,2 0 0,1 14,12A2,2 0 0,1 12,14A2,2 0 0,1 10,12M4,12A2,2 0 0,1 6,10A2,2 0 0,1 8,12A2,2 0 0,1 6,14A2,2 0 0,1 4,12Z',
+sync:'M12,18A6,6 0 0,1 6,12C6,11 6.25,10.03 6.7,9.2L5.24,7.74C4.46,8.97 4,10.43 4,12A8,8 0 0,0 12,20V23L16,19L12,15M12,4V1L8,5L12,9V6A6,6 0 0,1 18,12C18,13 17.75,13.97 17.3,14.8L18.76,16.26C19.54,15.03 20,13.57 20,12A8,8 0 0,0 12,4Z',
+refresh:'M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z',
+sort:'M9,3L5,7H8V14H10V7H13M16,17V10H14V17H11L15,21L19,17H16Z',
+arrowLeft:'M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z',
+download:'M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z',
+tag:'M5.5,7A1.5,1.5 0 0,1 4,5.5A1.5,1.5 0 0,1 5.5,4A1.5,1.5 0 0,1 7,5.5A1.5,1.5 0 0,1 5.5,7M21.41,11.58L12.41,2.58C12.05,2.22 11.55,2 11,2H4C2.89,2 2,2.89 2,4V11C2,11.55 2.22,12.05 2.59,12.41L11.58,21.41C11.95,21.77 12.45,22 13,22C13.55,22 14.05,21.77 14.41,21.41L21.41,14.41C21.78,14.05 22,13.55 22,13C22,12.44 21.77,11.94 21.41,11.58Z',
+file:'M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z',
+image:'M8.5,13.5L11,16.5L14.5,12L19,18H5M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19Z',
+note:'M5,3C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H19C20.11,21 21,20.11 21,19V5C21,3.89 20.11,3 19,3H5M5,5H19V19H5V5M7,7V9H17V7H7M7,11V13H17V11H7M7,15V17H14V15H7Z',
+folderMove:'M14,18V15H10V11H14V8L19,13M20,6H12L10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6Z',
+folderPlus:'M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4C2.89,20 2,19.1 2,18V6C2,4.89 2.89,4 4,4H10M15,9V12H12V14H15V17H17V14H20V12H17V9H15Z'
+};
+function jpIcon(name){return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="'+(JP_ICONS[name]||'')+'"/></svg>';}
+function jpIconEl(name){const s=document.createElement('span');s.className='jp-icon';s.innerHTML=jpIcon(name);return s;}
+function hydrateIcons(root){(root||document).querySelectorAll('.jp-icon[data-icon]').forEach(el=>{if(!el.firstChild)el.innerHTML=jpIcon(el.dataset.icon);});}
+function jpMenuItem(act,icon,label,cls){return '<button type="button" data-act="'+act+'" role="menuitem"'+(cls?' class="'+cls+'"':'')+'><span class="jp-icon">'+jpIcon(icon)+'</span><span>'+jpEscapeHtml(label)+'</span></button>';}
+function jpRoot(){return document.getElementById('joplix')||document.body;}
+// Small screens show one column at a time (css/style.css section 11): 'nav' | 'list' | 'note'.
+function setPane(p){const app=$('joplix-app');if(app)app.dataset.pane=p;}
+// Without an open note the editor column shows the empty state instead of title/body/attachments.
+function setHasNote(on){const app=$('joplix-app');if(app)app.classList.toggle('jp-no-note',!on);}
+function jpSettingsOpen(){const o=document.getElementById('jp-settings-overlay');return !!(o&&o.classList.contains('open'));}
+function jpDialogOpen(){return !!document.querySelector('.jp-dialog-overlay');}
+// One modal for every question. opts: title, message, input (string => text field), select ([{value,label}])
+// with value, buttons ([{label,value,primary,danger,submit}]; submit resolves with the field value) and
+// cancelValue (resolved on Escape or a click on the backdrop).
+function jpDialog(opts){
+  opts=opts||{};
+  return new Promise(resolve=>{
+    const previous=document.activeElement;
+    const overlay=document.createElement('div');overlay.className='jp-overlay jp-dialog-overlay open';
+    const backdrop=document.createElement('div');backdrop.className='jp-backdrop';
+    const modal=document.createElement('section');modal.className='jp-modal';modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
+    if(opts.title){const h=document.createElement('h2');h.textContent=opts.title;modal.appendChild(h);}
+    if(opts.message){const p=document.createElement('p');p.className='jp-dialog-message';p.textContent=opts.message;modal.appendChild(p);}
+    let field=null;
+    if(opts.select){field=document.createElement('select');opts.select.forEach(o=>{const el=document.createElement('option');el.value=o.value;el.textContent=o.label;field.appendChild(el);});if(opts.value!==undefined)field.value=opts.value;}
+    else if(opts.input!==undefined){field=document.createElement('input');field.type='text';field.value=String(opts.input||'');}
+    if(field){field.setAttribute('aria-label',opts.title||opts.message||'');modal.appendChild(field);}
+    const actions=document.createElement('div');actions.className='jp-modal-actions';modal.appendChild(actions);
+    const buttons=opts.buttons||[{label:t('OK'),value:true,primary:true}];
+    const cancelValue=opts.cancelValue!==undefined?opts.cancelValue:null;
+    let done=false,defaultBtn=null;
+    const finish=value=>{if(done)return;done=true;document.removeEventListener('keydown',onKey,true);overlay.remove();try{if(previous&&previous.focus)previous.focus();}catch(e){}resolve(value);};
+    buttons.forEach(b=>{const el=document.createElement('button');el.type='button';el.textContent=b.label;if(b.danger)el.className='danger';else if(b.primary)el.className='primary';el.onclick=()=>finish(b.submit&&field?field.value:b.value);actions.appendChild(el);if(b.primary||b.danger)defaultBtn=el;});
+    const onKey=ev=>{
+      if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();finish(cancelValue);return;}
+      if(ev.key==='Enter'&&field&&ev.target===field&&field.tagName==='INPUT'){ev.preventDefault();if(buttons.some(b=>b.submit))finish(field.value);return;}
+      if(ev.key==='Tab'){
+        const items=Array.from(modal.querySelectorAll('input,select,button'));if(!items.length)return;
+        const first=items[0],last=items[items.length-1];
+        if(!modal.contains(document.activeElement)){ev.preventDefault();first.focus();}
+        else if(ev.shiftKey&&document.activeElement===first){ev.preventDefault();last.focus();}
+        else if(!ev.shiftKey&&document.activeElement===last){ev.preventDefault();first.focus();}
+      }
+    };
+    document.addEventListener('keydown',onKey,true);
+    backdrop.onclick=()=>finish(cancelValue);
+    overlay.appendChild(backdrop);overlay.appendChild(modal);jpRoot().appendChild(overlay);
+    const focusTarget=field||defaultBtn||actions.querySelector('button');
+    if(focusTarget){focusTarget.focus();if(field&&field.select)field.select();}
+  });
+}
+function jpAlert(message,title){return jpDialog({title:title||'',message:String(message==null?'':message),cancelValue:true,buttons:[{label:t('OK'),value:true,primary:true}]});}
+function jpConfirm(message,o={}){return jpDialog({title:o.title||'',message:String(message||''),cancelValue:false,buttons:[{label:o.cancelLabel||t('Abbrechen'),value:false},{label:o.confirmLabel||t('OK'),value:true,primary:!o.danger,danger:!!o.danger}]});}
+function jpPrompt(title,value='',o={}){return jpDialog({title,message:o.message||'',input:value||'',cancelValue:null,buttons:[{label:t('Abbrechen'),value:null},{label:o.confirmLabel||t('OK'),submit:true,primary:true}]});}
+// Short, non-blocking confirmation. Uses Nextcloud's toast when available, otherwise the status line.
+function jpToast(message,type){try{if(window.OC&&OC.Notification&&typeof OC.Notification.showTemporary==='function'){OC.Notification.showTemporary(message,type==='error'?{type:'error'}:undefined);return;}}catch(e){}status(message,type==='error'?'error':'ok');}
+
 function formatJoplixDateTime(value){
   if(value===undefined||value===null)return '';
   const raw=String(value).trim();
@@ -30,7 +131,7 @@ function formatJoplixDateTime(value){
 function jpOverlay(){return document.getElementById('jp-settings-overlay');}
 function jpForceOpenSettings(){
   const o=jpOverlay();
-  if(!o){alert(t('Einstellungsbereich wurde nicht gefunden.'));return;}
+  if(!o){jpAlert(t('Einstellungsbereich wurde nicht gefunden.'));return;}
   const p=document.getElementById('jp-setting-joplin-path');
   if(p&&!p.value)p.value='/JoplinV2';
   o.classList.add('open');
@@ -131,7 +232,7 @@ document.addEventListener('change',function(ev){
   if(ev.target&&ev.target.id==='jp-setting-joplin-path'){jpApplySettingsFromUi(true);}
 },true);
 document.addEventListener('keydown',function(ev){
-  if(ev.key==='Escape'){jpApplySettingsFromUi(false).finally(()=>jpForceCloseSettings());}
+  if(ev.key==='Escape'&&jpSettingsOpen()&&!jpDialogOpen()){jpApplySettingsFromUi(false).finally(()=>jpForceCloseSettings());}
   if(ev.key==='Enter'&&ev.target&&ev.target.id==='jp-setting-joplin-path'){ev.preventDefault();jpApplySettingsFromUi(true);}
 },true);
 document.addEventListener('input',function(ev){
@@ -146,50 +247,40 @@ const storage={
   del(k){try{localStorage.removeItem('joplix.'+k);}catch(e){}}
 };
 function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
+// Column order is navigation | note list | note. Navigation and list have a stored pixel width
+// (localStorage joplix.columnWidths2 = {nav,list}); the note takes the remaining space. The widths reach
+// the stylesheet as --jp-nav-width / --jp-list-width. Only a finished drag, a double click on a handle or
+// "reset" stores a width, so a temporarily narrow window does not shrink the saved layout.
+const JP_COLS={nav:{def:300,min:220,max:440},list:{def:340,min:260,max:560}};
+function storedColumnWidths(){const w=storage.get('columnWidths2',null)||{};return {nav:Number(w.nav)||JP_COLS.nav.def,list:Number(w.list)||JP_COLS.list.def};}
 function applyColumnWidths(w){
-  const app=$('joplix-app'); if(!app)return;
-  w=w||storage.get('columnWidths',{left:310,right:370});
-  const appWidth=Math.max(900,Math.floor((app.getBoundingClientRect&&app.getBoundingClientRect().width)||window.innerWidth||1400));
-  const gutter=16;
-  const minLeft=240, maxLeft=Math.min(420,Math.floor(appWidth*.30));
-  const minRight=300, maxRight=Math.min(520,Math.floor(appWidth*.34));
-  const minMiddle=Math.min(520,Math.max(360,Math.floor(appWidth*.28)));
-  let left=clamp(Number(w.left)||310,minLeft,Math.max(minLeft,maxLeft));
-  let right=clamp(Number(w.right)||370,minRight,Math.max(minRight,maxRight));
-  const maxSideSpace=Math.max(minLeft+minRight,appWidth-gutter-minMiddle-16);
-  if(left+right>maxSideSpace){
-    const over=left+right-maxSideSpace;
-    const reduceLeft=Math.min(Math.max(0,left-minLeft),Math.ceil(over/2));
-    left-=reduceLeft;
-    right=Math.max(minRight,right-(over-reduceLeft));
-  }
-  app.style.setProperty('grid-template-columns',left+'px 8px minmax('+minMiddle+'px,1fr) 8px '+right+'px','important');
-  app.style.setProperty('--jp-left',left+'px');
-  app.style.setProperty('--jp-right',right+'px');
-  storage.set('columnWidths',{left,right});
+  const app=$('joplix-app'); if(!app)return null;
+  w=w||storedColumnWidths();
+  const appWidth=Math.floor((app.getBoundingClientRect&&app.getBoundingClientRect().width)||window.innerWidth||1400);
+  let nav=clamp(Number(w.nav)||JP_COLS.nav.def,JP_COLS.nav.min,JP_COLS.nav.max);
+  let list=clamp(Number(w.list)||JP_COLS.list.def,JP_COLS.list.min,JP_COLS.list.max);
+  // Leave at least 420px for the note itself; take the space from the list first, then the navigation.
+  const over=nav+list+2+420-appWidth;
+  if(over>0){const cutList=Math.min(list-JP_COLS.list.min,over);list-=cutList;nav=Math.max(JP_COLS.nav.min,nav-(over-cutList));}
+  app.style.setProperty('--jp-nav-width',nav+'px');
+  app.style.setProperty('--jp-list-width',list+'px');
+  return {nav,list};
 }
 function setupResizableColumns(){
   const app=$('joplix-app'); if(!app)return;
+  storage.del('columnWidths'); // layout before 2026.11.69 (list on the right); its widths do not carry over
   applyColumnWidths();
-  window.addEventListener('resize',()=>applyColumnWidths(storage.get('columnWidths',{left:310,right:370})));
+  window.addEventListener('resize',()=>applyColumnWidths());
   document.querySelectorAll('.jp-resizer').forEach(handle=>{
-    /* Existing oversized local column widths from 1.0.25 are normalized by applyColumnWidths. */
-    const side=handle.dataset.resize;
-    const beginResize=ev=>{
+    const side=handle.dataset.resize==='list'?'list':'nav';
+    handle.addEventListener('pointerdown',ev=>{
       if(ev.button!==undefined&&ev.button!==0)return;
       ev.preventDefault();
-      const startX=ev.clientX;
-      const cur=storage.get('columnWidths',{left:310,right:370});
-      const startLeft=Number(cur.left)||310, startRight=Number(cur.right)||370;
+      const startX=ev.clientX,start=storedColumnWidths();
+      let applied=null;
       document.body.classList.add('jp-resizing'); handle.classList.add('dragging');
       try{handle.setPointerCapture&&handle.setPointerCapture(ev.pointerId);}catch(e){}
-      const move=e=>{
-        const dx=e.clientX-startX;
-        const next={left:startLeft,right:startRight};
-        if(side==='left')next.left=startLeft+dx;
-        if(side==='right')next.right=startRight-dx;
-        applyColumnWidths(next);
-      };
+      const move=e=>{const next={nav:start.nav,list:start.list};next[side]=start[side]+(e.clientX-startX);applied=applyColumnWidths(next)||applied;};
       const up=e=>{
         document.body.classList.remove('jp-resizing');
         handle.classList.remove('dragging');
@@ -197,16 +288,13 @@ function setupResizableColumns(){
         handle.removeEventListener('pointermove',move);
         handle.removeEventListener('pointerup',up);
         handle.removeEventListener('pointercancel',up);
+        if(applied)storage.set('columnWidths2',applied);
       };
       handle.addEventListener('pointermove',move);
       handle.addEventListener('pointerup',up);
       handle.addEventListener('pointercancel',up);
-    };
-    handle.addEventListener('pointerdown',beginResize);
-    handle.addEventListener('dblclick',()=>{
-      const defaults=side==='left'?{left:310,right:(storage.get('columnWidths',{right:370}).right||370)}:{left:(storage.get('columnWidths',{left:310}).left||310),right:370};
-      applyColumnWidths(defaults);
     });
+    handle.addEventListener('dblclick',()=>{const w=storedColumnWidths();w[side]=JP_COLS[side].def;const applied=applyColumnWidths(w);if(applied)storage.set('columnWidths2',applied);});
   });
 }
 function isEmptyIndex(idx){return !idx||(!(idx.tree||[]).length&&!(idx.notebooks||[]).length&&!(idx.notes||[]).length);}
@@ -224,60 +312,133 @@ function localLocation(){return storage.get('lastLocation',{notebook_id:'',note_
 function firstNotebookId(idx){const tree=(idx&&idx.tree)||[];return tree.length?tree[0].id:'';}
 
 function jpEscapeHtml(v){return String(v||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-function jpInlineMarkdown(t){return jpEscapeHtml(t).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*]+)\*/g,'<em>$1</em>').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noreferrer">$1</a>');}
-function jpRenderMarkdown(md){
-  const lines=String(md||'').split(/\r?\n/);
-  let html='',listType='',inCode=false,code=[];
-  function closeList(){
-    if(listType){html+=(listType==='ol'?'</ol>':'</ul>');listType='';}
-  }
-  function openList(type){
-    if(listType===type)return;
-    closeList();
-    if(type==='task')html+='<ul class="jp-md-list jp-md-task-list">';
-    else if(type==='ul')html+='<ul class="jp-md-list">';
-    else html+='<ol class="jp-md-list">';
-    listType=type;
-  }
+// ---------------------------------------------------------------------------
+// Markdown preview. DISPLAY ONLY: the textarea #jp-body is the single source that is saved, and nothing
+// rendered here is ever written back, so the preview cannot change a note that syncs to other Joplin
+// clients. The one exception is a task checkbox, which edits exactly its own source line through
+// onDisplayCheckboxChange() (data-line = index of the line in the textarea).
+// Every piece of note text is HTML-escaped before markup is added; raw HTML in a note is shown as text.
+// Joplin resources (":/<32 hex id>") are loaded through /api/resources/{id}/data by hydratePreviewResources().
+// Remote images are shown as links: Nextcloud's content security policy blocks third-party image hosts.
+// ---------------------------------------------------------------------------
+const JP_RES_ID=/^:\/([0-9a-fA-F]{32})(?:[#?].*)?$/;
+const JP_LIST_RE=/^(\s*)(?:([-*+])|(\d+)[.)])\s+(.*)$/;
+function jpInlineMarkdown(src){
+  // Finished HTML is parked in kept[] behind a \u0001n\u0001 marker so later rules cannot alter it.
+  const kept=[];
+  const keep=html=>{kept.push(html);return '\u0001'+(kept.length-1)+'\u0001';};
+  const plain=v=>v.replace(/\u0001\d+\u0001/g,'');
+  const target=u=>{const res=u.match(JP_RES_ID);if(res)return {res:res[1].toLowerCase()};if(/^(https?:\/\/|mailto:)/i.test(u))return {url:u};return null;};
+  let s=String(src==null?'':src).replace(/\u0001/g,'');
+  s=s.replace(/`([^`]+)`/g,(m,c)=>keep('<code>'+jpEscapeHtml(c)+'</code>'));
+  s=jpEscapeHtml(s);
+  s=s.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+[^)]*)?\)/g,(m,alt,u)=>{const tg=target(u);if(!tg)return m;if(tg.res)return keep('<img class="jp-md-res" data-jp-res="'+tg.res+'" alt="'+plain(alt)+'">');return keep('<a href="'+tg.url+'" target="_blank" rel="noopener noreferrer">')+(alt||tg.url)+keep('</a>');});
+  s=s.replace(/\[([^\]]+)\]\(\s*([^)\s]+)(?:\s+[^)]*)?\)/g,(m,text,u)=>{const tg=target(u);if(!tg)return m;return keep(tg.res?'<a href="#" data-jp-res-link="'+tg.res+'">':'<a href="'+tg.url+'" target="_blank" rel="noopener noreferrer">')+text+keep('</a>');});
+  s=s.replace(/(^|[\s(]|&lt;)(https?:\/\/(?:(?!&gt;|&lt;|&quot;)\S)+)/g,(m,pre,u)=>{const tail=(u.match(/[.,;:!?)\]]+$/)||[''])[0];const url=tail?u.slice(0,-tail.length):u;return pre+keep('<a href="'+url+'" target="_blank" rel="noopener noreferrer">'+url+'</a>')+tail;});
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/(^|[^\w])__([^_]+)__(?!\w)/g,'$1<strong>$2</strong>')
+     .replace(/\*([^*\s][^*]*)\*/g,'<em>$1</em>').replace(/(^|[^\w])_([^_\s][^_]*)_(?!\w)/g,'$1<em>$2</em>')
+     .replace(/~~([^~]+)~~/g,'<del>$1</del>').replace(/==([^=]+)==/g,'<mark>$1</mark>');
+  return s.replace(/\u0001(\d+)\u0001/g,(m,i)=>kept[Number(i)]);
+}
+function jpRenderMarkdown(md){return jpRenderBlocks(String(md||'').split(/\r?\n/),true)||'<p class="jp-muted">'+t('Keine Notizinhalte.')+'</p>';}
+// lines: source lines. interactive: task checkboxes carry data-line and can be ticked (false inside a
+// block quote, where the line numbers of the nested call no longer match the textarea).
+function jpRenderBlocks(lines,interactive){
+  let html='',para=[];
+  const stack=[]; // open lists, outermost first: {indent,type}; the last <li> of each stays open
+  const blank=l=>/^\s*$/.test(l);
+  const flushPara=()=>{if(para.length){html+='<p>'+para.map(jpInlineMarkdown).join('<br>')+'</p>';para=[];}};
+  const closeTag=type=>'</li>'+(type==='ol'?'</ol>':'</ul>');
+  const closeLists=(keepIndent=-1)=>{while(stack.length&&stack[stack.length-1].indent>keepIndent)html+=closeTag(stack.pop().type);};
+  const closeAll=()=>{flushPara();closeLists();};
+  const isTableSep=l=>l.includes('|')&&/^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(l);
+  const cells=l=>{let s=l.trim();if(s.startsWith('|'))s=s.slice(1);if(s.endsWith('|')&&!s.endsWith('\\|'))s=s.slice(0,-1);return s.split(/(?<!\\)\|/).map(c=>c.trim().replace(/\\\|/g,'|'));};
   for(let i=0;i<lines.length;i++){
     const line=lines[i];
-    if(line.trim().startsWith('```')){
-      if(inCode){html+='<pre><code>'+jpEscapeHtml(code.join('\n'))+'</code></pre>';code=[];inCode=false;}
-      else{closeList();inCode=true;}
+    const fence=line.match(/^\s*(```|~~~)/);
+    if(fence){
+      closeAll();
+      const code=[];let j=i+1;
+      for(;j<lines.length&&!lines[j].trim().startsWith(fence[1]);j++)code.push(lines[j]);
+      html+='<pre><code>'+jpEscapeHtml(code.join('\n'))+'</code></pre>';
+      i=j;continue;
+    }
+    if(blank(line)){
+      flushPara();
+      // Joplin often stores list items with blank lines between them; they still belong to one list.
+      if(stack.length){let k=i+1;while(k<lines.length&&blank(lines[k]))k++;if(!(k<lines.length&&JP_LIST_RE.test(lines[k])))closeLists();}
       continue;
     }
-    if(inCode){code.push(line);continue;}
-    if(/^\s*$/.test(line)){
-      const nextLine=lines[i+1]||'';
-      const nextIsTask=/^\s*[-*]\s+\[([ xX])\]\s+/.test(nextLine);
-      // Leerzeilen zwischen Checkbox-Zeilen duerfen die Task-Liste nicht
-      // schliessen. Joplin speichert Listen oft mit Leerzeilen zwischen den
-      // Eintraegen; optisch gehoeren sie trotzdem zu einer gemeinsamen Liste.
-      if(listType==='task'&&nextIsTask)continue;
-      closeList();html+='<p></p>';continue;
+    const hd=line.match(/^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/);
+    if(hd){closeAll();const n=hd[1].length;html+='<h'+n+'>'+jpInlineMarkdown(hd[2])+'</h'+n+'>';continue;}
+    if(para.length&&!stack.length&&/^\s{0,3}(=+|-+)\s*$/.test(line)){const n=line.trim()[0]==='='?1:2;html+='<h'+n+'>'+para.map(jpInlineMarkdown).join(' ')+'</h'+n+'>';para=[];continue;}
+    if(/^\s{0,3}([-*_])(\s*\1){2,}\s*$/.test(line)){closeAll();html+='<hr>';continue;}
+    if(/^\s{0,3}>/.test(line)){
+      closeAll();
+      const quoted=[];let j=i;
+      for(;j<lines.length&&/^\s{0,3}>/.test(lines[j]);j++)quoted.push(lines[j].replace(/^\s{0,3}>\s?/,''));
+      html+='<blockquote>'+jpRenderBlocks(quoted,false)+'</blockquote>';
+      i=j-1;continue;
     }
-    let m=line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.*)$/);
-    if(m){
-      openList('task');
-      html+='<li class="jp-md-task"><label class="jp-md-task-label"><input type="checkbox" class="jp-md-checkbox" data-line="'+i+'" '+(m[1].toLowerCase()==='x'?'checked':'')+'><span class="jp-md-task-text">'+jpInlineMarkdown(m[2])+'</span></label></li>';
+    if(line.includes('|')&&i+1<lines.length&&isTableSep(lines[i+1])){
+      closeAll();
+      const head=cells(line);
+      const align=cells(lines[i+1]).map(c=>c.startsWith(':')&&c.endsWith(':')?'jp-md-center':(c.endsWith(':')?'jp-md-right':''));
+      const cell=(tag,c,k)=>'<'+tag+(align[k]?' class="'+align[k]+'"':'')+'>'+jpInlineMarkdown(c)+'</'+tag+'>';
+      html+='<div class="jp-md-table-wrap"><table><thead><tr>'+head.map((c,k)=>cell('th',c,k)).join('')+'</tr></thead><tbody>';
+      let j=i+2;
+      for(;j<lines.length&&!blank(lines[j])&&lines[j].includes('|');j++){const row=cells(lines[j]);html+='<tr>'+head.map((h,k)=>cell('td',row[k]||'',k)).join('')+'</tr>';}
+      html+='</tbody></table></div>';
+      i=j-1;continue;
+    }
+    const li=line.match(JP_LIST_RE);
+    if(li){
+      flushPara();
+      const indent=li[1].replace(/\t/g,'    ').length;
+      const ordered=li[3]!==undefined;
+      // Same shape as the pattern in onDisplayCheckboxChange(): "- [ ] text" or "* [x] text".
+      const task=!ordered&&li[2]!=='+'?li[4].match(/^\[([ xX])\]\s+(.*)$/):null;
+      const type=ordered?'ol':(task?'task':'ul');
+      closeLists(indent);
+      let top=stack[stack.length-1];
+      if(top&&top.indent===indent&&top.type!==type){html+=closeTag(stack.pop().type);top=stack[stack.length-1];}
+      if(top&&top.indent===indent)html+='</li>';
+      else{
+        html+=type==='ol'?'<ol class="jp-md-list"'+(li[3]!=='1'?' start="'+Number(li[3])+'"':'')+'>':'<ul class="jp-md-list'+(type==='task'?' jp-md-task-list':'')+'">';
+        stack.push({indent,type});
+      }
+      if(task)html+='<li class="jp-md-task"><label class="jp-md-task-label"><input type="checkbox" class="jp-md-checkbox"'+(interactive?' data-line="'+i+'"':' disabled')+(task[1]!==' '?' checked':'')+'><span class="jp-md-task-text">'+jpInlineMarkdown(task[2])+'</span></label>';
+      else html+='<li>'+jpInlineMarkdown(li[4]);
       continue;
     }
-    m=line.match(/^\s*[-*]\s+(.*)$/);
-    if(m){openList('ul');html+='<li>'+jpInlineMarkdown(m[1])+'</li>';continue;}
-    m=line.match(/^\s*\d+\.\s+(.*)$/);
-    if(m){openList('ol');html+='<li>'+jpInlineMarkdown(m[1])+'</li>';continue;}
-    closeList();
-    if(/^###\s+/.test(line))html+='<h3>'+jpInlineMarkdown(line.replace(/^###\s+/,''))+'</h3>';
-    else if(/^##\s+/.test(line))html+='<h2>'+jpInlineMarkdown(line.replace(/^##\s+/,''))+'</h2>';
-    else if(/^#\s+/.test(line))html+='<h1>'+jpInlineMarkdown(line.replace(/^#\s+/,''))+'</h1>';
-    else if(/^---+$/.test(line.trim()))html+='<hr>';
-    else html+='<p>'+jpInlineMarkdown(line)+'</p>';
+    // An indented line directly under a list item continues that item.
+    if(stack.length&&/^\s+\S/.test(line)){html+='<br>'+jpInlineMarkdown(line.trim());continue;}
+    closeLists();
+    para.push(line);
   }
-  closeList();
-  if(inCode)html+='<pre><code>'+jpEscapeHtml(code.join('\n'))+'</code></pre>';
-  return html||'<p class="jp-muted">'+t('Keine Notizinhalte.')+'</p>';
+  closeAll();
+  return html;
 }
-function renderDisplayMode(){const d=$('jp-note-display'),ta=$('jp-body');if(!d||!ta)return;d.innerHTML=jpRenderMarkdown(ta.value||'');d.querySelectorAll('.jp-md-checkbox').forEach(cb=>cb.addEventListener('change',onDisplayCheckboxChange));updateSaveButton();}
+// Resource payloads ({data_url,mime,title,...}) by id, shared by the preview and the attachment list.
+const resourceDataCache=new Map();
+function resourceData(id){
+  if(resourceDataCache.has(id))return resourceDataCache.get(id);
+  const p=api('/api/resources/'+id+'/data');
+  resourceDataCache.set(id,p);
+  p.catch(()=>resourceDataCache.delete(id));
+  while(resourceDataCache.size>24)resourceDataCache.delete(resourceDataCache.keys().next().value);
+  return p;
+}
+function findResource(id){return ((state.note&&state.note.resources)||[]).find(r=>String(r.id).toLowerCase()===String(id).toLowerCase())||{id};}
+function hydratePreviewResources(root){
+  root.querySelectorAll('img[data-jp-res]').forEach(img=>{
+    const known=findResource(img.dataset.jpRes);
+    if(known.mime&&!String(known.mime).toLowerCase().startsWith('image/')){img.classList.add('jp-md-missing');return;}
+    resourceData(img.dataset.jpRes).then(p=>{if(p&&/^data:image\//i.test(String(p.data_url||'')))img.src=p.data_url;else img.classList.add('jp-md-missing');}).catch(()=>img.classList.add('jp-md-missing'));
+  });
+  root.querySelectorAll('a[data-jp-res-link]').forEach(a=>a.addEventListener('click',ev=>{ev.preventDefault();openResourceExternal(findResource(a.dataset.jpResLink)).catch(e=>jpAlert(e.message));}));
+}
+function renderDisplayMode(){const d=$('jp-note-display'),ta=$('jp-body');if(!d||!ta)return;d.innerHTML=jpRenderMarkdown(ta.value||'');d.querySelectorAll('.jp-md-checkbox[data-line]').forEach(cb=>cb.addEventListener('change',onDisplayCheckboxChange));hydratePreviewResources(d);updateSaveButton();}
 function setNoteMode(mode){state.displayMode=mode==='edit'?'edit':'view';const app=$('joplix-app');if(app){app.classList.toggle('jp-edit-mode',state.displayMode==='edit');app.classList.toggle('jp-view-mode',state.displayMode!=='edit');}if(state.displayMode!=='edit')renderDisplayMode();}
 function onDisplayCheckboxChange(ev){const cb=ev.currentTarget,ta=$('jp-body');if(!ta||!state.note)return;const idx=parseInt(cb.getAttribute('data-line'),10);const lines=(ta.value||'').split(/\r?\n/);if(isNaN(idx)||!lines[idx])return;lines[idx]=lines[idx].replace(/^(\s*[-*]\s+\[)[ xX](\]\s+)/,'$1'+(cb.checked?'x':' ')+'$2');ta.value=lines.join('\n');markDirty();}
 
@@ -340,6 +501,7 @@ function findNoteMeta(id){return ((state.index&&state.index.notes)||[]).find(n=>
 function showNoteLoading(id,title=''){
   state.noteLoading=true;
   state.noteId=id||state.noteId||'';
+  setHasNote(true);
   ensureNoteSelected(state.noteId);
   const meta=findNoteMeta(id);
   if($('jp-title'))$('jp-title').value=title||meta.title||t('Notiz wird geladen...');
@@ -355,7 +517,7 @@ function showNoteLoading(id,title=''){
   updateSaveButton();
 }
 function renderNoteToEditor(n,fromCache=false){
-  state.note=n;state.noteId=n.id;state.noteLoading=false;
+  state.note=n;state.noteId=n.id;state.noteLoading=false;setHasNote(true);
   ensureNoteSelected(n.id);
   if($('jp-title'))$('jp-title').value=n.title||'';
   if($('jp-body')){$('jp-body').classList.remove('jp-note-loading');$('jp-body').placeholder=t('Notizinhalt');$('jp-body').value=n.body||'';renderDisplayMode();setNoteMode('view');}
@@ -458,11 +620,26 @@ function restoreLocation(idx){
 }
 function fillSettings(){/* Einstellungen in 1.0.6 voruebergehend deaktiviert */}
 function renderIndex(idx){rememberIndex(idx);renderTree(idx.tree||[]);renderNotes([]);}
-function renderTree(nodes){const root=$('jp-tree');root.innerHTML='';const walk=(n,l)=>{const row=document.createElement('div');row.className='jp-tree-row';row.dataset.id=n.id;row.style.paddingLeft=(4+l*18)+'px';const b=document.createElement('button');b.className='jp-tree-item';b.dataset.id=n.id;b.onclick=()=>selectNotebook(n.id);const icon=document.createElement('span');icon.className='jp-folder-icon';icon.setAttribute('aria-hidden','true');const label=document.createElement('span');label.className='jp-tree-label';label.textContent=notebookTitleWithCount(n);b.appendChild(icon);b.appendChild(label);const menu=document.createElement('button');menu.className='jp-tree-menu';menu.textContent='⋯';menu.title=t('Aktionen');menu.onclick=(ev)=>{ev.stopPropagation();showNotebookMenu(n,row,menu);};row.appendChild(b);row.appendChild(menu);root.appendChild(row);(n.children||[]).forEach(c=>walk(c,l+1));};nodes.forEach(n=>walk(n,0));}
-function selectNotebook(id,opts={}){state.notebookId=id;document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));const notes=(state.index.notes||[]).filter(n=>n.notebook_id===id).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent=breadcrumb(id);if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);if(!opts.skipSave)saveLastLocation();}
+function renderTree(nodes){const root=$('jp-tree');root.innerHTML='';const walk=(n,l)=>{const row=document.createElement('div');row.className='jp-tree-row';row.dataset.id=n.id;row.style.paddingLeft=(4+l*18)+'px';const b=document.createElement('button');b.type='button';b.className='jp-tree-item';b.dataset.id=n.id;b.onclick=()=>selectNotebook(n.id);const icon=document.createElement('span');icon.className='jp-folder-icon';icon.setAttribute('aria-hidden','true');const label=document.createElement('span');label.className='jp-tree-label';label.textContent=notebookTitleWithCount(n);b.appendChild(icon);b.appendChild(label);const menu=document.createElement('button');menu.type='button';menu.className='jp-tree-menu';menu.appendChild(jpIconEl('dots'));menu.title=t('Aktionen');menu.setAttribute('aria-label',t('Aktionen'));menu.onclick=(ev)=>{ev.stopPropagation();showNotebookMenu(n,row,menu);};row.appendChild(b);row.appendChild(menu);root.appendChild(row);(n.children||[]).forEach(c=>walk(c,l+1));};nodes.forEach(n=>walk(n,0));}
+function selectNotebook(id,opts={}){state.notebookId=id;setPane('list');document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));const notes=(state.index.notes||[]).filter(n=>n.notebook_id===id).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent=breadcrumb(id);if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);if(!opts.skipSave)saveLastLocation();}
 function breadcrumb(id){const names=[];let guard=0;while(id&&guard<20){const nb=(state.index.notebooks||[]).find(n=>n.id===id);if(!nb)break;names.unshift(nb.title);id=nb.parent_id;guard++;}return names.join(' › ')||t('Notizbuch');}
 function sorter(){return (a,b)=>state.sort==='title_asc'?a.title.localeCompare(b.title):(state.sort==='updated_asc'?String(a.updated_time).localeCompare(String(b.updated_time)):String(b.updated_time).localeCompare(String(a.updated_time)));}
-function renderNotes(notes){const box=$('jp-notes');box.innerHTML='';if(!notes.length){box.innerHTML='<p>'+t('Keine Notizen gefunden.')+'</p>';return;}notes.forEach(n=>{const b=document.createElement('button');b.className='jp-note-item';b.dataset.id=n.id;b.innerHTML='<strong></strong><span></span><small></small>';b.querySelector('strong').textContent=n.title;b.querySelector('span').textContent=formatJoplixDateTime(n.updated_time);b.querySelector('small').textContent=(n.resource_count?('📎 '+n.resource_count+' '):'')+(n.tag_count?('🏷 '+n.tag_count):'');b.onclick=()=>openNote(n.id);b.addEventListener('contextmenu',ev=>showNoteContextMenu(ev,n));box.appendChild(b);});}
+function renderNotes(notes){
+  const box=$('jp-notes');box.innerHTML='';
+  if(!notes.length){box.innerHTML='<p>'+t('Keine Notizen gefunden.')+'</p>';return;}
+  notes.forEach(n=>{
+    const b=document.createElement('button');b.type='button';b.className='jp-note-item';b.dataset.id=n.id;
+    const title=document.createElement('strong');title.textContent=n.title||t('Ohne Titel');
+    const sub=document.createElement('span');sub.className='jp-note-sub';
+    const time=document.createElement('time');time.textContent=formatJoplixDateTime(n.updated_time);sub.appendChild(time);
+    const count=(icon,num)=>{if(!num)return;const c=document.createElement('span');c.className='jp-note-count';c.appendChild(jpIconEl(icon));c.appendChild(document.createTextNode(String(num)));sub.appendChild(c);};
+    count('paperclip',n.resource_count);count('tag',n.tag_count);
+    b.appendChild(title);b.appendChild(sub);
+    b.onclick=()=>openNote(n.id);b.addEventListener('contextmenu',ev=>showNoteContextMenu(ev,n));
+    box.appendChild(b);
+  });
+  ensureNoteSelected(state.noteId);
+}
 async function handleDirtyBeforeNoteChange(targetId){
   // Wenn der Benutzer unmittelbar nach "Speichern" zu einer anderen Notiz wechselt,
   // wartet der Wechsel zuerst auf denselben laufenden Speichervorgang. Dadurch wird
@@ -472,14 +649,14 @@ async function handleDirtyBeforeNoteChange(targetId){
     ensureNoteSelected(targetId);
     setSavingUi(true);
     try{await state.savePromise;}
-    catch(e){alert(t('Speichern fehlgeschlagen: ')+(e&&e.message?e.message:e));state.pendingNoteId='';ensureNoteSelected(state.noteId);return false;}
+    catch(e){jpAlert(t('Speichern fehlgeschlagen: ')+(e&&e.message?e.message:e));state.pendingNoteId='';ensureNoteSelected(state.noteId);return false;}
     finally{setSavingUi(false);}
     state.pendingNoteId='';
   }
   if(!state.dirty||!state.noteId||state.noteId===targetId)return true;
   const fromId=state.noteId;
-  const saveFirst=confirm(t('Diese Notiz hat ungespeicherte Änderungen.\n\nOK = Änderungen speichern und wechseln.\nAbbrechen = weitere Auswahl.'));
-  if(saveFirst){
+  const choice=await jpDialog({title:t('Ungespeicherte Änderungen'),message:t('Diese Notiz hat ungespeicherte Änderungen.'),cancelValue:'cancel',buttons:[{label:t('Abbrechen'),value:'cancel'},{label:t('Verwerfen'),value:'discard'},{label:t('Speichern'),value:'save',primary:true}]});
+  if(choice==='save'){
     try{
       state.pendingNoteId=targetId;
       const ok=await saveNote({keepMode:true,skipReload:true,fastDirtySave:true});
@@ -488,18 +665,18 @@ async function handleDirtyBeforeNoteChange(targetId){
       return !state.dirty;
     }catch(e){
       state.pendingNoteId='';
-      alert(t('Speichern vor dem Wechsel fehlgeschlagen: ')+(e&&e.message?e.message:e));
+      jpAlert(t('Speichern vor dem Wechsel fehlgeschlagen: ')+(e&&e.message?e.message:e));
       ensureNoteSelected(fromId);
       return false;
     }
   }
-  const discard=confirm(t('Änderungen verwerfen und trotzdem zu einer anderen Notiz wechseln?'));
-  if(discard){state.dirty=false;updateSaveButton();return true;}
+  if(choice==='discard'){state.dirty=false;updateSaveButton();return true;}
   ensureNoteSelected(fromId);
   return false;
 }
 async function openNote(id,opts={}){
   if(!opts.silent&&!(await handleDirtyBeforeNoteChange(id))){ensureNoteSelected(state.noteId);return;}
+  if(!opts.silent)setPane('note');
   state.loadingNoteId=id;
   const meta=findNoteMeta(id);
   const mem=noteMemoryGet(id);
@@ -522,17 +699,17 @@ async function openNote(id,opts={}){
     throw e;
   }
 }
-function clearNote(){state.note=null;state.noteId='';state.originalNote=null;state.dirty=false;state.noteLoading=false;$('jp-title').value='';$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Bitte rechts eine Notiz auswählen.');$('jp-meta').textContent=t('Keine Notiz geöffnet');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();updateSaveButton();}
+function clearNote(){setHasNote(false);state.note=null;state.noteId='';state.originalNote=null;state.dirty=false;state.noteLoading=false;$('jp-title').value='';$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Bitte eine Notiz auswählen.');$('jp-meta').textContent=t('Keine Notiz geöffnet');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();updateSaveButton();}
 function renderTags(tags){
   const box=$('jp-tags');box.innerHTML='';
   normalizeLocalTags(tags).forEach(tag=>{
     const chip=document.createElement('span');chip.className='jp-tag-chip';
     const label=document.createElement('span');label.className='jp-tag-label';label.textContent=tag.title;chip.appendChild(label);
-    const remove=document.createElement('button');remove.type='button';remove.className='jp-tag-remove';remove.textContent='×';remove.title=t('Tag von dieser Notiz entfernen');remove.setAttribute('aria-label',L('Tag '+tag.title+' entfernen','Remove tag '+tag.title));
+    const remove=document.createElement('button');remove.type='button';remove.className='jp-tag-remove';remove.appendChild(jpIconEl('close'));remove.title=t('Tag von dieser Notiz entfernen');remove.setAttribute('aria-label',L('Tag '+tag.title+' entfernen','Remove tag '+tag.title));
     remove.onclick=ev=>{ev.preventDefault();ev.stopPropagation();removeTag(tag);};
     chip.appendChild(remove);box.appendChild(chip);
   });
-  const add=document.createElement('button');add.textContent=t('+ Tag');add.onclick=addTag;box.appendChild(add);
+  const add=document.createElement('button');add.type='button';add.className='jp-tag-add';add.title=t('Neuer Tag');add.appendChild(jpIconEl('plus'));add.appendChild(document.createTextNode('Tag'));add.onclick=addTag;box.appendChild(add);
 }
 function resourceIsPdf(r){return !!(r&&((r.is_pdf===true)||String(r.mime||'').toLowerCase()==='application/pdf'||String(r.file_extension||'').toLowerCase()==='pdf'||String(r.title||'').toLowerCase().endsWith('.pdf')));}
 function resourceIsOffice(r){const ext=String(r&&r.file_extension||'').toLowerCase();const title=String(r&&r.title||'').toLowerCase();return !!(r&&((r.is_office===true)||['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp'].includes(ext)||['.doc','.docx','.xls','.xlsx','.ppt','.pptx','.odt','.ods','.odp'].some(e=>title.endsWith(e))));}
@@ -559,6 +736,7 @@ async function pollOfficeEdit(resourceId,statusEl,options={}){
         return result;
       }
       if(result.updated||result.already_applied){
+        resourceDataCache.delete(resourceId);
         sync.lastHash=String(result.sha256||sync.lastHash||'');
         officeStatusText(statusEl,t('Änderungen wurden in die Joplix-Ressource übernommen und können synchronisiert werden.'),'ok');
         scheduleBackgroundRefresh(350);
@@ -703,11 +881,29 @@ async function startOfficeEdit(r,statusEl){
 }
 function resourceKind(r){const ext=String(r.file_extension||'').toLowerCase();const mime=String(r.mime||'').toLowerCase();if(resourceIsOffice(r))return 'office';if(resourceIsPdf(r))return 'pdf';if(r.is_image||mime.startsWith('image/'))return 'image';if(mime.startsWith('audio/')||['mp3','ogg','wav','m4a','flac'].includes(ext))return 'audio';if(mime.startsWith('video/')||['mp4','webm','mov','mkv','avi'].includes(ext))return 'video';if(['zip','7z','rar','tar','gz','bz2'].includes(ext))return 'archive';return 'file';}
 function resourcePrimaryLabel(kind){return t({office:'Bearbeiten',pdf:'Öffnen',image:'Öffnen',audio:'Abspielen',video:'Abspielen'}[kind]||'');}
-function renderResources(rs){const box=$('jp-resources');box.innerHTML='';if(!rs||!rs.length)return;const head=document.createElement('div');head.className='jp-resources-head';head.textContent=t('Anhänge');box.appendChild(head);rs.forEach(async r=>{const kind=resourceKind(r);const card=document.createElement('div');card.className='jp-resource jp-resource-'+kind;const title=document.createElement('strong');title.textContent=r.title||r.id;const meta=document.createElement('span');meta.textContent=[r.mime||'',r.file_extension?('.'+r.file_extension):'',r.exists?'':t('Datei fehlt')].filter(Boolean).join(' ');card.appendChild(title);card.appendChild(meta);box.appendChild(card);if(!r.exists)return;
- if(kind==='image'){try{const p=await api('/api/resources/'+r.id+'/data');if(p.data_url){const img=document.createElement('img');img.src=p.data_url;img.alt=r.title||t('Bild');card.appendChild(img);}}catch(e){}}
- const actions=document.createElement('div');actions.className='jp-resource-actions';const primary=resourcePrimaryLabel(kind);if(primary){const primaryBtn=document.createElement('button');primaryBtn.type='button';primaryBtn.className='jp-resource-action jp-resource-action-primary';primaryBtn.textContent=primary;actions.appendChild(primaryBtn);if(kind==='office'){const status=document.createElement('div');status.className='jp-resource-edit-status';card.appendChild(actions);card.appendChild(status);primaryBtn.onclick=async()=>{primaryBtn.disabled=true;try{await startOfficeEdit(r,status);}catch(e){alert(e.message);}finally{primaryBtn.disabled=false;}};}else{primaryBtn.onclick=async()=>{try{await openResourceExternal(r);}catch(e){alert(e.message);}};card.appendChild(actions);}}
- const downloadBtn=document.createElement('button');downloadBtn.type='button';downloadBtn.className='jp-resource-action jp-resource-action-secondary';downloadBtn.textContent='Download';downloadBtn.onclick=async()=>{try{await openResourceExternal(r);}catch(e){alert(e.message);}};actions.appendChild(downloadBtn);if(!actions.parentNode)card.appendChild(actions);
- });}
+function renderResources(rs){
+  const box=$('jp-resources');box.innerHTML='';if(!rs||!rs.length)return;
+  const head=document.createElement('div');head.className='jp-resources-head';head.textContent=t('Anhänge');box.appendChild(head);
+  rs.forEach(r=>{
+    const kind=resourceKind(r);
+    const row=document.createElement('div');row.className='jp-resource jp-resource-'+kind;
+    row.appendChild(jpIconEl(kind==='image'?'image':'file'));
+    const main=document.createElement('div');main.className='jp-resource-main';
+    const title=document.createElement('strong');title.textContent=r.title||r.id;
+    const meta=document.createElement('span');meta.textContent=[r.file_extension?String(r.file_extension).toUpperCase():(r.mime||''),formatBytes(r.size),r.exists?'':t('Datei fehlt')].filter(Boolean).join(' · ');
+    main.appendChild(title);main.appendChild(meta);row.appendChild(main);box.appendChild(row);
+    if(!r.exists)return;
+    const actions=document.createElement('div');actions.className='jp-resource-actions';row.appendChild(actions);
+    const open=async()=>{try{await openResourceExternal(r);}catch(e){jpAlert(e.message);}};
+    const primary=resourcePrimaryLabel(kind);
+    if(primary){
+      const b=document.createElement('button');b.type='button';b.className='jp-resource-action jp-resource-action-primary';b.textContent=primary;actions.appendChild(b);
+      if(kind==='office'){const status=document.createElement('div');status.className='jp-resource-edit-status';row.appendChild(status);b.onclick=async()=>{b.disabled=true;try{await startOfficeEdit(r,status);}catch(e){jpAlert(e.message);}finally{b.disabled=false;}};}
+      else b.onclick=open;
+    }
+    const dl=document.createElement('button');dl.type='button';dl.className='jp-resource-action jp-icon-btn';dl.title='Download';dl.setAttribute('aria-label','Download');dl.appendChild(jpIconEl('download'));dl.onclick=open;actions.appendChild(dl);
+  });
+}
 function openPdfViewer(p){return;}
 function closePdfViewer(){const o=$('jp-pdf-viewer-overlay'),f=$('jp-pdf-viewer-frame');if(f)f.src='about:blank';if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}}
 
@@ -724,49 +920,17 @@ function closeNotebookMenuByEscape(ev){
 function showNotebookMenu(node,row,button){
   closeNotebookMenu();
   const menu=document.createElement('div');
-  menu.className='jp-context-menu jp-tree-context-menu';
+  menu.className='jp-context-menu jp-menu open';
   menu.setAttribute('role','menu');
   const en=resolvedLanguage()==='en';
-  menu.innerHTML='<button data-act="rename" role="menuitem">'+(en?'Rename':'Umbenennen')+'</button><button data-act="newchild" role="menuitem">'+(en?'New sub-notebook':'Neues Unter-Notizbuch')+'</button><button data-act="delete" role="menuitem" class="danger">'+(en?'Delete':'Löschen')+'</button>';
+  menu.innerHTML=jpMenuItem('rename','pencil',en?'Rename':'Umbenennen')+jpMenuItem('newchild','folderPlus',en?'New sub-notebook':'Neues Unter-Notizbuch')+jpMenuItem('delete','delete',en?'Delete':'Löschen','danger');
   menu.addEventListener('click',ev=>ev.stopPropagation());
-  document.body.appendChild(menu);
-
-  const rect=button.getBoundingClientRect();
-  const gap=10;
-  const margin=12;
-  const menuWidth=Math.max(menu.offsetWidth||220,220);
-  const menuHeight=menu.offsetHeight||156;
-  const viewportWidth=window.innerWidth||document.documentElement.clientWidth;
-  const viewportHeight=window.innerHeight||document.documentElement.clientHeight;
-
-  /*
-   * Joplix 1.0.28: Das Menue soll bei unteren Kapiteln nicht wie ein abgeschnittenes Drop-down wirken.
-   * Stattdessen wird es als sauberer Nextcloud-aehnlicher Popover seitlich neben dem Drei-Punkte-Button
-   * positioniert und vertikal am Button ausgerichtet. Nur wenn wirklich kein Platz ist, wird begrenzt.
-   */
-  let placement='left';
-  let left=rect.left-menuWidth-gap;
-  if(left<margin){
-    const rightCandidate=rect.right+gap;
-    if(rightCandidate+menuWidth<=viewportWidth-margin){
-      left=rightCandidate;
-      placement='right';
-    }else{
-      left=Math.min(Math.max(margin,rect.right-menuWidth),viewportWidth-menuWidth-margin);
-      placement='inside';
-    }
-  }
-
-  let top=rect.top+(rect.height/2)-(menuHeight/2);
-  if(top<margin)top=margin;
-  if(top+menuHeight>viewportHeight-margin)top=viewportHeight-menuHeight-margin;
-  if(top<margin){
-    top=margin;
-    menu.style.maxHeight=Math.max(120,viewportHeight-(margin*2))+'px';
-    menu.style.overflowY='auto';
-  }
-
-  menu.dataset.placement=placement;
+  jpRoot().appendChild(menu);
+  // Opens below the button like a Nextcloud action menu; flips above when there is no room.
+  const rect=button.getBoundingClientRect(),margin=8;
+  const left=clamp(rect.left,margin,Math.max(margin,(window.innerWidth||0)-menu.offsetWidth-margin));
+  let top=rect.bottom+4;
+  if(top+menu.offsetHeight>(window.innerHeight||0)-margin)top=Math.max(margin,rect.top-menu.offsetHeight-4);
   menu.style.left=Math.round(left)+'px';
   menu.style.top=Math.round(top)+'px';
   menu.querySelector('[data-act="rename"]').onclick=()=>{closeNotebookMenu();renameNotebookNode(node);};
@@ -780,40 +944,18 @@ function showNotebookMenu(node,row,button){
   },0);
 }
 
-async function renameNotebookNode(node){const en=resolvedLanguage()==='en';const title=prompt(en?'Rename notebook:':'Notizbuch umbenennen:',node.title);if(!title||title===node.title)return;const nb=(state.index.notebooks||[]).find(n=>n.id===node.id);await api('/api/notebooks/'+node.id,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
+async function renameNotebookNode(node){const en=resolvedLanguage()==='en';const title=await jpPrompt(en?'Rename notebook':'Notizbuch umbenennen',node.title);if(!title||title===node.title)return;const nb=(state.index.notebooks||[]).find(n=>n.id===node.id);await api('/api/notebooks/'+node.id,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
 function confirmNotebookDeletion(node){
   const en=resolvedLanguage()==='en';
   const isSub=!!(node.parent_id||'');
   const title=String(node.title||'').trim()|| (en?'Untitled':'Ohne Titel');
-  return new Promise(resolve=>{
-    const old=document.getElementById('jp-delete-notebook-overlay');
-    if(old)old.remove();
-    const overlay=document.createElement('div');
-    overlay.id='jp-delete-notebook-overlay';
-    overlay.className='jp-delete-notebook-overlay open';
-    overlay.setAttribute('aria-hidden','false');
-    const heading=en
-      ?('Delete '+(isSub?'sub-notebook':'notebook')+' “'+title+'”?')
-      :((isSub?'Unter-Notizbuch':'Notizbuch')+' „'+title+'“ löschen?');
-    const body=en
-      ?(isSub?'All notes and nested sub-notebooks in it will also be permanently deleted.':'All notes and sub-notebooks in this notebook will also be permanently deleted.')
-      :(isSub?'Alle Notizen und weiteren Unter-Notizbücher darin werden ebenfalls endgültig gelöscht.':'Alle Notizen und Unter-Notizbücher in diesem Notizbuch werden ebenfalls endgültig gelöscht.');
-    overlay.innerHTML='<div class="jp-delete-notebook-backdrop"></div><section class="jp-delete-notebook-modal" role="dialog" aria-modal="true" aria-labelledby="jp-delete-notebook-title"><h2 id="jp-delete-notebook-title"></h2><p></p><div class="jp-delete-notebook-actions"><button type="button" data-delete-cancel></button><button type="button" class="danger" data-delete-confirm></button></div></section>';
-    overlay.querySelector('h2').textContent=heading;
-    overlay.querySelector('p').textContent=body;
-    overlay.querySelector('[data-delete-cancel]').textContent=en?'Cancel':'Abbrechen';
-    overlay.querySelector('[data-delete-confirm]').textContent=en?'Delete':'Löschen';
-    document.body.appendChild(overlay);
-    let done=false;
-    const finish=value=>{if(done)return;done=true;document.removeEventListener('keydown',onKey,true);overlay.remove();resolve(value);};
-    const onKey=ev=>{if(ev.key==='Escape'){ev.preventDefault();finish(false);}};
-    document.addEventListener('keydown',onKey,true);
-    overlay.querySelector('[data-delete-cancel]').onclick=()=>finish(false);
-    overlay.querySelector('.jp-delete-notebook-backdrop').onclick=()=>finish(false);
-    const del=overlay.querySelector('[data-delete-confirm]');
-    del.onclick=()=>finish(true);
-    setTimeout(()=>del.focus(),0);
-  });
+  const heading=en
+    ?('Delete '+(isSub?'sub-notebook':'notebook')+' “'+title+'”?')
+    :((isSub?'Unter-Notizbuch':'Notizbuch')+' „'+title+'“ löschen?');
+  const body=en
+    ?(isSub?'All notes and nested sub-notebooks in it will also be permanently deleted.':'All notes and sub-notebooks in this notebook will also be permanently deleted.')
+    :(isSub?'Alle Notizen und weiteren Unter-Notizbücher darin werden ebenfalls endgültig gelöscht.':'Alle Notizen und Unter-Notizbücher in diesem Notizbuch werden ebenfalls endgültig gelöscht.');
+  return jpConfirm(body,{title:heading,danger:true,confirmLabel:en?'Delete':'Löschen',cancelLabel:en?'Cancel':'Abbrechen'});
 }
 async function deleteNotebookNode(node){
   const en=resolvedLanguage()==='en';
@@ -829,7 +971,7 @@ async function deleteNotebookNode(node){
   }catch(e){
     const msg=(en?'Could not delete '+kind+': ':'Löschen fehlgeschlagen: ')+e.message;
     status(msg,'error');
-    alert(msg);
+    jpAlert(msg);
   }
 }
 async function saveNote(options={}){
@@ -838,7 +980,7 @@ async function saveNote(options={}){
     return state.savePromise;
   }
   state.savePromise=(async()=>{
-    if(!state.notebookId&&!state.note){alert(t('Bitte Notizbuch auswaehlen.'));return false;}
+    if(!state.notebookId&&!state.note){jpAlert(t('Bitte Notizbuch auswaehlen.'));return false;}
     do{
       state.saveAgain=false;
       if(!state.dirty){updateSaveButton();break;}
@@ -907,13 +1049,13 @@ async function saveNote(options={}){
   try{return await state.savePromise;}
   finally{state.savePromise=null;state.saving=false;state.saveAgain=false;setSavingUi(false);updateSaveButton();}
 }
-async function newNote(){if(!(await handleDirtyBeforeNoteChange('__new__')))return;state.note=null;state.noteId='';setNoteMode('edit');$('jp-title').value=t('Neue Notiz');$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Notizinhalt');$('jp-meta').textContent=t('Neue Notiz in diesem Notizbuch');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();state.originalNote={title:'',body:''};resetEditorHistory('');state.dirty=true;updateSaveButton();}
-async function deleteNote(){if(!state.note||!confirm(t('Notiz wirklich löschen?')))return;await api('/api/notes/'+state.note.id,{method:'DELETE'});await rebuildAndRestore(true);clearNote();}
-async function newNotebook(parent){const en=resolvedLanguage()==='en';const title=prompt(parent?(en?'Sub-notebook name:':'Name des Unter-Notizbuchs:'):(en?'Notebook name:':'Name des Notizbuchs:'));if(!title)return;await api('/api/notebooks',{method:'POST',body:{title,parent_id:parent||''}});await rebuildAndRestore();}
-async function renameNotebook(){if(!state.notebookId){alert(t('Bitte Notizbuch auswählen.'));return;}const nb=(state.index.notebooks||[]).find(n=>n.id===state.notebookId);const title=prompt(t('Neuer Name'),nb?nb.title:'');if(!title)return;await api('/api/notebooks/'+state.notebookId,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
+async function newNote(){if(!(await handleDirtyBeforeNoteChange('__new__')))return;state.note=null;state.noteId='';setHasNote(true);setPane('note');setNoteMode('edit');$('jp-title').value=t('Neue Notiz');$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Notizinhalt');$('jp-meta').textContent=t('Neue Notiz in diesem Notizbuch');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();state.originalNote={title:'',body:''};resetEditorHistory('');state.dirty=true;updateSaveButton();}
+async function deleteNote(){if(!state.note||!(await jpConfirm(state.note.title||'',{title:t('Notiz wirklich löschen?'),danger:true,confirmLabel:t('Löschen')})))return;await api('/api/notes/'+state.note.id,{method:'DELETE'});await rebuildAndRestore(true);clearNote();}
+async function newNotebook(parent){const en=resolvedLanguage()==='en';const title=await jpPrompt(parent?(en?'New sub-notebook':'Neues Unter-Notizbuch'):(en?'New notebook':'Neues Notizbuch'),'',{confirmLabel:en?'Create':'Anlegen'});if(!title)return;await api('/api/notebooks',{method:'POST',body:{title,parent_id:parent||''}});await rebuildAndRestore();}
+async function renameNotebook(){if(!state.notebookId){jpAlert(t('Bitte Notizbuch auswählen.'));return;}const nb=(state.index.notebooks||[]).find(n=>n.id===state.notebookId);const title=await jpPrompt(t('Neuer Name'),nb?nb.title:'');if(!title)return;await api('/api/notebooks/'+state.notebookId,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
 function mimeFromFilename(name){const ext=String(name||'').toLowerCase().split('.').pop();const map={pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',doc:'application/msword',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',ppt:'application/vnd.ms-powerpoint',odt:'application/vnd.oasis.opendocument.text',ods:'application/vnd.oasis.opendocument.spreadsheet',odp:'application/vnd.oasis.opendocument.presentation'};return map[ext]||'application/octet-stream';}
 async function uploadResource(file){
-  if(!state.note){alert(t('Bitte zuerst eine Notiz öffnen.'));return;}
+  if(!state.note){jpAlert(t('Bitte zuerst eine Notiz öffnen.'));return;}
   const noteId=state.note.id;
   const data=await new Promise((resolve,reject)=>{
     const reader=new FileReader();
@@ -981,18 +1123,18 @@ async function removeTag(tag){
   }catch(e){
     applyTagsLocally(noteId,currentTags);
     status(t('Tag konnte nicht entfernt werden: ')+e.message,'error');
-    alert(t('Tag konnte nicht entfernt werden: ')+e.message);
+    jpAlert(t('Tag konnte nicht entfernt werden: ')+e.message);
   }
 }
 async function addTag(){
-  if(!state.note){alert(t('Bitte zuerst eine Notiz öffnen.'));return;}
-  const entered=prompt(t('Neuer Tag'));
+  if(!state.note){jpAlert(t('Bitte zuerst eine Notiz öffnen.'));return;}
+  const entered=await jpPrompt(t('Neuer Tag'),'');
   const title=String(entered||'').trim();
   if(!title)return;
   const noteId=state.note.id;
   const currentTags=normalizeLocalTags(state.note.tags||[]);
   if(currentTags.some(t=>t.title.toLocaleLowerCase()===title.toLocaleLowerCase())){
-    alert(t('Dieser Tag ist der Notiz bereits zugeordnet.'));
+    jpAlert(t('Dieser Tag ist der Notiz bereits zugeordnet.'));
     return;
   }
 
@@ -1016,21 +1158,29 @@ async function addTag(){
       .filter(t=>t.id!==temporaryTag.id);
     applyTagsLocally(noteId,rollback.length?rollback:currentTags);
     status(t('Tag konnte nicht gespeichert werden: ')+e.message,'error');
-    alert(t('Tag konnte nicht gespeichert werden: ')+e.message);
+    jpAlert(t('Tag konnte nicht gespeichert werden: ')+e.message);
   }
 }
 function closeNoteContextMenu(){const m=$('jp-note-context-menu');if(m){m.classList.remove('open');m.setAttribute('aria-hidden','true');m.innerHTML='';}}
-function showNoteContextMenu(ev,note){ev.preventDefault();ev.stopPropagation();closeNoteContextMenu();const m=$('jp-note-context-menu');if(!m)return;m.dataset.noteId=note.id;m.innerHTML='<button data-act="move">'+t('Verschieben in Notizbuch')+'</button><button data-act="tags">Tags</button><button data-act="delete" class="danger">'+t('Löschen')+'</button>';m.style.left=Math.min(ev.clientX,window.innerWidth-240)+'px';m.style.top=Math.min(ev.clientY,window.innerHeight-150)+'px';m.classList.add('open');m.setAttribute('aria-hidden','false');m.querySelector('[data-act="delete"]').onclick=()=>{closeNoteContextMenu();deleteNoteById(note.id,note.title);};m.querySelector('[data-act="move"]').onclick=()=>{closeNoteContextMenu();moveNoteByPrompt(note.id);};m.querySelector('[data-act="tags"]').onclick=()=>{closeNoteContextMenu();editTagsByPrompt(note.id);};setTimeout(()=>document.addEventListener('click',closeNoteContextMenu,{once:true}),0);}
+function showNoteContextMenu(ev,note){ev.preventDefault();ev.stopPropagation();closeNoteContextMenu();const m=$('jp-note-context-menu');if(!m)return;m.dataset.noteId=note.id;m.innerHTML=jpMenuItem('move','folderMove',t('Verschieben in Notizbuch'))+jpMenuItem('tags','tag','Tags')+jpMenuItem('delete','delete',t('Löschen'),'danger');m.style.left=Math.min(ev.clientX,window.innerWidth-240)+'px';m.style.top=Math.min(ev.clientY,window.innerHeight-150)+'px';m.classList.add('open');m.setAttribute('aria-hidden','false');m.querySelector('[data-act="delete"]').onclick=()=>{closeNoteContextMenu();deleteNoteById(note.id,note.title);};m.querySelector('[data-act="move"]').onclick=()=>{closeNoteContextMenu();moveNoteByPrompt(note.id);};m.querySelector('[data-act="tags"]').onclick=()=>{closeNoteContextMenu();editTagsByPrompt(note.id);};setTimeout(()=>document.addEventListener('click',closeNoteContextMenu,{once:true}),0);}
 function flatNotebooks(){return (state.index&&state.index.notebooks?state.index.notebooks:[]).slice().sort((a,b)=>String(a.title||'').localeCompare(String(b.title||'')));}
-async function deleteNoteById(id,title){if(!confirm(t('Notiz wirklich löschen?')+'\n\n'+(title||id)))return;await api('/api/notes/'+id,{method:'DELETE'});if(state.noteId===id)clearNote();await rebuildAndRestore(true);}
-async function moveNoteByPrompt(id){const books=flatNotebooks();if(!books.length){alert(t('Keine Notizbücher gefunden.'));return;}const msg=books.map((b,i)=>(i+1)+'. '+b.title).join('\n');const ans=prompt(t('Ziel-Notizbuch auswählen:')+'\n\n'+msg+'\n\n'+t('Bitte Nummer eingeben:'));if(!ans)return;const idx=parseInt(ans,10)-1;if(idx<0||idx>=books.length){alert(t('Ungültige Auswahl.'));return;}await api('/api/notes/'+id+'/move',{method:'POST',body:{target_notebook_id:books[idx].id}});await rebuildAndRestore(true);if(state.noteId===id)await openNote(id).catch(()=>{});}
+async function deleteNoteById(id,title){if(!(await jpConfirm(title||id,{title:t('Notiz wirklich löschen?'),danger:true,confirmLabel:t('Löschen')})))return;await api('/api/notes/'+id,{method:'DELETE'});if(state.noteId===id)clearNote();await rebuildAndRestore(true);}
+async function moveNoteByPrompt(id){
+  const books=flatNotebooks().map(b=>({value:b.id,label:breadcrumb(b.id)})).sort((a,b)=>a.label.localeCompare(b.label));
+  if(!books.length){jpAlert(t('Keine Notizbücher gefunden.'));return;}
+  const target=await jpDialog({title:t('Verschieben in Notizbuch'),select:books,value:findNoteMeta(id).notebook_id||books[0].value,cancelValue:null,buttons:[{label:t('Abbrechen'),value:null},{label:t('Verschieben'),submit:true,primary:true}]});
+  if(!target||target===findNoteMeta(id).notebook_id)return;
+  await api('/api/notes/'+id+'/move',{method:'POST',body:{target_notebook_id:target}});
+  await rebuildAndRestore(true);
+  if(state.noteId===id)await openNote(id).catch(()=>{});
+}
 async function editTagsByPrompt(id){
   const note=state.noteId===id&&state.note?state.note:await api('/api/notes/'+id);
   const allRaw=await api('/api/tags').catch(()=>[]);
   const all=normalizeLocalTags(allRaw);
   const currentTags=normalizeLocalTags(note.tags||[]);
   const current=currentTags.map(t=>t.title).join(', ');
-  const input=prompt(t('Tags bearbeiten. Mehrere Tags mit Komma trennen. Entfernte Namen werden von dieser Notiz gelöst.')+'\n\n'+t('Vorhandene Tags:')+'\n'+(all.map(x=>x.title).join(', ')||t('Keine'))+'\n\n'+t('Tags für diese Notiz:'),current);
+  const input=await jpPrompt(t('Tags bearbeiten'),current,{message:t('Mehrere Tags mit Komma trennen. Entfernte Namen werden von dieser Notiz gelöst.')+'\n\n'+t('Vorhandene Tags:')+' '+(all.map(x=>x.title).join(', ')||t('Keine'))});
   if(input===null)return;
   const names=[...new Set(input.split(',').map(s=>s.trim()).filter(Boolean))];
   const selected=[];
@@ -1055,7 +1205,7 @@ async function editTagsByPrompt(id){
   }catch(e){
     applyTagsLocally(id,currentTags);
     status(t('Tags konnten nicht gespeichert werden: ')+e.message,'error');
-    alert(t('Tags konnten nicht gespeichert werden: ')+e.message);
+    jpAlert(t('Tags konnten nicht gespeichert werden: ')+e.message);
   }
 }
 async function rebuildAndRestore(clear=false){status(t('Index wird neu aufgebaut...'),'warning');const r=await api('/api/index/rebuild',{method:'POST'});const idx=r.index||r;if(clear){state.index=idx;rememberIndex(idx);renderTree(idx.tree||[]);if(state.notebookId)selectNotebook(state.notebookId);else restoreLocation(idx);status(t('Index aktualisiert'),'ok');}else{applyIndexPreservingFocus(idx,t('Index aktualisiert'));}if(!clear&&state.noteId&&!state.dirty)openNote(state.noteId,{silent:true,preferCache:true}).catch(()=>{});if($('jp-search')&&$('jp-search').value.trim())runFullTextSearch($('jp-search').value);}
@@ -1089,7 +1239,7 @@ async function persistSettings(extra={}){
   await api('/api/settings',{method:'POST',body:local}).catch(e=>{status(t('Einstellungen konnten nicht gespeichert werden: ')+e.message,'error');throw e;});
 }
 function normalizePath(p){p=String(p||'').trim();if(!p)return '/JoplinV2';if(!p.startsWith('/'))p='/'+p;return p.replace(/\/+/g,'/').replace(/\/\/+/, '/').replace(/\s+$/,'');}
-function openSettings(){const o=$('jp-settings-overlay');if(!o){alert(t('Einstellungsbereich wurde nicht gefunden.'));return;}syncSettingsUi();loadFoldersForSettings();o.classList.add('open');o.setAttribute('aria-hidden','false');}
+function openSettings(){const o=$('jp-settings-overlay');if(!o){jpAlert(t('Einstellungsbereich wurde nicht gefunden.'));return;}syncSettingsUi();loadFoldersForSettings();o.classList.add('open');o.setAttribute('aria-hidden','false');}
 function closeSettings(){const o=$('jp-settings-overlay');if(!o)return;o.classList.remove('open');o.setAttribute('aria-hidden','true');}
 function activateSettingsTab(tab){document.querySelectorAll('[data-settings-tab]').forEach(b=>b.classList.toggle('active',b.dataset.settingsTab===tab));document.querySelectorAll('[data-settings-section]').forEach(sec=>sec.classList.toggle('active',sec.dataset.settingsSection===tab));}
 function syncSettingsUi(){const local=currentLocalSettings();if($('jp-setting-language'))$('jp-setting-language').value=local.language||'system';if($('jp-setting-sort'))$('jp-setting-sort').value=local.sort_order||state.sort||'updated_desc';if($('jp-setting-joplin-path'))$('jp-setting-joplin-path').value=local.joplin_path||'/JoplinV2';if($('jp-setting-office-open-mode'))$('jp-setting-office-open-mode').value=local.office_open_mode==='tab'?'tab':'window';if($('jp-setting-update-backup'))$('jp-setting-update-backup').value=local.update_backup_enabled==='yes'?'yes':'no';setSwitch($('jp-setting-remember-toggle'),(local.remember_last_location||'yes')==='yes');syncUpdateUi();}
@@ -1172,7 +1322,7 @@ async function checkUpdates(){
     updateStatus(t('Update-Prüfung fehlgeschlagen: ')+e.message,'error');
   }
 }
-async function installUpdateAsset(asset,rel){if(!asset?.id||!rel?.id)return;const backupEnabled=currentLocalSettings().update_backup_enabled==='yes';if(!confirm(t('Joplix Update jetzt installieren?')+'\n\n'+asset.name+'\n\n'+(backupEnabled?t('Vor dem Update wird ein optionales App-Backup erstellt.'):t('Es wird kein App-Backup erstellt. Bitte stellen Sie sicher, dass ein vollständiges Nextcloud-Backup vorhanden ist.'))))return;try{updateStatus(t('Update wird heruntergeladen und installiert...'),'warning');const r=await api('/api/updates/install',{method:'POST',body:{release_id:rel.id,asset_id:asset.id}});const ch=releaseChannel(rel||{});storage.set('installed_channel',ch);const settings=storage.get('settings',{});settings.installed_channel=ch;storage.set('settings',settings);updateStatus((r.message||t('Update installiert. Bitte Seite neu laden.'))+' Version: '+(r.version||''),'ok');alert((r.message||t('Update installiert. Bitte Seite neu laden.'))+(r.backup?'\n\nBackup: '+r.backup:'')+'\nVersion: '+(r.version||''));}catch(e){updateStatus(t('Update-Installation fehlgeschlagen: ')+e.message,'error');alert(t('Update-Installation fehlgeschlagen:')+'\n'+e.message);}}
+async function installUpdateAsset(asset,rel){if(!asset?.id||!rel?.id)return;const backupEnabled=currentLocalSettings().update_backup_enabled==='yes';if(!(await jpConfirm(asset.name+'\n\n'+(backupEnabled?t('Vor dem Update wird ein optionales App-Backup erstellt.'):t('Es wird kein App-Backup erstellt. Bitte stellen Sie sicher, dass ein vollständiges Nextcloud-Backup vorhanden ist.')),{title:t('Joplix Update jetzt installieren?'),confirmLabel:t('Installieren')})))return;try{updateStatus(t('Update wird heruntergeladen und installiert...'),'warning');const r=await api('/api/updates/install',{method:'POST',body:{release_id:rel.id,asset_id:asset.id}});const ch=releaseChannel(rel||{});storage.set('installed_channel',ch);const settings=storage.get('settings',{});settings.installed_channel=ch;storage.set('settings',settings);updateStatus((r.message||t('Update installiert. Bitte Seite neu laden.'))+' Version: '+(r.version||''),'ok');jpAlert((r.message||t('Update installiert. Bitte Seite neu laden.'))+(r.backup?'\n\nBackup: '+r.backup:'')+'\nVersion: '+(r.version||''));}catch(e){updateStatus(t('Update-Installation fehlgeschlagen: ')+e.message,'error');jpAlert(t('Update-Installation fehlgeschlagen:')+'\n'+e.message);}}
 
 
 // ---------------------------------------------------------------------------
@@ -1278,7 +1428,7 @@ const JP_EN={
 ' | Aktualisierung fehlgeschlagen: ':' | Refresh failed: ',
 'Notiz aus Schnellcache angezeigt. Aktualisierung fehlgeschlagen: ':'Showing note from quick cache. Refresh failed: ',
 'Notiz konnte nicht geladen werden: ':'Note could not be loaded: ',
-'Bitte rechts eine Notiz auswählen.':'Please select a note on the right.',
+'Bitte eine Notiz auswählen.':'Please select a note.',
 'Tag von dieser Notiz entfernen':'Remove tag from this note',
 '+ Tag':'+ Tag',
 'Ressource konnte nicht gelesen werden.':'Attachment could not be read.',
@@ -1366,6 +1516,11 @@ const JP_EN={
 'Backup-Einstellung gespeichert.':'Backup setting saved.',
 'Update-Einstellungen gespeichert.':'Update settings saved.',
 'Update-Einstellungen konnten nicht gespeichert werden: ':'Update settings could not be saved: ',
+// UI refresh 2026.11.69
+'Neues Notizbuch':'New notebook','Notizen durchsuchen …':'Search notes …','Sortierung umkehren':'Reverse sort order','Zurück':'Back','Vorschau':'Preview','Weitere Aktionen':'More actions','Datei anhängen':'Attach file','Notiz löschen':'Delete note',
+'Wähle eine Notiz aus der Liste oder lege eine neue an.':'Select a note from the list or create a new one.','Joplix-Einstellungen':'Joplix settings','Spaltenbreiten':'Column widths','Setzt die Breite der Spalten auf den Standard zurück.':'Resets the column widths to their defaults.','Zurücksetzen':'Reset',
+'OK':'OK','Abbrechen':'Cancel','Verwerfen':'Discard','Verschieben':'Move','Ohne Titel':'Untitled','Notiz gespeichert':'Note saved','Ungespeicherte Änderungen':'Unsaved changes','Diese Notiz hat ungespeicherte Änderungen.':'This note has unsaved changes.',
+'Tags bearbeiten':'Edit tags','Mehrere Tags mit Komma trennen. Entfernte Namen werden von dieser Notiz gelöst.':'Separate multiple tags with commas. Removed names are detached from this note.',
 };
 function resolvedLanguage(){const v=(currentLocalSettings().language||'system');if(v==='de'||v==='en')return v;return String(navigator.language||'en').toLowerCase().startsWith('de')?'de':'en';}
 // German -> English for one string, or the string unchanged when there is no entry. Tries, in order:
@@ -1404,15 +1559,15 @@ function setupSettings(){
   const openBtn=$('jp-open-settings'); if(openBtn)openBtn.addEventListener('click',ev=>{ev.preventDefault();openSettings();});
   const closeBtn=$('jp-close-settings'); if(closeBtn)closeBtn.addEventListener('click',ev=>{ev.preventDefault();closeSettings();});
   const backdrop=$('jp-settings-backdrop'); if(backdrop)backdrop.addEventListener('click',()=>closeSettings());
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSettings();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!jpDialogOpen())closeSettings();});
   document.querySelectorAll('[data-settings-tab]').forEach(b=>b.addEventListener('click',()=>activateSettingsTab(b.dataset.settingsTab)));
   const languageEl=$('jp-setting-language'); if(languageEl)languageEl.addEventListener('change',async e=>{await persistSettings({language:e.target.value});location.reload();});
   const sortEl=$('jp-setting-sort'); if(sortEl)sortEl.addEventListener('change',async e=>{state.sort=e.target.value;await persistSettings({sort_order:state.sort});if(state.notebookId)selectNotebook(state.notebookId);});
   const officeMode=$('jp-setting-office-open-mode'); if(officeMode)officeMode.addEventListener('change',async e=>{await persistSettings({office_open_mode:e.target.value==='tab'?'tab':'window'});jpStatusText(t('Office-Öffnungsart gespeichert.'),'ok');});const backupMode=$('jp-setting-update-backup');if(backupMode)backupMode.addEventListener('change',async e=>{await persistSettings({update_backup_enabled:e.target.value==='yes'?'yes':'no'});jpStatusText(t('Backup-Einstellung gespeichert.'),'ok');});
-  const pathEl=$('jp-setting-joplin-path'); if(pathEl){pathEl.addEventListener('change',()=>applyJoplinPathFromInput().catch(e=>alert(e.message)));pathEl.addEventListener('blur',()=>applyJoplinPathFromInput().catch(e=>alert(e.message)));}
+  const pathEl=$('jp-setting-joplin-path'); if(pathEl){pathEl.addEventListener('change',()=>applyJoplinPathFromInput().catch(e=>jpAlert(e.message)));pathEl.addEventListener('blur',()=>applyJoplinPathFromInput().catch(e=>jpAlert(e.message)));}
   const remember=$('jp-setting-remember-toggle'); if(remember)remember.addEventListener('click',async()=>{const local=currentLocalSettings();local.remember_last_location=(local.remember_last_location||'yes')==='yes'?'no':'yes';setSwitch(remember,local.remember_last_location==='yes');await persistSettings({remember_last_location:local.remember_last_location});});
-  const reset=$('jp-layout-reset'); if(reset)reset.addEventListener('click',()=>{storage.del('columnWidths');applyColumnWidths({left:300,right:360});});
-  const rebuild=$('jp-settings-rebuild'); if(rebuild)rebuild.addEventListener('click',()=>rebuildAndRestore().catch(e=>alert(e.message)));
+  const reset=$('jp-layout-reset'); if(reset)reset.addEventListener('click',()=>{storage.del('columnWidths2');applyColumnWidths();});
+  const rebuild=$('jp-settings-rebuild'); if(rebuild)rebuild.addEventListener('click',()=>rebuildAndRestore().catch(e=>jpAlert(e.message)));
   const upd=$('jp-update-check'); if(upd)upd.addEventListener('click',()=>checkUpdates());
   const updChannel=$('jp-update-channel'); if(updChannel)updChannel.addEventListener('change',()=>persistUpdateSettings().then(()=>updateStatus(t('Update-Einstellungen gespeichert.'),'ok')).catch(e=>updateStatus(t('Update-Einstellungen konnten nicht gespeichert werden: ')+e.message,'error')));
   const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeUpdateRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus(t('Update-Einstellungen gespeichert.'),'ok')).catch(e=>updateStatus(t('Update-Einstellungen konnten nicht gespeichert werden: ')+e.message,'error'));});
@@ -1506,7 +1661,7 @@ async function runSync(opts={}){
         continue;
       }
       if(last.status==='error'&&last.code==='massDelete'&&opts.manual&&!confirmDelete){
-        if(window.confirm(last.message+'\n\n'+L('Diese Elemente jetzt auch auf dem Joplin Server löschen?','Delete these items on the Joplin Server as well?'))){confirmDelete=true;continue;}
+        if(await jpConfirm(last.message,{title:L('Diese Elemente jetzt auch auf dem Joplin Server löschen?','Delete these items on the Joplin Server as well?'),danger:true,confirmLabel:L('Löschen','Delete')})){confirmDelete=true;continue;}
       }
       break;
     }
@@ -1564,17 +1719,35 @@ function setupSync(){
   setInterval(()=>{if(document.visibilityState==='visible'&&syncEnabled()&&!state.saving)runSync().catch(()=>{});},120000);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&syncEnabled()&&Date.now()-syncState.lastAuto>60000){syncState.lastAuto=Date.now();scheduleSync(800);}});
 }
+// Toolbar "more" menu, the back buttons of the single-pane layout and Ctrl/Cmd+S.
+function setupChrome(){
+  const moreBtn=$('jp-more-button'),moreMenu=$('jp-more-menu');
+  if(moreBtn&&moreMenu){
+    const closeMore=()=>{moreMenu.hidden=true;moreBtn.setAttribute('aria-expanded','false');};
+    moreBtn.addEventListener('click',ev=>{ev.stopPropagation();const open=moreMenu.hidden;moreMenu.hidden=!open;moreBtn.setAttribute('aria-expanded',open?'true':'false');});
+    document.addEventListener('click',closeMore);
+    document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeMore();});
+  }
+  if($('jp-back-to-list'))$('jp-back-to-list').onclick=()=>setPane('list');
+  if($('jp-back-to-nav'))$('jp-back-to-nav').onclick=()=>setPane('nav');
+  document.addEventListener('keydown',ev=>{
+    if(!(ev.ctrlKey||ev.metaKey)||ev.altKey||String(ev.key).toLowerCase()!=='s'||jpDialogOpen()||jpSettingsOpen())return;
+    ev.preventDefault();
+    if(state.dirty)saveNote({keepMode:true,skipReload:true}).then(ok=>{if(ok)jpToast(t('Notiz gespeichert'));}).catch(e=>jpAlert(e.message));
+  });
+}
 document.addEventListener('DOMContentLoaded',()=>{
+  try{hydrateIcons(jpRoot());setupChrome();}catch(e){console.error('Joplix chrome init failed',e);}
   try{setupResizableColumns();}catch(e){console.error('Joplix resizable init failed',e);} try{setupEditorFormatbar();}catch(e){console.error('Joplix editor toolbar init failed',e);} try{setupSettings();}catch(e){console.error('Joplix settings init failed',e);} try{setupWelcome();}catch(e){console.error('Joplix welcome init failed',e);} try{setupSync();}catch(e){console.error('Joplix sync init failed',e);} try{setTimeout(()=>checkUpdateOnStart(),1200);}catch(e){console.warn('Joplix update startup init failed',e);} if($('jp-pdf-viewer-close'))$('jp-pdf-viewer-close').onclick=closePdfViewer; if($('jp-pdf-viewer-backdrop'))$('jp-pdf-viewer-backdrop').onclick=closePdfViewer;
   if($('jp-new-root'))$('jp-new-root').onclick=()=>newNotebook('');
   if($('jp-new-note-main'))$('jp-new-note-main').onclick=newNote;
-  if($('jp-save-note'))$('jp-save-note').onclick=()=>saveNote({skipReload:true}).catch(e=>alert(e.message)); if($('jp-save-note-top'))$('jp-save-note-top').onclick=()=>saveNote({keepMode:true,skipReload:true,fastDirtySave:true}).catch(e=>alert(e.message)); if($('jp-edit-note'))$('jp-edit-note').onclick=()=>setNoteMode('edit'); if($('jp-cancel-edit'))$('jp-cancel-edit').onclick=()=>setNoteMode('view'); if($('jp-title'))$('jp-title').addEventListener('input',()=>{markDirty();updateNotePath();}); if($('jp-body'))$('jp-body').addEventListener('input',()=>{markDirty();renderDisplayMode();});
-  if($('jp-delete-note'))$('jp-delete-note').onclick=()=>deleteNote().catch(e=>alert(e.message));
-  if($('jp-rebuild-index'))$('jp-rebuild-index').onclick=()=>rebuildAndRestore().catch(e=>alert(e.message));
-  if($('jp-resource-file'))$('jp-resource-file').onchange=e=>{if(e.target.files[0])uploadResource(e.target.files[0]).catch(err=>alert(err.message));};
+  if($('jp-save-note'))$('jp-save-note').onclick=()=>saveNote({keepMode:true,skipReload:true}).then(ok=>{if(ok)jpToast(t('Notiz gespeichert'));}).catch(e=>jpAlert(e.message)); if($('jp-save-note-top'))$('jp-save-note-top').onclick=()=>saveNote({keepMode:true,skipReload:true,fastDirtySave:true}).catch(e=>jpAlert(e.message)); if($('jp-edit-note'))$('jp-edit-note').onclick=()=>setNoteMode('edit'); if($('jp-cancel-edit'))$('jp-cancel-edit').onclick=()=>setNoteMode('view'); if($('jp-title'))$('jp-title').addEventListener('input',()=>{markDirty();updateNotePath();}); if($('jp-body'))$('jp-body').addEventListener('input',()=>{markDirty();});
+  if($('jp-delete-note'))$('jp-delete-note').onclick=()=>deleteNote().catch(e=>jpAlert(e.message));
+  if($('jp-rebuild-index'))$('jp-rebuild-index').onclick=()=>rebuildAndRestore().catch(e=>jpAlert(e.message));
+  if($('jp-resource-file'))$('jp-resource-file').onchange=e=>{if(e.target.files[0])uploadResource(e.target.files[0]).catch(err=>jpAlert(err.message));};
   if($('jp-search'))$('jp-search').addEventListener('input',e=>runFullTextSearch(e.target.value));
   if($('jp-sort-button'))$('jp-sort-button').onclick=()=>{state.sort=state.sort==='updated_desc'?'updated_asc':'updated_desc';persistSettings({sort_order:state.sort}).catch(()=>{});if(state.notebookId)selectNotebook(state.notebookId);};
-  updateSaveButton(); load().catch(e=>alert(e.message)).then(()=>loadSyncStatus()).then(()=>{if(syncEnabled()){syncState.lastAuto=Date.now();runSync().catch(()=>{});}});
+  updateSaveButton(); load().catch(e=>jpAlert(e.message)).then(()=>loadSyncStatus()).then(()=>{if(syncEnabled()){syncState.lastAuto=Date.now();runSync().catch(()=>{});}});
 });
 })();
 

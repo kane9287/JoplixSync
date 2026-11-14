@@ -12,6 +12,8 @@ const $=id=>document.getElementById(id); const route=p=>OC.generateUrl('/apps/jo
 // - Menus and dialogs are appended to jpRoot() (#joplix), which css/style.css scopes every rule to.
 // ---------------------------------------------------------------------------
 const JP_ICONS={
+menu:'M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z',
+chevronRight:'M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z',
 plus:'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
 close:'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
 magnify:'M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z',
@@ -54,6 +56,20 @@ function jpMenuItem(act,icon,label,cls){return '<button type="button" data-act="
 function jpRoot(){return document.getElementById('joplix')||document.body;}
 // Small screens show one column at a time (css/style.css section 11): 'nav' | 'list' | 'note'.
 function setPane(p){const app=$('joplix-app');if(app)app.dataset.pane=p;}
+// Below 1025px (same breakpoint as CSS section 11) the notebook sidebar is a drawer over the list/note pane,
+// open while #joplix-app has jp-nav-open. On wide screens the class is never set.
+const jpNarrow=window.matchMedia('(max-width: 1024px)');
+function navIsOpen(){const app=$('joplix-app');return !!(app&&app.classList.contains('jp-nav-open'));}
+function setNavOpen(open,opts={}){
+  const app=$('joplix-app');if(!app)return;
+  open=!!open&&jpNarrow.matches;
+  const was=app.classList.contains('jp-nav-open');
+  app.classList.toggle('jp-nav-open',open);
+  const toggle=$('jp-nav-toggle');if(toggle)toggle.setAttribute('aria-expanded',open?'true':'false');
+  if(!opts.focus||was===open)return;
+  if(open){const target=document.querySelector('#jp-tree .jp-tree-row.active .jp-tree-item')||document.querySelector('#jp-tree .jp-tree-item')||$('jp-new-root');if(target)setTimeout(()=>target.focus({preventScroll:true}),0);}
+  else if(toggle)toggle.focus();
+}
 // Without an open note the editor column shows the empty state instead of title/body/attachments.
 function setHasNote(on){const app=$('joplix-app');if(app){app.classList.toggle('jp-no-note',!on);app.classList.remove('jp-trash-note');}if($('jp-title'))$('jp-title').readOnly=false;}
 function setTrashNote(on){const app=$('joplix-app');if(app)app.classList.toggle('jp-trash-note',!!on);if($('jp-title'))$('jp-title').readOnly=!!on;}
@@ -664,8 +680,52 @@ function restoreLocation(idx){
 }
 function fillSettings(){/* Einstellungen in 1.0.6 voruebergehend deaktiviert */}
 function renderIndex(idx){rememberIndex(idx);renderTree(idx.tree||[]);renderNotes([]);}
-function renderTree(nodes){const root=$('jp-tree');root.innerHTML='';const walk=(n,l)=>{const row=document.createElement('div');row.className='jp-tree-row';row.dataset.id=n.id;row.style.paddingLeft=(4+l*18)+'px';const b=document.createElement('button');b.type='button';b.className='jp-tree-item';b.dataset.id=n.id;b.onclick=()=>selectNotebook(n.id);const icon=document.createElement('span');icon.className='jp-folder-icon';icon.setAttribute('aria-hidden','true');const label=document.createElement('span');label.className='jp-tree-label';label.textContent=notebookTitleWithCount(n);b.appendChild(icon);b.appendChild(label);const menu=document.createElement('button');menu.type='button';menu.className='jp-tree-menu';menu.appendChild(jpIconEl('dots'));menu.title=t('Aktionen');menu.setAttribute('aria-label',t('Aktionen'));menu.onclick=(ev)=>{ev.stopPropagation();showNotebookMenu(n,row,menu);};row.appendChild(b);row.appendChild(menu);root.appendChild(row);(n.children||[]).forEach(c=>walk(c,l+1));};nodes.forEach(n=>walk(n,0));renderTrashRow(root);}
-function selectNotebook(id,opts={}){if(id===JP_TRASH_ID&&!trashCount(state.index)){id=firstNotebookId(state.index);if(!id){state.notebookId='';return;}}const app=$('joplix-app');if(app)app.classList.toggle('jp-in-trash',id===JP_TRASH_ID);if(id===JP_TRASH_ID){state.notebookId=id;setPane('list');document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));renderTrash();if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);return;}state.notebookId=id;setPane('list');document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));const notes=(state.index.notes||[]).filter(n=>n.notebook_id===id).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent=breadcrumb(id);if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);if(!opts.skipSave)saveLastLocation();}
+// Notebook tree: each node is its row followed by a .jp-tree-children group holding its sub-notebooks.
+// Collapsed notebooks (ids in localStorage joplix.collapsedNotebooks) keep that group hidden; every
+// notebook starts expanded. Toggling only flips the DOM, so the active row and scroll position stay put.
+function jpCollapsed(){const v=storage.get('collapsedNotebooks',[]);return new Set(Array.isArray(v)?v:[]);}
+function jpSetCollapsed(id,on){const c=jpCollapsed();if(on)c.add(id);else c.delete(id);storage.set('collapsedNotebooks',[...c]);}
+function applyTreeCollapse(id,collapsed){
+  const root=$('jp-tree');if(!root)return;
+  const group=root.querySelector('.jp-tree-children[data-parent="'+CSS.escape(id)+'"]');if(group)group.hidden=collapsed;
+  const tg=root.querySelector('.jp-tree-row[data-id="'+CSS.escape(id)+'"] > button.jp-tree-toggle');
+  if(tg){tg.setAttribute('aria-expanded',collapsed?'false':'true');const label=collapsed?t('Ausklappen'):t('Einklappen');tg.title=label;tg.setAttribute('aria-label',label);}
+}
+function toggleNotebookCollapsed(id){const collapsed=!jpCollapsed().has(id);jpSetCollapsed(id,collapsed);applyTreeCollapse(id,collapsed);}
+// Expands every ancestor of a notebook (e.g. when a note link or the restored location points into a
+// collapsed branch) and scrolls its row into view.
+function revealNotebook(id){
+  const nbs=(state.index&&state.index.notebooks)||[];const c=jpCollapsed();let changed=false;let nb=nbs.find(n=>n.id===id);let guard=0;
+  while(nb&&nb.parent_id&&guard<50){if(c.has(nb.parent_id)){c.delete(nb.parent_id);applyTreeCollapse(nb.parent_id,false);changed=true;}nb=nbs.find(n=>n.id===nb.parent_id);guard++;}
+  if(changed)storage.set('collapsedNotebooks',[...c]);
+  const row=document.querySelector('#jp-tree .jp-tree-row[data-id="'+CSS.escape(id)+'"]');if(row&&row.scrollIntoView)row.scrollIntoView({block:'nearest'});
+}
+function renderTree(nodes){
+  const root=$('jp-tree');root.innerHTML='';
+  const stored=jpCollapsed();const collapsed=new Set();
+  const walk=(n,l,parent)=>{
+    const kids=n.children||[];const isCollapsed=kids.length>0&&stored.has(n.id);if(isCollapsed)collapsed.add(n.id);
+    const row=document.createElement('div');row.className='jp-tree-row';row.dataset.id=n.id;row.style.paddingLeft=(4+l*18)+'px';
+    let toggle;
+    if(kids.length){toggle=document.createElement('button');toggle.type='button';toggle.className='jp-tree-toggle';toggle.appendChild(jpIconEl('chevronRight'));toggle.onclick=(ev)=>{ev.stopPropagation();toggleNotebookCollapsed(n.id);};}
+    else{toggle=document.createElement('span');toggle.className='jp-tree-toggle';toggle.setAttribute('aria-hidden','true');}
+    const b=document.createElement('button');b.type='button';b.className='jp-tree-item';b.dataset.id=n.id;b.onclick=()=>selectNotebook(n.id);
+    const icon=document.createElement('span');icon.className='jp-folder-icon';icon.setAttribute('aria-hidden','true');
+    const label=document.createElement('span');label.className='jp-tree-label';label.textContent=notebookTitleWithCount(n);
+    b.appendChild(icon);b.appendChild(label);
+    const menu=document.createElement('button');menu.type='button';menu.className='jp-tree-menu';menu.appendChild(jpIconEl('dots'));menu.title=t('Aktionen');menu.setAttribute('aria-label',t('Aktionen'));menu.onclick=(ev)=>{ev.stopPropagation();showNotebookMenu(n,row,menu);};
+    row.appendChild(toggle);row.appendChild(b);row.appendChild(menu);parent.appendChild(row);
+    if(kids.length){
+      const group=document.createElement('div');group.className='jp-tree-children';group.setAttribute('role','group');group.dataset.parent=n.id;
+      parent.appendChild(group);kids.forEach(c=>walk(c,l+1,group));applyTreeCollapse(n.id,isCollapsed);
+    }
+  };
+  nodes.forEach(n=>walk(n,0,root));
+  // Forget notebooks that no longer exist or no longer have children.
+  if(collapsed.size!==stored.size)storage.set('collapsedNotebooks',[...collapsed]);
+  renderTrashRow(root);
+}
+function selectNotebook(id,opts={}){if(id===JP_TRASH_ID&&!trashCount(state.index)){id=firstNotebookId(state.index);if(!id){state.notebookId='';return;}}const app=$('joplix-app');if(app)app.classList.toggle('jp-in-trash',id===JP_TRASH_ID);if(id===JP_TRASH_ID){state.notebookId=id;setPane('list');setNavOpen(false);document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));renderTrash();if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);return;}state.notebookId=id;setPane('list');setNavOpen(false);document.querySelectorAll('.jp-tree-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));document.querySelectorAll('.jp-tree-row').forEach(r=>r.classList.toggle('active',r.dataset.id===id));revealNotebook(id);const notes=(state.index.notes||[]).filter(n=>n.notebook_id===id).sort(sorter());renderNotes(notes);$('jp-breadcrumb').textContent=breadcrumb(id);if(!opts.keepNote)clearNote();else ensureNoteSelected(state.noteId);if(!opts.skipSave)saveLastLocation();}
 function breadcrumb(id){const names=[];let guard=0;while(id&&guard<20){const nb=(state.index.notebooks||[]).find(n=>n.id===id);if(!nb)break;names.unshift(nb.title);id=nb.parent_id;guard++;}return names.join(' › ')||t('Notizbuch');}
 function sorter(){return (a,b)=>state.sort==='title_asc'?a.title.localeCompare(b.title):(state.sort==='updated_asc'?String(a.updated_time).localeCompare(String(b.updated_time)):String(b.updated_time).localeCompare(String(a.updated_time)));}
 function renderNotes(notes){
@@ -959,7 +1019,7 @@ function closeNotebookMenu(){
   document.removeEventListener('keydown',closeNotebookMenuByEscape,true);
 }
 function closeNotebookMenuByEscape(ev){
-  if(ev && ev.key==='Escape')closeNotebookMenu();
+  if(ev && ev.key==='Escape'){ev.stopPropagation();closeNotebookMenu();}
 }
 function showNotebookMenu(node,row,button){
   closeNotebookMenu();
@@ -1096,7 +1156,7 @@ async function saveNote(options={}){
 }
 async function newNote(){if(state.notebookId===JP_TRASH_ID)return;if(!(await handleDirtyBeforeNoteChange('__new__')))return;state.note=null;state.noteId='';setHasNote(true);setPane('note');setNoteMode('edit');$('jp-title').value=t('Neue Notiz');$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('Notizinhalt');$('jp-meta').textContent=t('Neue Notiz in diesem Notizbuch');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();state.originalNote={title:'',body:''};resetEditorHistory('');state.dirty=true;updateSaveButton();}
 async function deleteNote(){if(!state.note)return;if(state.note.is_deleted)return purgeTrashedNote(state.note.id,state.note.title);const id=state.note.id;if(!(await jpConfirm(state.note.title||'',{title:t('Notiz in den Papierkorb verschieben?'),confirmLabel:t('In den Papierkorb')})))return;await api('/api/notes/'+id,{method:'DELETE'});forgetNote(id);await rebuildAndRestore(true);clearNote();status(t('In den Papierkorb verschoben'),'ok');}
-async function newNotebook(parent){const en=resolvedLanguage()==='en';const title=await jpPrompt(parent?(en?'New sub-notebook':'Neues Unter-Notizbuch'):(en?'New notebook':'Neues Notizbuch'),'',{confirmLabel:en?'Create':'Anlegen'});if(!title)return;await api('/api/notebooks',{method:'POST',body:{title,parent_id:parent||''}});await rebuildAndRestore();}
+async function newNotebook(parent){const en=resolvedLanguage()==='en';const title=await jpPrompt(parent?(en?'New sub-notebook':'Neues Unter-Notizbuch'):(en?'New notebook':'Neues Notizbuch'),'',{confirmLabel:en?'Create':'Anlegen'});if(!title)return;await api('/api/notebooks',{method:'POST',body:{title,parent_id:parent||''}});if(parent)jpSetCollapsed(parent,false);await rebuildAndRestore();}
 async function renameNotebook(){if(!state.notebookId){jpAlert(t('Bitte Notizbuch auswählen.'));return;}const nb=(state.index.notebooks||[]).find(n=>n.id===state.notebookId);const title=await jpPrompt(t('Neuer Name'),nb?nb.title:'');if(!title)return;await api('/api/notebooks/'+state.notebookId,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
 function mimeFromFilename(name){const ext=String(name||'').toLowerCase().split('.').pop();const map={pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',doc:'application/msword',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',ppt:'application/vnd.ms-powerpoint',odt:'application/vnd.oasis.opendocument.text',ods:'application/vnd.oasis.opendocument.spreadsheet',odp:'application/vnd.oasis.opendocument.presentation'};return map[ext]||'application/octet-stream';}
 async function uploadResource(file){
@@ -1221,7 +1281,7 @@ function renderTrashRow(root){
   const row=document.createElement('div');row.className='jp-tree-row jp-trash-row';row.dataset.id=JP_TRASH_ID;row.style.paddingLeft='4px';
   const b=document.createElement('button');b.type='button';b.className='jp-tree-item';b.dataset.id=JP_TRASH_ID;b.onclick=()=>selectNotebook(JP_TRASH_ID);
   const label=document.createElement('span');label.className='jp-tree-label';label.textContent=t('Papierkorb')+' ('+n+')';
-  b.appendChild(jpIconEl('delete'));b.appendChild(label);row.appendChild(b);root.appendChild(row);
+  const spacer=document.createElement('span');spacer.className='jp-tree-toggle';spacer.setAttribute('aria-hidden','true');b.appendChild(jpIconEl('delete'));b.appendChild(label);row.appendChild(spacer);row.appendChild(b);root.appendChild(row);
   if(state.notebookId===JP_TRASH_ID){row.classList.add('active');b.classList.add('active');}
 }
 function renderTrash(){
@@ -1599,7 +1659,7 @@ const JP_EN={
 'Index leer oder nicht vorhanden, erster Neuaufbau läuft...':'Index empty or missing, first rebuild in progress...',
 'Server-Index geladen. Änderungen werden im Hintergrund geprüft...':'Server index loaded. Checking for changes in the background...',
 'Kein Index vorhanden. Bitte Joplix-Ordner in den Einstellungen prüfen.':'No index available. Please check the Joplix folder in the settings.',
-'Aktionen':'Actions',
+'Aktionen':'Actions','Einklappen':'Collapse','Ausklappen':'Expand',
 'Keine Notizen gefunden.':'No notes found.',
 'Speichern fehlgeschlagen: ':'Saving failed: ',
 'Diese Notiz hat ungespeicherte Änderungen.\n\nOK = Änderungen speichern und wechseln.\nAbbrechen = weitere Auswahl.':'This note has unsaved changes.\n\nOK = save changes and switch.\nCancel = more options.',
@@ -1923,7 +1983,12 @@ function setupChrome(){
     document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeMore();});
   }
   if($('jp-back-to-list'))$('jp-back-to-list').onclick=()=>setPane('list');
-  if($('jp-back-to-nav'))$('jp-back-to-nav').onclick=()=>setPane('nav');
+  if($('jp-nav-toggle'))$('jp-nav-toggle').onclick=()=>setNavOpen(!navIsOpen(),{focus:true});
+  if($('jp-nav-backdrop'))$('jp-nav-backdrop').onclick=()=>setNavOpen(false);
+  if($('jp-open-settings'))$('jp-open-settings').addEventListener('click',()=>setNavOpen(false));
+  document.addEventListener('keydown',ev=>{if(ev.key!=='Escape'||!navIsOpen()||jpDialogOpen()||jpSettingsOpen())return;ev.preventDefault();setNavOpen(false,{focus:true});});
+  const onWidth=()=>{if(!jpNarrow.matches)setNavOpen(false);};
+  if(jpNarrow.addEventListener)jpNarrow.addEventListener('change',onWidth);else if(jpNarrow.addListener)jpNarrow.addListener(onWidth);
   document.addEventListener('keydown',ev=>{
     if(!(ev.ctrlKey||ev.metaKey)||ev.altKey||String(ev.key).toLowerCase()!=='s'||jpDialogOpen()||jpSettingsOpen())return;
     ev.preventDefault();
@@ -1947,7 +2012,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if($('jp-resource-file'))$('jp-resource-file').onchange=e=>{if(e.target.files[0])uploadResource(e.target.files[0]).catch(err=>jpAlert(err.message));};
   if($('jp-search'))$('jp-search').addEventListener('input',e=>runFullTextSearch(e.target.value));
   if($('jp-sort-button'))$('jp-sort-button').onclick=()=>{state.sort=state.sort==='updated_desc'?'updated_asc':'updated_desc';persistSettings({sort_order:state.sort}).catch(()=>{});if(state.notebookId)selectNotebook(state.notebookId);};
-  updateSaveButton(); load().catch(e=>jpAlert(e.message)).then(()=>loadSyncStatus()).then(()=>{if(syncEnabled()){syncState.lastAuto=Date.now();runSync().catch(()=>{});}});
+  updateSaveButton(); load().catch(e=>jpAlert(e.message)).then(()=>{if(!state.notebookId)setNavOpen(true);}).then(()=>loadSyncStatus()).then(()=>{if(syncEnabled()){syncState.lastAuto=Date.now();runSync().catch(()=>{});}});
 });
 })();
 

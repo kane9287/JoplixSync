@@ -72,6 +72,7 @@
 
 /* 2 — layout ------------------------------------------------------------------------------------------ */
 #joplix-app {
+  position: relative;
   display: grid;
   grid-template-columns: var(--jp-nav-width, 300px) 1px var(--jp-list-width, 340px) 1px minmax(0, 1fr);
   height: 100%; min-height: 0; overflow: hidden;
@@ -88,7 +89,9 @@
 #joplix .jp-resizer:hover,
 #joplix .jp-resizer.dragging { background: var(--color-primary-element); box-shadow: 0 0 0 1px var(--color-primary-element); }
 body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-select: none !important; }
-#joplix .jp-back { display: none; }
+#joplix .jp-back,
+#joplix .jp-nav-toggle,
+#joplix .jp-nav-backdrop { display: none; }
 
 /* 3 — navigation -------------------------------------------------------------------------------------- */
 #joplix .jp-sidebar {
@@ -120,6 +123,17 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
   -webkit-mask: url('../img/folder.svg') center / contain no-repeat; mask: url('../img/folder.svg') center / contain no-repeat;
 }
 #joplix .jp-tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Collapse chevron (js: renderTree / applyTreeCollapse). Rows without sub-notebooks get an empty span of the
+   same width so all labels line up. */
+#joplix .jp-tree-toggle { flex: 0 0 20px; width: 20px; }
+#joplix button.jp-tree-toggle {
+  min-height: 0; height: 24px; padding: 0; border-radius: var(--jp-radius);
+  background: transparent; color: inherit; opacity: .7;
+}
+#joplix button.jp-tree-toggle:hover { background: var(--color-background-hover); opacity: 1; }
+#joplix button.jp-tree-toggle .jp-icon { width: 16px; height: 16px; transition: transform .15s ease; }
+#joplix button.jp-tree-toggle[aria-expanded="true"] .jp-icon { transform: rotate(90deg); }
+#joplix .jp-tree-children[hidden] { display: none; }
 #joplix button.jp-tree-menu { flex: 0 0 auto; width: var(--jp-h); padding: 0; background: transparent; color: inherit; opacity: 0; }
 #joplix .jp-tree-row:hover button.jp-tree-menu,
 #joplix .jp-tree-row:focus-within button.jp-tree-menu,
@@ -434,17 +448,28 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 #joplix .jp-update-asset { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; }
 #joplix .jp-update-asset span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* 11 — small screens: one pane at a time, chosen by data-pane on #joplix-app (setPane() in js/app.js) --- */
+/* 11 — small screens: list or note, chosen by data-pane on #joplix-app (setPane() in js/app.js). The
+   sidebar is a drawer over them, open while #joplix-app has jp-nav-open (setNavOpen()), like Nextcloud's
+   own app navigation on mobile. Absolute positioning takes it and the backdrop out of the grid. ------- */
 @media (max-width: 1024px) {
   #joplix-app { grid-template-columns: minmax(0, 1fr); }
   #joplix .jp-resizer,
-  #joplix-app > .jp-sidebar,
   #joplix-app > .jp-list,
   #joplix-app > .jp-content { display: none; }
-  #joplix-app[data-pane="nav"] > .jp-sidebar,
   #joplix-app[data-pane="list"] > .jp-list,
   #joplix-app[data-pane="note"] > .jp-content { display: flex; }
-  #joplix button.jp-back { display: inline-flex; }
+  #joplix-app > .jp-sidebar {
+    position: absolute; inset: 0 auto 0 0; z-index: 20;
+    width: min(300px, calc(100% - 48px));
+    background: var(--color-main-background); -webkit-backdrop-filter: none; backdrop-filter: none;
+    box-shadow: 0 0 10px var(--color-box-shadow);
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform .2s ease, visibility 0s linear .2s;
+  }
+  #joplix-app.jp-nav-open > .jp-sidebar { transform: none; visibility: visible; transition: transform .2s ease, visibility 0s; }
+  #joplix-app.jp-nav-open > .jp-nav-backdrop { display: block; position: absolute; inset: 0; z-index: 19; background: var(--color-box-shadow); }
+  #joplix button.jp-back,
+  #joplix button.jp-nav-toggle { display: inline-flex; }
   #joplix button.jp-tree-menu { opacity: 1; }
   #joplix .jp-note-area { padding: 0 16px; }
   #joplix .jp-segment button span:not(.jp-icon),
@@ -457,4 +482,9 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
   #joplix .jp-settings-panel-area { padding: 12px 16px 24px; }
   #joplix .jp-settings-close { position: fixed; top: 24px; right: 24px; }
   #joplix .jp-setting-card:not(.jp-about-card) { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #joplix-app > .jp-sidebar,
+  #joplix-app.jp-nav-open > .jp-sidebar,
+  #joplix button.jp-tree-toggle .jp-icon { transition: none; }
 }

@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.75",
+  "version": "2026.11.76",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-14",
   "channel": "beta",
-  "base_version": "2026.11.74",
+  "base_version": "2026.11.75",
   "build_date": "2026-11-14",
   "release_date": "2026-11-14",
-  "summary": "Readable note picker.",
+  "summary": "Notebook drawer on small screens, collapsible notebooks.",
   "updated": "2026-11-14",
-  "notes": "Fixes the Link to note dialog, whose result rows were squashed together when there were many matches."
+  "notes": "On small screens the notebook sidebar is a drawer opened with a menu button. Notebooks with sub-notebooks can be collapsed."
 }

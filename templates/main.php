@@ -24,8 +24,8 @@ if (is_readable($infoXml)) {
 ?>
 <link rel="icon" type="image/svg+xml" href="<?php p($faviconUrl); ?>">
 <div id="joplix" class="notranslate" translate="no">
-<div id="joplix-app" class="jp-view-mode jp-no-note" data-pane="nav" data-joplix-version="<?php p($joplixVersion); ?>" data-joplix-is-admin="<?php p($isAdmin ? '1' : '0'); ?>">
-  <aside class="jp-sidebar" data-jp-col="nav">
+<div id="joplix-app" class="jp-view-mode jp-no-note" data-pane="list" data-joplix-version="<?php p($joplixVersion); ?>" data-joplix-is-admin="<?php p($isAdmin ? '1' : '0'); ?>">
+  <aside class="jp-sidebar" id="jp-sidebar" data-jp-col="nav">
     <div class="jp-brand">
       <img class="jp-logo-img" src="<?php p($iconUrl); ?>" alt="">
       <div class="jp-brand-text"><strong>Joplix</strong><?php if ($isAdmin): ?><a id="jp-brand-update" class="jp-brand-update" href="#" target="_blank" rel="noopener" hidden></a><?php endif; ?></div>
@@ -35,12 +35,14 @@ if (is_readable($infoXml)) {
     <div id="jp-tree" class="jp-tree"></div>
     <button class="jp-settings-button" id="jp-open-settings" type="button"><span class="jp-icon" data-icon="cog"></span><span>Einstellungen</span></button>
   </aside>
+  <!-- Below 1025px the sidebar is a drawer over the list (class jp-nav-open on #joplix-app); this dims the rest. -->
+  <div class="jp-nav-backdrop" id="jp-nav-backdrop"></div>
 
   <div class="jp-resizer" id="jp-resize-left" data-resize="nav" title="Spaltenbreite ändern"></div>
 
   <section class="jp-list" data-jp-col="list">
     <div class="jp-list-head">
-      <button id="jp-back-to-nav" class="jp-icon-btn jp-back" type="button" title="Notizbücher" aria-label="Notizbücher"><span class="jp-icon" data-icon="arrowLeft"></span></button>
+      <button id="jp-nav-toggle" class="jp-icon-btn jp-nav-toggle" type="button" title="Notizbücher" aria-label="Notizbücher" aria-controls="jp-sidebar" aria-expanded="false"><span class="jp-icon" data-icon="menu"></span></button>
       <div class="jp-search-wrap"><span class="jp-icon" data-icon="magnify"></span><input id="jp-search" type="search" placeholder="Notizen durchsuchen …" aria-label="Notizen durchsuchen …"></div>
       <button id="jp-sort-button" class="jp-icon-btn" type="button" title="Sortierung umkehren" aria-label="Sortierung umkehren"><span class="jp-icon" data-icon="sort"></span></button>
       <button id="jp-empty-trash" class="jp-icon-btn jp-trash-only" type="button" title="Papierkorb leeren" aria-label="Papierkorb leeren"><span class="jp-icon" data-icon="delete"></span></button>

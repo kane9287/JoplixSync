@@ -1,3 +1,8 @@
+# Joplix 2026.11.76
+
+- Small screens (single-column view): the notebook list is now a sidebar that slides in over the notes, like the navigation in other Nextcloud apps such as Collectives. Open it with the menu button next to the search field; choosing a notebook, tapping beside it or pressing Escape hides it again.
+- Notebooks with sub-notebooks can be collapsed and expanded with the arrow in front of their name, as in the Joplin apps. Joplix remembers which notebooks are collapsed in this browser. Opening a note or notebook inside a collapsed notebook (for example through a note link) expands it again.
+
 # Joplix 2026.11.75
 
 - "Link to note": the result rows were squashed into each other when the list had more matches than fit; each row now shows its full title and notebook, and the list scrolls.

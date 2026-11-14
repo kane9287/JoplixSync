@@ -3,8 +3,6 @@
 
 ### Updated to include sync with a self hosted Joplin sync server.
 
-![Joplix Complete Overview](assets/media/promo-joplix-Joplix_Complete_Overview.png)
-
 Joplix is a modern, open-source notes and productivity application built for seamless Nextcloud integration. It lets you create, organize, edit, and synchronize your notes while keeping your data under your own control.  Joplix is currently the only tool that provides online access to Joplix, allowing you to access and work with your Joplix notes directly through a web browser.
 
 Joplix is a modern, open-source notes and productivity application designed for users who want to keep their notes, documents, and data under their own control.

@@ -1,4 +1,7 @@
-# Joplix
+# Joplix Xsync
+## Forked From: https://codeberg.org/Stoneubi/joplix
+
+### Updated to include sync with a self hosted Joplin sync server.
 
 ![Joplix Complete Overview](assets/media/promo-joplix-Joplix_Complete_Overview.png)
 

@@ -8,7 +8,7 @@ Joplix is a modern, open-source, notes and productivity application built for se
 ## Built for Nextcloud
 Joplix provides a central workspace for creating, editing, organizing, and synchronizing your notes. Notes can be structured with notebooks and tags. You can add attachments and files directly from your Nextcloud server. 
 
-Joplix is especially best for self-hosted environments where privacy, data ownership, and independence are important. Your data remains in your own Nextcloud environment, synchronization with a Joplin server keeps your Joplix workspace available across your devices.
+Joplix is best for self-hosted environments where privacy, data ownership, and independence are important. Your data remains in your own Nextcloud environment, synchronization with a Joplin server keeps your Joplix workspace available across your devices.
 
 ## Edit With Office 
 ### EuroOffice **ONLY** Other self hosted office editors are on the roadmap.

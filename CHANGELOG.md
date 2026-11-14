@@ -1,3 +1,11 @@
+# Joplix 2026.11.67
+
+- The integrated updater and the one-step installer now use the GitHub repository `kane9287/joplix-xsync` instead of Codeberg. A stored Codeberg update address is replaced by the GitHub address automatically.
+- A release no longer needs an attached package: if no `JoplixNC_v<version>.zip` asset exists, the source archive of the release tag is installed. The version in the tag must equal the version in `appinfo/info.xml`.
+- GitHub pre-releases form the Beta channel, regular releases the Main channel.
+- `install/install.sh` and `install/uninstall.sh` are complete, working scripts again (the previous files were truncated).
+- English mode now translates the whole interface, including status messages, dialogs, tooltips and the welcome dialog.
+
 # Joplix 2026.11.66-beta
 
 - Adds two-way synchronisation with a self-hosted Joplin Server (Settings › Synchronisation). Joplix pulls changes from the server into the Joplix folder and pushes edits, new items and deletions made in Joplix.

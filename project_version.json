@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.66",
+  "version": "2026.11.67",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-13",
   "channel": "beta",
-  "base_version": "2026.11.65",
+  "base_version": "2026.11.66",
   "build_date": "2026-11-13",
   "release_date": "2026-11-13",
-  "summary": "Two-way synchronisation with a self-hosted Joplin Server; the Nextcloud folder doubles as a versioned backup.",
+  "summary": "Complete English UI; updater and installer now use the GitHub repository kane9287/joplix-xsync.",
   "updated": "2026-11-13",
-  "notes": "Joplix can now synchronise its Nextcloud folder with a Joplin Server account (in-app and via a background job). Credentials are stored encrypted per user."
+  "notes": "The integrated updater and the one-step installer read releases from GitHub and can install a release from its tag source archive when no JoplixNC package is attached. English mode now translates the whole interface."
 }

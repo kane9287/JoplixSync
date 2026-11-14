@@ -130,7 +130,52 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  /**
  * @NoAdminRequired
  */ public function uploadResource(): JSONResponse{try{$r=$this->writer()->uploadResource((string)$this->request->getParam('filename','upload.bin'),(string)$this->request->getParam('mime','application/octet-stream'),(string)$this->request->getParam('data_base64',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
- 
+
+ // ---- Attach from Nextcloud. Paths are relative to the user's files root ("/Documents/a.pdf").
+ // The Joplin sync folder and the .joplix workspace are not offered and cannot be attached from.
+ private function cleanFilesPath(string $path): string{
+  $parts=[];foreach(explode('/',str_replace('\\','/',$path)) as $p){if($p===''||$p==='.')continue;if($p==='..')throw new \RuntimeException('Ungueltiger Pfad');$parts[]=$p;}
+  return '/'.implode('/',$parts);
+ }
+ private function isHiddenFilesPath(string $path): bool{
+  foreach([$this->joplinPath(),'/.joplix'] as $root){if($path===$root||str_starts_with($path,rtrim($root,'/').'/'))return true;}
+  return false;
+ }
+ private function filesNode(string $path){$uf=$this->userFolder();if($path==='/')return $uf;try{return $uf->get(ltrim($path,'/'));}catch(\OCP\Files\NotFoundException $e){throw new \RuntimeException('Nicht gefunden: '.$path);}}
+ /**
+ * @NoAdminRequired
+ * @NoCSRFRequired
+ */ public function browseFiles(): JSONResponse{
+  try{
+   $path=$this->cleanFilesPath((string)$this->request->getParam('path','/'));
+   if($this->isHiddenFilesPath($path))throw new \RuntimeException('Dieser Ordner kann nicht angezeigt werden');
+   $node=$this->filesNode($path);
+   if(!$node instanceof Folder)throw new \RuntimeException('Kein Ordner: '.$path);
+   $entries=[];
+   foreach($node->getDirectoryListing() as $child){
+    $name=$child->getName();if($name===''||$name[0]==='.')continue;
+    $p=rtrim($path,'/').'/'.$name;if($this->isHiddenFilesPath($p))continue;
+    $isDir=$child instanceof Folder;
+    $entries[]=['name'=>$name,'path'=>$p,'type'=>$isDir?'dir':'file','mime'=>$isDir?'':(string)$child->getMimeType(),'size'=>$isDir?0:(int)$child->getSize(),'mtime'=>(int)$child->getMTime()];
+   }
+   usort($entries,fn($a,$b)=>(($a['type']==='dir'?0:1)<=>($b['type']==='dir'?0:1))?:strnatcasecmp($a['name'],$b['name']));
+   $parent=$path==='/'?null:dirname($path);
+   return new JSONResponse(['path'=>$path,'parent'=>$parent,'entries'=>$entries]);
+  }catch(\Throwable $e){return $this->err($e);}
+ }
+ /**
+ * @NoAdminRequired
+ */ public function attachNextcloudFile(): JSONResponse{
+  try{
+   $path=$this->cleanFilesPath((string)$this->request->getParam('path',''));
+   if($path==='/'||$this->isHiddenFilesPath($path))throw new \RuntimeException('Diese Datei kann nicht angehaengt werden');
+   $node=$this->filesNode($path);
+   if(!$node instanceof \OCP\Files\File)throw new \RuntimeException('Keine Datei: '.$path);
+   $r=$this->writer()->createResourceFromStream($node->getName(),(string)$node->getMimeType(),$node->fopen('r'),(int)$node->getSize());
+   $this->rebuildIndex();
+   return new JSONResponse($r);
+  }catch(\Throwable $e){return $this->err($e);}
+ }
 
 
  public function updateReleases(): JSONResponse {

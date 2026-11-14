@@ -1,3 +1,11 @@
+# Joplix 2026.11.77
+
+- Attach files directly from Nextcloud: the "⋯" menu has a new item "Attach from Nextcloud", and the paperclip in the editor toolbar now asks whether to attach from this device or from Nextcloud. A picker shows your Nextcloud files (folders first, filter field, keyboard navigation) and opens in the folder you used last. The chosen file is copied on the server into the note as a normal Joplin attachment, so it syncs to the Joplin apps like an uploaded one, and large files do not have to pass through the browser.
+- Files larger than 25 MB are marked in the picker, and attaching one asks for confirmation first, because every attachment is transferred to each synced Joplin device. Nothing is blocked.
+- The Joplin sync folder itself and the Joplix workspace folder (`.joplix`) are not shown in the picker.
+- After attaching a file (from either source) the attachment list below the note updates right away; before, it only showed the new file after reopening the note.
+- A notebook's "⋯" menu could close immediately when opened again after it had been closed with Escape.
+
 # Joplix 2026.11.76
 
 - Small screens (single-column view): the notebook list is now a sidebar that slides in over the notes, like the navigation in other Nextcloud apps such as Collectives. Open it with the menu button next to the search field; choosing a notebook, tapping beside it or pressing Escape hides it again.

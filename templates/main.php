@@ -70,7 +70,8 @@ if (is_readable($infoXml)) {
           <div class="jp-more">
             <button id="jp-more-button" class="jp-icon-btn" type="button" title="Weitere Aktionen" aria-label="Weitere Aktionen" aria-haspopup="menu" aria-expanded="false"><span class="jp-icon" data-icon="dots"></span></button>
             <div id="jp-more-menu" class="jp-menu" role="menu" hidden>
-              <label class="jp-menu-item jp-upload jp-note-only"><span class="jp-icon" data-icon="paperclip"></span><span>Datei anhängen</span><input id="jp-resource-file" type="file"></label>
+              <label class="jp-menu-item jp-upload jp-note-only"><span class="jp-icon" data-icon="paperclip"></span><span>Vom Gerät anhängen</span><input id="jp-resource-file" type="file"></label>
+              <button id="jp-attach-nextcloud" class="jp-menu-item jp-note-only" type="button" role="menuitem"><span class="jp-icon" data-icon="cloud"></span><span>Aus Nextcloud anhängen</span></button>
               <button id="jp-rebuild-index" class="jp-menu-item" type="button" role="menuitem"><span class="jp-icon" data-icon="refresh"></span><span>Index neu aufbauen</span></button>
               <button id="jp-delete-note" class="jp-menu-item danger jp-note-only" type="button" role="menuitem"><span class="jp-icon" data-icon="delete"></span><span>Notiz löschen</span></button>
             </div>

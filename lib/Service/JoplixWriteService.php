@@ -77,22 +77,33 @@ class JoplixWriteService {
  public function uploadResource(string $filename,string $mime,string $dataBase64): array{
   $bin=base64_decode($dataBase64,true);
   if($bin===false)throw new \RuntimeException('Ungueltige Base64-Daten');
-  if($bin==='')throw new \RuntimeException('Leere Ressource kann nicht angehaengt werden');
+  return $this->createResource($filename,$mime,$bin,strlen($bin));
+ }
+ // Attach a file from the user's Nextcloud: the content is streamed straight into .resource/<id>,
+ // so large files never pass through the browser or PHP's upload limits.
+ /** @param resource $stream */
+ public function createResourceFromStream(string $filename,string $mime,$stream,int $size): array{
+  if(!is_resource($stream))throw new \RuntimeException('Datei konnte nicht gelesen werden');
+  try{return $this->createResource($filename,$mime,$stream,$size);}finally{if(is_resource($stream))fclose($stream);}
+ }
+ /** @param string|resource $content */
+ private function createResource(string $filename,string $mime,$content,int $size): array{
+  if($size<=0)throw new \RuntimeException('Leere Ressource kann nicht angehaengt werden');
   $safeName=$this->cleanResourceFileName($filename);
   $mime=$this->cleanMime($mime,$safeName);
   $id=$this->model->newId();
   $now=$this->model->now();
   $ext=strtolower(pathinfo($safeName,PATHINFO_EXTENSION));
   $blobMs=(string)round(microtime(true)*1000);
-  $item=['_body'=>$safeName,'id'=>$id,'mime'=>$mime,'filename'=>'','created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'file_extension'=>$ext,'encryption_cipher_text'=>'','encryption_applied'=>'0','encryption_blob_encrypted'=>'0','size'=>(string)strlen($bin),'is_shared'=>'0','share_id'=>'','master_key_id'=>'','user_data'=>'','blob_updated_time'=>$blobMs,'ocr_text'=>'','ocr_details'=>'','ocr_status'=>'0','ocr_error'=>'','ocr_driver_id'=>'1','is_locked'=>'0','type_'=>'4'];
+  $item=['_body'=>$safeName,'id'=>$id,'mime'=>$mime,'filename'=>'','created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'file_extension'=>$ext,'encryption_cipher_text'=>'','encryption_applied'=>'0','encryption_blob_encrypted'=>'0','size'=>(string)$size,'is_shared'=>'0','share_id'=>'','master_key_id'=>'','user_data'=>'','blob_updated_time'=>$blobMs,'ocr_text'=>'','ocr_details'=>'','ocr_status'=>'0','ocr_error'=>'','ocr_driver_id'=>'1','is_locked'=>'0','type_'=>'4'];
   if(!$this->folder->nodeExists('.resource'))$this->folder->newFolder('.resource');
   $rf=$this->folder->get('.resource');
   if(!$rf instanceof Folder)throw new \RuntimeException('.resource ist kein Ordner');
   $this->writeNew($id,$item);
   if($rf->nodeExists($id))$rf->get($id)->delete();
-  $rf->newFile($id,$bin);
+  $rf->newFile($id,$content);
   if(!$this->folder->nodeExists($id.'.md')||!$rf->nodeExists($id))throw new \RuntimeException('Ressource konnte nicht vollstaendig angelegt werden');
-  return ['id'=>$id,'title'=>$safeName,'mime'=>$mime,'file_extension'=>$ext,'size'=>strlen($bin),'markdown'=>'['.$safeName.'](:/'.$id.')'];
+  return ['id'=>$id,'title'=>$safeName,'mime'=>$mime,'file_extension'=>$ext,'size'=>$size,'markdown'=>'['.$safeName.'](:/'.$id.')'];
  }
  public function updateResourceBinary(string $id,string $binary,string $knownHash=''): array{
   if($binary==='')throw new \RuntimeException('Leere Ressource kann nicht gespeichert werden');

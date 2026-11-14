@@ -383,6 +383,20 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 #joplix .jp-modal .jp-note-picker-item.active { background: var(--color-background-hover); }
 #joplix .jp-note-picker-item strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #joplix .jp-note-picker-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--jp-muted); font-size: 12px; }
+/* Nextcloud file picker (attach from Nextcloud): rows are icon | name | size, built on the note picker. */
+#joplix .jp-file-picker { width: min(640px, 100%); }
+#joplix .jp-file-picker-path { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-width: 0; }
+#joplix .jp-file-picker-path button { min-height: 0; height: auto; padding: 2px 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#joplix .jp-file-picker-path button:last-child { font-weight: bold; }
+#joplix .jp-file-picker-sep { color: var(--jp-muted); }
+#joplix .jp-modal .jp-file-picker-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: 8px; }
+#joplix .jp-file-picker-item > .jp-icon { color: var(--jp-muted); }
+#joplix .jp-file-picker-item .jp-file-picker-size { display: inline-flex; align-items: center; gap: 4px; justify-self: end; }
+#joplix .jp-file-picker-item .jp-file-picker-size span { color: inherit; }
+#joplix .jp-file-picker-item.jp-file-large .jp-file-picker-size { color: var(--color-warning-text, var(--color-warning)); }
+@media (max-width: 600px) {
+  #joplix .jp-file-picker-item.jp-file-large .jp-file-picker-size > span:not(.jp-icon) { display: none; }
+}
 
 #joplix .jp-welcome-modal { width: min(560px, 100%); }
 #joplix .jp-welcome-close { position: absolute; top: 12px; right: 12px; }

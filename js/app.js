@@ -47,7 +47,11 @@ image:'M8.5,13.5L11,16.5L14.5,12L19,18H5M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0
 note:'M5,3C3.89,3 3,3.89 3,5V19C3,20.11 3.89,21 5,21H19C20.11,21 21,20.11 21,19V5C21,3.89 20.11,3 19,3H5M5,5H19V19H5V5M7,7V9H17V7H7M7,11V13H17V11H7M7,15V17H14V15H7Z',
 restore:'M13,3A9,9 0 0,0 4,12H1L4.89,15.89L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3Z',
 folderMove:'M14,18V15H10V11H14V8L19,13M20,6H12L10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6Z',
-folderPlus:'M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4C2.89,20 2,19.1 2,18V6C2,4.89 2.89,4 4,4H10M15,9V12H12V14H15V17H17V14H20V12H17V9H15Z'
+folderPlus:'M10,4L12,6H20A2,2 0 0,1 22,8V18A2,2 0 0,1 20,20H4C2.89,20 2,19.1 2,18V6C2,4.89 2.89,4 4,4H10M15,9V12H12V14H15V17H17V14H20V12H17V9H15Z',
+folder:'M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z',
+cloud:'M19.35,10.03C18.67,6.59 15.64,4 12,4C9.11,4 6.6,5.64 5.35,8.03C2.34,8.36 0,10.9 0,14A6,6 0 0,0 6,20H19A5,5 0 0,0 24,15C24,12.36 21.95,10.22 19.35,10.03Z',
+arrowUp:'M13,20H11V8L5.5,13.5L4.08,12.08L12,4.16L19.92,12.08L18.5,13.5L13,8V20Z',
+alert:'M13,14H11V9H13M13,18H11V16H13M1,21H23L12,2L1,21Z'
 };
 function jpIcon(name){return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="'+(JP_ICONS[name]||'')+'"/></svg>';}
 function jpIconEl(name){const s=document.createElement('span');s.className='jp-icon';s.innerHTML=jpIcon(name);return s;}
@@ -1014,6 +1018,9 @@ function closePdfViewer(){const o=$('jp-pdf-viewer-overlay'),f=$('jp-pdf-viewer-
 function closeNotebookMenu(){
   const old=document.querySelector('.jp-context-menu');
   if(old)old.remove();
+  // Also drop the pending outside-click listener: after an Escape close it would otherwise close the next menu
+  // the moment its opening click bubbles up.
+  document.removeEventListener('click',closeNotebookMenu);
   document.removeEventListener('scroll',closeNotebookMenu,true);
   window.removeEventListener('resize',closeNotebookMenu);
   document.removeEventListener('keydown',closeNotebookMenuByEscape,true);
@@ -1022,12 +1029,21 @@ function closeNotebookMenuByEscape(ev){
   if(ev && ev.key==='Escape'){ev.stopPropagation();closeNotebookMenu();}
 }
 function showNotebookMenu(node,row,button){
+  const en=resolvedLanguage()==='en';
+  jpShowMenu(button,[
+    {act:'rename',icon:'pencil',label:en?'Rename':'Umbenennen',run:()=>renameNotebookNode(node)},
+    {act:'newchild',icon:'folderPlus',label:en?'New sub-notebook':'Neues Unter-Notizbuch',run:()=>newNotebook(node.id)},
+    {act:'delete',icon:'delete',label:en?'Delete':'Löschen',cls:'danger',run:()=>deleteNotebookNode(node)}
+  ]);
+}
+// Small action menu anchored to a button (notebook "⋯", attach source). items: [{act,icon,label,cls,run}].
+// Only one exists at a time (.jp-context-menu); closes on outside click, scroll, resize and Escape.
+function jpShowMenu(button,items){
   closeNotebookMenu();
   const menu=document.createElement('div');
   menu.className='jp-context-menu jp-menu open';
   menu.setAttribute('role','menu');
-  const en=resolvedLanguage()==='en';
-  menu.innerHTML=jpMenuItem('rename','pencil',en?'Rename':'Umbenennen')+jpMenuItem('newchild','folderPlus',en?'New sub-notebook':'Neues Unter-Notizbuch')+jpMenuItem('delete','delete',en?'Delete':'Löschen','danger');
+  menu.innerHTML=items.map(i=>jpMenuItem(i.act,i.icon,i.label,i.cls)).join('');
   menu.addEventListener('click',ev=>ev.stopPropagation());
   jpRoot().appendChild(menu);
   // Opens below the button like a Nextcloud action menu; flips above when there is no room.
@@ -1037,9 +1053,7 @@ function showNotebookMenu(node,row,button){
   if(top+menu.offsetHeight>(window.innerHeight||0)-margin)top=Math.max(margin,rect.top-menu.offsetHeight-4);
   menu.style.left=Math.round(left)+'px';
   menu.style.top=Math.round(top)+'px';
-  menu.querySelector('[data-act="rename"]').onclick=()=>{closeNotebookMenu();renameNotebookNode(node);};
-  menu.querySelector('[data-act="newchild"]').onclick=()=>{closeNotebookMenu();newNotebook(node.id);};
-  menu.querySelector('[data-act="delete"]').onclick=()=>{closeNotebookMenu();deleteNotebookNode(node);};
+  items.forEach(i=>{menu.querySelector('[data-act="'+i.act+'"]').onclick=()=>{closeNotebookMenu();i.run();};});
   setTimeout(()=>{
     document.addEventListener('click',closeNotebookMenu,{once:true});
     document.addEventListener('scroll',closeNotebookMenu,true);
@@ -1170,10 +1184,115 @@ async function uploadResource(file){
   });
   if(state.note?.id!==noteId||state.noteLoading)throw new Error(t('Die ursprüngliche Notiz ist nicht mehr geöffnet.'));
   const resource=await api('/api/resources',{method:'POST',body:{filename:file.name,mime:file.type||mimeFromFilename(file.name),data_base64:data}});
+  await appendResourceLink(noteId,resource);
+}
+// Shared tail of both attach sources: append the resource link to the note it was started from, then save.
+async function appendResourceLink(noteId,resource){
   if(state.note?.id!==noteId||state.noteLoading)throw new Error(t('Anhang hochgeladen. Der Link konnte der ursprünglichen Notiz nicht hinzugefügt werden: ')+resource.markdown);
   $('jp-body').value+='\n\n'+resource.markdown;
   markDirty();
   await saveNote();
+  // The attachment list is otherwise only rendered when a note is opened; fetch the server's view of it.
+  forgetNote(noteId);
+  try{const n=await api('/api/notes/'+noteId);if(state.note?.id===noteId&&!state.noteLoading){state.note.resources=n.resources||[];renderResources(state.note.resources);}}catch(e){}
+}
+// Paperclip in the editor toolbar: choose the attach source.
+function showAttachMenu(button){
+  if(!button){const f=$('jp-resource-file');if(f)f.click();return;}
+  jpShowMenu(button,[
+    {act:'device',icon:'paperclip',label:t('Vom Gerät anhängen'),run:()=>{const f=$('jp-resource-file');if(f)f.click();}},
+    {act:'nextcloud',icon:'cloud',label:t('Aus Nextcloud anhängen'),run:()=>attachFromNextcloud().catch(e=>jpAlert(e.message))}
+  ]);
+}
+// Files above this size get a warning in the picker and a confirmation: every attachment is uploaded to
+// Joplin Server and downloaded by every Joplin client. Warning only, no limit.
+const JP_ATTACH_WARN_BYTES=25*1024*1024;
+function jpAttachFolder(){try{return localStorage.getItem('joplix.attachFolder')||'/';}catch(e){return '/';}}
+function jpSetAttachFolder(path){try{localStorage.setItem('joplix.attachFolder',path);}catch(e){}}
+async function attachFromNextcloud(){
+  if(!state.note){jpAlert(t('Bitte zuerst eine Notiz öffnen.'));return;}
+  if(state.note.is_deleted)return;
+  const noteId=state.note.id;
+  let entry=null;
+  for(;;){
+    entry=await jpPickNextcloudFile();
+    if(!entry)return;
+    if(entry.size<=JP_ATTACH_WARN_BYTES)break;
+    const ok=await jpConfirm(entry.name+' ('+formatBytes(entry.size)+')',{title:t('Datei ist größer als 25 MB. Trotzdem anhängen?'),confirmLabel:t('Anhängen')});
+    if(ok)break;
+  }
+  if(state.note?.id!==noteId||state.noteLoading)throw new Error(t('Die ursprüngliche Notiz ist nicht mehr geöffnet.'));
+  status(t('Anhang wird kopiert …'),'warning');
+  const resource=await api('/api/resources/from-files',{method:'POST',body:{path:entry.path}});
+  await appendResourceLink(noteId,resource);
+  status(t('Anhang hinzugefügt: ')+resource.title,'ok');
+}
+// Picker over the user's Nextcloud files (GET /api/files). Resolves with a file entry
+// {name,path,type,mime,size,mtime} or null. Opens in the folder used last.
+function jpPickNextcloudFile(){
+  return jpDialog({title:t('Datei aus Nextcloud wählen'),cancelValue:null,buttons:[{label:t('Abbrechen'),value:null}],mount:(modal,finish)=>{
+    modal.classList.add('jp-file-picker');
+    const crumbs=document.createElement('div');crumbs.className='jp-file-picker-path';
+    const input=document.createElement('input');input.type='search';input.className='jp-note-picker-search';input.placeholder=t('In diesem Ordner filtern');input.setAttribute('aria-label',t('In diesem Ordner filtern'));
+    const list=document.createElement('div');list.className='jp-note-picker-list jp-file-picker-list';list.setAttribute('role','listbox');
+    modal.appendChild(crumbs);modal.appendChild(input);modal.appendChild(list);
+    let data=null,shown=[],active=0,seq=0;
+    const message=text=>{list.innerHTML='';const p=document.createElement('p');p.className='jp-muted';p.textContent=text;list.appendChild(p);};
+    const mark=()=>list.querySelectorAll('.jp-note-picker-item').forEach((el,i)=>{el.classList.toggle('active',i===active);el.setAttribute('aria-selected',i===active?'true':'false');if(i===active)el.scrollIntoView({block:'nearest'});});
+    const choose=e=>{if(!e)return;if(e.type==='up'||e.type==='dir')load(e.path);else finish(e);};
+    const renderCrumbs=path=>{
+      crumbs.innerHTML='';
+      const parts=path.split('/').filter(Boolean);
+      const add=(label,target)=>{const b=document.createElement('button');b.type='button';b.className='jp-btn-tertiary';b.textContent=label;b.onclick=()=>load(target);crumbs.appendChild(b);};
+      add(t('Dateien'),'/');
+      parts.forEach((p,i)=>{const s=document.createElement('span');s.className='jp-file-picker-sep';s.textContent='/';crumbs.appendChild(s);add(p,'/'+parts.slice(0,i+1).join('/'));});
+    };
+    const render=()=>{
+      if(!data)return;
+      const q=normalizeSearchText(input.value).trim();
+      shown=data.entries.filter(e=>!q||normalizeSearchText(e.name).includes(q));
+      if(data.parent!==null&&!q)shown.unshift({type:'up',name:t('Übergeordneter Ordner'),path:data.parent});
+      active=0;list.innerHTML='';
+      if(!shown.length){message(q?t('Keine Treffer'):t('Leerer Ordner'));return;}
+      shown.forEach((e,i)=>{
+        const b=document.createElement('button');b.type='button';b.className='jp-note-picker-item jp-file-picker-item';b.setAttribute('role','option');b.tabIndex=-1;
+        const large=e.type==='file'&&e.size>JP_ATTACH_WARN_BYTES;
+        if(large)b.classList.add('jp-file-large');
+        b.appendChild(jpIconEl(e.type==='up'?'arrowUp':e.type==='dir'?'folder':(String(e.mime||'').startsWith('image/')?'image':'file')));
+        const name=document.createElement('strong');name.textContent=e.name;b.appendChild(name);
+        if(e.type==='file'){
+          const meta=document.createElement('span');meta.className='jp-file-picker-size';meta.textContent=formatBytes(e.size);
+          if(large){meta.appendChild(jpIconEl('alert'));const w=document.createElement('span');w.textContent=t('Groß – wird auf jedes synchronisierte Gerät übertragen');meta.appendChild(w);b.title=t('Datei ist größer als 25 MB');}
+          b.appendChild(meta);
+        }
+        b.onclick=()=>choose(e);b.onmouseenter=()=>{active=i;mark();};
+        list.appendChild(b);
+      });
+      mark();
+    };
+    const load=async path=>{
+      const my=++seq;message(t('Wird geladen …'));
+      try{
+        const d=await api('/api/files?path='+encodeURIComponent(path));
+        if(my!==seq)return;
+        data={path:d.path,parent:d.parent,entries:d.entries||[]};jpSetAttachFolder(d.path);
+        input.value='';renderCrumbs(d.path);render();input.focus();
+      }catch(err){
+        if(my!==seq)return;
+        // A remembered folder that no longer exists falls back to the root once.
+        if(path!=='/'){load('/');return;}
+        message(err.message);
+      }
+    };
+    input.addEventListener('input',render);
+    input.addEventListener('keydown',ev=>{
+      if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();if(!shown.length)return;active=(active+(ev.key==='ArrowDown'?1:shown.length-1))%shown.length;mark();}
+      else if(ev.key==='Enter'){ev.preventDefault();choose(shown[active]);}
+      else if(ev.key==='Backspace'&&!input.value&&data&&data.parent!==null){ev.preventDefault();load(data.parent);}
+    });
+    load(jpAttachFolder());
+    return input;
+  }});
 }
 function normalizeLocalTags(tags){
   const seen=new Set();
@@ -1519,8 +1638,8 @@ async function insertNoteLink(){
 }
 function jpFormatDateTime(){const d=new Date();try{return new Intl.DateTimeFormat('de-AT',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(d).replace(',', '');}catch(e){return d.toLocaleString();}}
 function continueMarkdownList(ev){const ta=$('jp-body');if(!ta||ev.key!=='Enter'||ev.shiftKey||ev.altKey||ev.ctrlKey||ev.metaKey)return;const val=ta.value||'',pos=ta.selectionStart||0;if(pos!==ta.selectionEnd)return;const lineStart=val.lastIndexOf('\n',pos-1)+1;const line=val.slice(lineStart,pos);const indent=(line.match(/^\s*/)||[''])[0];let marker='';if(/^\s*- \[ \]\s*$/.test(line)||/^\s*-\s*$/.test(line)||/^\s*\d+\.\s*$/.test(line)){ev.preventDefault();pushEditorUndo(val);applyEditorValue(val.slice(0,lineStart)+val.slice(pos),lineStart);return;}if(/^\s*- \[ \] /.test(line))marker=indent+'- [ ] ';else if(/^\s*- /.test(line))marker=indent+'- ';else{const m=line.match(/^(\s*)(\d+)\. /);if(m)marker=m[1]+(parseInt(m[2],10)+1)+'. ';}if(marker){ev.preventDefault();jpInsertAtCursor('\n'+marker);}}
-function handleEditorTool(action){const ta=$('jp-body');if(!ta)return;if(action==='undo'){editorUndo();return;}if(action==='bold')return jpReplaceSelection('**','**','Text');if(action==='italic')return jpReplaceSelection('*','*','Text');if(action==='link')return jpReplaceSelection('[','](https://)',t('Linktext'));if(action==='code')return jpReplaceSelection('`','`','code');if(action==='notelink'){insertNoteLink().catch(e=>jpAlert(e.message));return;}if(action==='resource'){const f=$('jp-resource-file');if(f)f.click();return;}if(action==='ul')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- ');if(action==='ol')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'1. ');if(action==='todo')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- [ ] ');if(action==='h2')return jpInsertAtCursor('\n## ');if(action==='hr')return jpInsertAtCursor('\n\n---\n\n');if(action==='datetime')return jpInsertAtCursor(jpFormatDateTime());if(action==='marker')return jpReplaceSelection('==','==',t('Markierung'));}
-function setupEditorFormatbar(){document.querySelectorAll('[data-jp-editor]').forEach(b=>b.addEventListener('click',ev=>{ev.preventDefault();handleEditorTool(b.dataset.jpEditor);}));const ta=$('jp-body');if(ta){resetEditorHistory(ta.value||'');ta.addEventListener('keydown',continueMarkdownList);ta.addEventListener('input',()=>{const h=state.editorHistory||(state.editorHistory={undo:[],last:'',max:80});if(h.last!==ta.value){h.undo.push(h.last);while(h.undo.length>(h.max||80))h.undo.shift();h.last=ta.value;}});}}
+function handleEditorTool(action,button){const ta=$('jp-body');if(!ta)return;if(action==='undo'){editorUndo();return;}if(action==='bold')return jpReplaceSelection('**','**','Text');if(action==='italic')return jpReplaceSelection('*','*','Text');if(action==='link')return jpReplaceSelection('[','](https://)',t('Linktext'));if(action==='code')return jpReplaceSelection('`','`','code');if(action==='notelink'){insertNoteLink().catch(e=>jpAlert(e.message));return;}if(action==='resource'){showAttachMenu(button);return;}if(action==='ul')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- ');if(action==='ol')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'1. ');if(action==='todo')return jpInsertAtCursor((ta.selectionStart>0&&!ta.value.slice(0,ta.selectionStart).endsWith('\n')?'\n':'')+'- [ ] ');if(action==='h2')return jpInsertAtCursor('\n## ');if(action==='hr')return jpInsertAtCursor('\n\n---\n\n');if(action==='datetime')return jpInsertAtCursor(jpFormatDateTime());if(action==='marker')return jpReplaceSelection('==','==',t('Markierung'));}
+function setupEditorFormatbar(){document.querySelectorAll('[data-jp-editor]').forEach(b=>b.addEventListener('click',ev=>{ev.preventDefault();handleEditorTool(b.dataset.jpEditor,b);}));const ta=$('jp-body');if(ta){resetEditorHistory(ta.value||'');ta.addEventListener('keydown',continueMarkdownList);ta.addEventListener('input',()=>{const h=state.editorHistory||(state.editorHistory={undo:[],last:'',max:80});if(h.last!==ta.value){h.undo.push(h.last);while(h.undo.length>(h.max||80))h.undo.shift();h.last=ta.value;}});}}
 
 function getInstalledVersion(){const app=document.getElementById('joplix-app');const v=(app&&app.dataset&&app.dataset.joplixVersion)||'';return parseJoplixVersionText(v)?parseJoplixVersionText(v).text:v||'0.0.0';}
 function syncInstalledVersionUi(){const v=getInstalledVersion();const el=$('jp-update-installed-version');if(el)el.textContent='Joplix '+v;}
@@ -1771,7 +1890,7 @@ const JP_EN={
 'Update-Einstellungen gespeichert.':'Update settings saved.',
 'Update-Einstellungen konnten nicht gespeichert werden: ':'Update settings could not be saved: ',
 // UI refresh 2026.11.69
-'Neues Notizbuch':'New notebook','Notizen durchsuchen …':'Search notes …','Sortierung umkehren':'Reverse sort order','Zurück':'Back','Vorschau':'Preview','Weitere Aktionen':'More actions','Datei anhängen':'Attach file','Notiz löschen':'Delete note',
+'Neues Notizbuch':'New notebook','Notizen durchsuchen …':'Search notes …','Sortierung umkehren':'Reverse sort order','Zurück':'Back','Vorschau':'Preview','Weitere Aktionen':'More actions','Datei anhängen':'Attach file','Vom Gerät anhängen':'Attach from device','Aus Nextcloud anhängen':'Attach from Nextcloud','Datei aus Nextcloud wählen':'Choose a file from Nextcloud','In diesem Ordner filtern':'Filter this folder','Übergeordneter Ordner':'Parent folder','Leerer Ordner':'Empty folder','Wird geladen …':'Loading …','Dateien':'Files','Anhängen':'Attach','Anhang wird kopiert …':'Copying attachment …','Anhang hinzugefügt: ':'Attachment added: ','Datei ist größer als 25 MB. Trotzdem anhängen?':'File is larger than 25 MB. Attach anyway?','Datei ist größer als 25 MB':'File is larger than 25 MB','Groß – wird auf jedes synchronisierte Gerät übertragen':'Large – transferred to every synced device','Notiz löschen':'Delete note',
 'Wähle eine Notiz aus der Liste oder lege eine neue an.':'Select a note from the list or create a new one.','Joplix-Einstellungen':'Joplix settings','Spaltenbreiten':'Column widths','Setzt die Breite der Spalten auf den Standard zurück.':'Resets the column widths to their defaults.','Zurücksetzen':'Reset',
 'OK':'OK','Abbrechen':'Cancel','Verwerfen':'Discard','Verschieben':'Move','Ohne Titel':'Untitled','Notiz gespeichert':'Note saved','Ungespeicherte Änderungen':'Unsaved changes','Diese Notiz hat ungespeicherte Änderungen.':'This note has unsaved changes.',
 'Tags bearbeiten':'Edit tags','Mehrere Tags mit Komma trennen. Entfernte Namen werden von dieser Notiz gelöst.':'Separate multiple tags with commas. Removed names are detached from this note.',
@@ -2010,6 +2129,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if($('jp-empty-trash'))$('jp-empty-trash').onclick=()=>emptyTrash().catch(e=>jpAlert(e.message));
   if($('jp-rebuild-index'))$('jp-rebuild-index').onclick=()=>rebuildAndRestore().catch(e=>jpAlert(e.message));
   if($('jp-resource-file'))$('jp-resource-file').onchange=e=>{if(e.target.files[0])uploadResource(e.target.files[0]).catch(err=>jpAlert(err.message));};
+  if($('jp-attach-nextcloud'))$('jp-attach-nextcloud').onclick=()=>attachFromNextcloud().catch(err=>jpAlert(err.message));
   if($('jp-search'))$('jp-search').addEventListener('input',e=>runFullTextSearch(e.target.value));
   if($('jp-sort-button'))$('jp-sort-button').onclick=()=>{state.sort=state.sort==='updated_desc'?'updated_asc':'updated_desc';persistSettings({sort_order:state.sort}).catch(()=>{});if(state.notebookId)selectNotebook(state.notebookId);};
   updateSaveButton(); load().catch(e=>jpAlert(e.message)).then(()=>{if(!state.notebookId)setNavOpen(true);}).then(()=>loadSyncStatus()).then(()=>{if(syncEnabled()){syncState.lastAuto=Date.now();runSync().catch(()=>{});}});

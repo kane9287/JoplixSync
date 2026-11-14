@@ -25,6 +25,8 @@ return ['routes'=>[
  ['name'=>'api#remove_note_tag','url'=>'/api/notes/{id}/tags/{tagId}','verb'=>'DELETE'],
  ['name'=>'api#create_and_assign_tag','url'=>'/api/notes/{id}/tags/create','verb'=>'POST'],
  ['name'=>'api#upload_resource','url'=>'/api/resources','verb'=>'POST'],
+ ['name'=>'api#attach_nextcloud_file','url'=>'/api/resources/from-files','verb'=>'POST'],
+ ['name'=>'api#browse_files','url'=>'/api/files','verb'=>'GET'],
  ['name'=>'api#resource_data','url'=>'/api/resources/{id}/data','verb'=>'GET'],
  ['name'=>'api#start_office_edit','url'=>'/api/resources/{id}/office/start','verb'=>'POST'],
  ['name'=>'api#office_edit_status','url'=>'/api/resources/{id}/office/status','verb'=>'GET'],

@@ -87,6 +87,17 @@ if [[ $WEBUSER == root ]]; then
 fi
 id "$WEBUSER" >/dev/null 2>&1 && [[ $(id -u "$WEBUSER") != 0 ]] ||
     fail "Invalid PHP user. Set WEBUSER to the account that runs Nextcloud (for example www-data)."
+# The official Nextcloud Docker image takes PHP settings (memory_limit and others) from container
+# environment variables. sudo and su drop them; PHP and occ then print warnings in front of their real
+# output. Restore missing PHP_* variables from the container's main process (harmless elsewhere).
+if [[ -r /proc/1/environ ]]; then
+    while IFS= read -r -d '' kv; do
+        name=${kv%%=*}
+        if [[ $kv == PHP_*=* && $name =~ ^PHP_[A-Z0-9_]+$ && -z ${!name+x} ]]; then
+            export "$kv"
+        fi
+    done < /proc/1/environ
+fi
 # stdin is detached: under "curl ... | bash" stdin is the script itself and must not be read by PHP.
 run_php() {
     runuser -u "$WEBUSER" -- "$PHP_BIN" -d apc.enable_cli=1 "$@" < /dev/null
@@ -96,7 +107,7 @@ occ() {
 }
 
 # Honour the configured app paths and keep an existing installation where it is.
-APP_PATHS=$(occ config:list system --output=json | jq -ec --arg path "$NC_DIR/apps" '
+APP_PATHS=$(occ config:list system --output=json | sed -n '/^{/,$p' | jq -ec --arg path "$NC_DIR/apps" '
     .system | if type != "object" then error("Nextcloud system configuration is missing")
     elif has("apps_paths") then .apps_paths | if type == "array" then . else error("Invalid apps_paths") end
     else [{path: $path, writable: true}] end

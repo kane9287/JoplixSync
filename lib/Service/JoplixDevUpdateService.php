@@ -224,7 +224,10 @@ class JoplixDevUpdateService {
     }
 
     private function validateApp(string $source): string {
-        $info = $source === '' ? false : @simplexml_load_file($source . '/appinfo/info.xml', \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        // Read the file ourselves and parse the string: inside a Nextcloud request libxml's external entity
+        // loader is replaced by one that loads nothing, so simplexml_load_file() fails for every file.
+        $xml = $source === '' ? false : @file_get_contents($source . '/appinfo/info.xml');
+        $info = ($xml === false || $xml === '') ? false : @simplexml_load_string($xml, \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
         if ($info === false || (string)$info->id !== 'joplix' || !preg_match('/^\d+\.\d+\.\d+$/D', (string)$info->version)) {
             throw new \RuntimeException('ZIP enthaelt keine gueltige Joplix-App.');
         }

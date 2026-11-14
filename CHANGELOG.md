@@ -1,3 +1,8 @@
+# Joplix 2026.11.72
+
+- Fixes the in-app updater (Settings › Update), which rejected every release with "ZIP enthaelt keine gueltige Joplix-App".
+- Installations up to 2026.11.71 still contain the faulty updater: update them once with `install/install.sh`. From 2026.11.72 on, updating inside Nextcloud works.
+
 # Joplix 2026.11.71
 
 - A newly created note now appears in the note list, and the notebook count goes up, right after saving. Title changes also reach the list without reloading the page.

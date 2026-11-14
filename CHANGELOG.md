@@ -1,3 +1,7 @@
+# Joplix 2026.11.71
+
+- A newly created note now appears in the note list, and the notebook count goes up, right after saving. Title changes also reach the list without reloading the page.
+
 # Joplix 2026.11.70
 
 - The notebook sidebar now uses the Nextcloud navigation background, so it is translucent over the wallpaper like in other Nextcloud apps.

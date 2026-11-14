@@ -1220,6 +1220,13 @@ async function backgroundRefresh(){
       status(t('Änderungen erkannt. Index wird im Hintergrund aktualisiert...'),'warning');
       const r=await api('/api/index/rebuild',{method:'POST'});
       applyIndexPreservingFocus(r.index||r,state.dirty?t('Index aktualisiert. Geöffnete Notiz wegen ungespeicherter Änderungen nicht überschrieben.'):t('Index im Hintergrund aktualisiert'));
+    } else if(st.fingerprint&&state.index&&state.index.fingerprint!==st.fingerprint){
+      // "current" only says the server index matches the files. Write endpoints (create/update note,
+      // notebooks, tags) rebuild it on the server themselves, so it can be current and still newer than
+      // the copy in this browser: fetch it, otherwise a new note is missing from the list until a reload.
+      const idx=await api('/api/index');
+      if(idx&&!isEmptyIndex(idx))applyIndexPreservingFocus(idx,state.dirty?t('Index aktualisiert. Geöffnete Notiz wegen ungespeicherter Änderungen nicht überschrieben.'):t('Index im Hintergrund aktualisiert'));
+      if($('jp-search')&&$('jp-search').value.trim())runFullTextSearch($('jp-search').value);
     } else {
       status(t('Index aktuell'),'ok');
     }

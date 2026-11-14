@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.70",
+  "version": "2026.11.71",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-14",
   "channel": "beta",
-  "base_version": "2026.11.69",
+  "base_version": "2026.11.70",
   "build_date": "2026-11-14",
   "release_date": "2026-11-14",
-  "summary": "Translucent notebook sidebar like other Nextcloud apps; browsers no longer offer to translate the page.",
+  "summary": "New and renamed notes appear in the list without reloading the page.",
   "updated": "2026-11-14",
-  "notes": "The sidebar uses the Nextcloud navigation background (blurred wallpaper). The page is marked as not to be translated, and English is applied before the settings request finishes."
+  "notes": "The background index check now also fetches the server index when it is newer than the copy held in the browser."
 }

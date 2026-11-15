@@ -507,17 +507,24 @@ function showNoteLoading(id,title=''){
   updateNotePath();
   updateSaveButton();
 }
+// Shows a note. When it is the note already open (refresh after saving, index refresh, synchronisation),
+// the current mode stays (no jump from editing back to the preview), and if the text is unchanged the
+// fields are not touched, so cursor position and undo history survive.
 function renderNoteToEditor(n,fromCache=false){
+  const same=!!(state.note&&state.note.id===n.id&&state.noteId===n.id&&!state.noteLoading);
+  const unchanged=same&&!!$('jp-body')&&$('jp-body').value===(n.body||'')&&!!$('jp-title')&&$('jp-title').value===(n.title||'');
+  const keepEdit=same&&state.displayMode==='edit'&&!n.is_deleted;
   state.note=n;state.noteId=n.id;state.noteLoading=false;setHasNote(true);setTrashNote(n.is_deleted);
   ensureNoteSelected(n.id);
-  if($('jp-title'))$('jp-title').value=n.title||'';
-  if($('jp-body')){$('jp-body').classList.remove('jp-note-loading');$('jp-body').placeholder=t('joplix','Note content');$('jp-body').value=n.body||'';renderDisplayMode();setNoteMode('view');}
+  if($('jp-title')&&!unchanged)$('jp-title').value=n.title||'';
+  if($('jp-body')){$('jp-body').classList.remove('jp-note-loading');$('jp-body').placeholder=t('joplix','Note content');if(!unchanged)$('jp-body').value=n.body||'';renderDisplayMode();setNoteMode(keepEdit?'edit':'view');}
   if($('jp-meta'))$('jp-meta').textContent=(fromCache?t('joplix','From local quick cache, refreshing... '):'')+t('joplix','Updated: ')+formatJoplixDateTime(n.updated_time)+t('joplix',' | Notebook: ')+(n.notebook_title||'')+(n.is_deleted?' | '+t('joplix','In trash'):'');
   renderTags(n.tags||[]);
   renderResources(n.resources||[]);
   updateNotePath();
   setOriginalFromEditor();
-  resetEditorHistory($('jp-body')?$('jp-body').value:'');renderDisplayMode();
+  if(!unchanged)resetEditorHistory($('jp-body')?$('jp-body').value:'');
+  renderDisplayMode();
 }
 function ensureNoteSelected(id){document.querySelectorAll('.jp-note-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));}
 async function api(p,o={}){const form=typeof FormData!=='undefined'&&o.body instanceof FormData;o.headers=Object.assign(form?{'requesttoken':OC.requestToken||''}:{'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&!form&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);const d=await r.json();if(!r.ok||d.error){const err=new Error(d.error||'HTTP '+r.status);err.status=r.status;throw err;}noteLocalChangeForSync(p,o,d);return d;}
@@ -1587,14 +1594,8 @@ function updateStatus(txt,cls=''){const el=$('jp-update-status');if(el){el.textC
 function isInstallableJoplixAsset(asset){const n=String((asset&&asset.name)||'').trim().replace(/\s+/g,'');return /^JoplixNC_v\d+\.\d+\.\d+(?:-beta)?\.zip$/i.test(n);}
 function releaseIsNewer(rel,installed){return isAllowedUpdateTransition(rel,installed);}
 function renderUpdateList(data){const box=$('jp-update-list');if(!box)return;box.innerHTML='';syncInstalledVersionUi();const installed=parseJoplixVersionText(getInstalledVersion());let rels=((data&&data.releases)||[]).filter(rel=>releaseIsNewer(rel,installed));rels=rels.filter(rel=>((rel.assets||[]).some(isInstallableJoplixAsset)));if(!rels.length){box.innerHTML='<p>'+t('joplix','No newer version found for this channel. Currently installed: Joplix ')+getInstalledVersion()+' ('+(installedChannel()==='beta'?'Beta':'Main')+').</p>';return;}rels.sort((a,b)=>{const c=compareJoplixVersions(releaseVersion(b),releaseVersion(a));if(c!==0)return c;return releaseChannel(a)==='main'?-1:1;});rels.forEach(rel=>{const card=document.createElement('div');card.className='jp-update-release';const h=document.createElement('div');h.className='jp-update-release-head';h.innerHTML='<strong></strong><span></span>';h.querySelector('strong').textContent=(rel.name||rel.tag||'Release')+' ['+(releaseChannel(rel)==='beta'?'Beta':'Main')+']';h.querySelector('span').textContent=rel.published_at||'';card.appendChild(h);(rel.assets||[]).filter(isInstallableJoplixAsset).forEach(asset=>{const row=document.createElement('div');row.className='jp-update-asset';const name=document.createElement('span');name.textContent=asset.name;const btn=document.createElement('button');btn.type='button';btn.textContent=t('joplix','Install');btn.onclick=()=>installUpdateAsset(asset,rel);row.appendChild(name);row.appendChild(btn);card.appendChild(row);});box.appendChild(card);});}
-async function persistUpdateSettings(){
-  const repo=normalizeUpdateRepoUrlInput($('jp-update-repo-url')?.value||JP_UPDATE_REPO_URL);
-  const channel=$('jp-update-channel')?.value||'main';
-  await api('/api/settings',{method:'POST',body:{update_source:'github',update_repo_url:repo,update_channel:channel}});
-  const updates={update_source:'github',update_repo_url:repo,update_channel:channel};
-  storage.set('settings',Object.assign(storage.get('settings',{}),updates));
-  state.settings=Object.assign({},state.settings||{},updates);
-}
+// The repository is fixed on the server (read-only field); only the channel is saved from here.
+async function persistUpdateSettings(){await persistSettings({update_channel:$('jp-update-channel')?.value||'main'});}
 async function checkUpdates(){
   try{
     if(!joplixIsAdmin())throw new Error(t('joplix','Administrator rights required.'));
@@ -1641,7 +1642,6 @@ function setupSettings(){
   const rebuild=$('jp-settings-rebuild'); if(rebuild)rebuild.addEventListener('click',()=>rebuildAndRestore().catch(e=>jpAlert(e.message)));
   const upd=$('jp-update-check'); if(upd)upd.addEventListener('click',()=>checkUpdates());
   const updChannel=$('jp-update-channel'); if(updChannel)updChannel.addEventListener('change',()=>persistUpdateSettings().then(()=>updateStatus(t('joplix','Update settings saved.'),'ok')).catch(e=>updateStatus(t('joplix','Update settings could not be saved: ')+e.message,'error')));
-  const updRepo=$('jp-update-repo-url'); if(updRepo)updRepo.addEventListener('change',()=>{updRepo.value=normalizeUpdateRepoUrlInput(updRepo.value);persistUpdateSettings().then(()=>updateStatus(t('joplix','Update settings saved.'),'ok')).catch(e=>updateStatus(t('joplix','Update settings could not be saved: ')+e.message,'error'));});
   syncSettingsUi();
 }
 // ---------------------------------------------------------------------------

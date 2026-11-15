@@ -16,7 +16,14 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  /** One parsed model per request; dropped whenever the folder may have changed (locked(), write()). */
  private ?JoplixModelService $model=null;
  private function model(): JoplixModelService{return $this->model??=new JoplixModelService($this->joplinFolder(),$this->l);}
- private function indexSvc(): JoplixIndexService{return new JoplixIndexService($this->appDataFactory->get(Application::APP_ID),$this->uid(),$this->joplinPath(),$this->userFolder());} private function devSvc(): JoplixDevUpdateService{return new JoplixDevUpdateService($this->userFolder(),$this->setting('dev_folder','/.joplix/updates'),$this->config,$this->setting('update_backup_enabled','no')==='yes');} private function writer(): JoplixWriteService{return new JoplixWriteService($this->model(),$this->l);}
+ private function indexSvc(): JoplixIndexService{return new JoplixIndexService($this->appDataFactory->get(Application::APP_ID),$this->uid(),$this->joplinPath(),$this->userFolder());} private function devSvc(): JoplixDevUpdateService{return new JoplixDevUpdateService($this->userFolder(),$this->setting('dev_folder','/.joplix/updates'),$this->config,$this->updateSetting('update_backup_enabled','no')==='yes');}
+ /**
+  * Updater settings act on the whole server, so they are app settings (one value for all admins), no longer
+  * per-admin user settings. A value an admin had stored before is used until the setting is saved again.
+  * update_repo_url is not writable from the browser at all (see JoplixDevUpdateService::DEFAULT_REPO_URL).
+  */
+ private function updateSetting(string $k,string $d): string{$v=$this->config->getAppValue(Application::APP_ID,$k,"\0");return $v!=="\0"?$v:$this->setting($k,$d);}
+ private function updateRepoUrl(): string{return JoplixDevUpdateService::repoUrlOrDefault($this->config->getAppValue(Application::APP_ID,'update_repo_url',''));} private function writer(): JoplixWriteService{return new JoplixWriteService($this->model(),$this->l);}
  /** Every change to the Joplin folder runs inside this: the model is read, checked and written under the per-user write lock that the sync engine takes per item (JoplixWriteLock). */
  private function locked(callable $fn){return $this->writeLock->run($this->uid(),function() use ($fn){$this->model=null;try{$r=$fn();}finally{$this->model=null;}$this->maintenanceIfDue();return $r;});}
  /** A change through JoplixWriteService, then the cached index rebuilt from the files as they are now. */
@@ -64,7 +71,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function getSettings(): JSONResponse{try{return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_repo_url'=>JoplixDevUpdateService::repoUrlOrDefault($this->setting('update_repo_url','')),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'office_editor'=>$this->setting('office_editor','auto'),'office_editors'=>$this->officeEditors(),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'is_admin'=>$this->isAdmin()]);}catch(\Throwable $e){return $this->err($e);}}
+ public function getSettings(): JSONResponse{try{return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_repo_url'=>$this->updateRepoUrl(),'update_channel'=>$this->updateSetting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'office_editor'=>$this->setting('office_editor','auto'),'office_editors'=>$this->officeEditors(),'update_backup_enabled'=>$this->updateSetting('update_backup_enabled','no'),'is_admin'=>$this->isAdmin()]);}catch(\Throwable $e){return $this->err($e);}}
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
@@ -81,7 +88,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          $keys = ['joplin_path', 'sort_order', 'remember_last_location', 'first_run_completed', 'office_open_mode', 'office_editor'];
          $isAdmin = $this->isAdmin();
          if ($isAdmin) {
-             $keys = array_merge($keys, ['dev_enabled', 'dev_folder', 'update_repo_url', 'update_channel', 'update_backup_enabled']);
+             $keys = array_merge($keys, ['dev_enabled', 'dev_folder', 'update_channel', 'update_backup_enabled']);
          }
          $values = [];
          foreach ($keys as $key) {
@@ -93,9 +100,6 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          if (isset($values['joplin_path'])) {
              $values['joplin_path'] = JoplixFolders::normalizePath($values['joplin_path']);
          }
-         if (isset($values['update_repo_url'])) {
-             $values['update_repo_url'] = JoplixDevUpdateService::normalizeRepo($values['update_repo_url'])['url'];
-         }
          if (isset($values['office_editor']) && $values['office_editor'] !== 'auto' && !array_key_exists($values['office_editor'], self::OFFICE_EDITORS)) {
              throw new \RuntimeException($this->l->t('Invalid office editor.'));
          }
@@ -103,7 +107,11 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
              throw new \RuntimeException($this->l->t('Invalid update channel.'));
          }
          foreach ($values as $key => $value) {
-             $this->setSetting($key, $value);
+             if (in_array($key, ['update_channel', 'update_backup_enabled'], true)) {
+                 $this->config->setAppValue(Application::APP_ID, $key, $value);
+             } else {
+                 $this->setSetting($key, $value);
+             }
          }
          if ($isAdmin && in_array($this->setting('dev_folder', ''), ['', '/JoplixUpdates'], true)) {
              $this->setSetting('dev_folder', '/.joplix/updates');
@@ -281,8 +289,8 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          }
          $service = $this->devSvc();
          return new JSONResponse($service->remoteReleases(
-             $this->setting('update_repo_url', ''),
-             $this->setting('update_channel', 'main'),
+             $this->updateRepoUrl(),
+             $this->updateSetting('update_channel', 'main'),
              $service->installedVersion()
          ));
      } catch (\Throwable $e) {
@@ -301,8 +309,8 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
              throw new \RuntimeException($this->l->t('Please reload the release list and select a package.'));
          }
          return new JSONResponse($this->devSvc()->installRemoteAsset(
-             $this->setting('update_repo_url', ''),
-             $this->setting('update_channel', 'main'),
+             $this->updateRepoUrl(),
+             $this->updateSetting('update_channel', 'main'),
              $releaseId,
              $assetId
          ));

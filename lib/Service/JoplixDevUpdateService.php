@@ -9,8 +9,11 @@ use OCP\IConfig;
 
 class JoplixDevUpdateService {
     private const MAX_ZIP_BYTES = 35 * 1024 * 1024;
-    // Update source: GitHub releases of this repository. The admin can point the updater at another
-    // GitHub repository (a fork) in the settings; other hosts are rejected by normalizeRepo().
+    // Update source: GitHub releases of this repository. Since 2026.11.82 the repository is a server
+    // setting that only the system administrator can change (occ config:app:set joplix update_repo_url
+    // --value=https://github.com/<owner>/<repo>/releases); before, any Nextcloud admin could point the
+    // updater at any GitHub repository from the browser and install its code. Other hosts are rejected by
+    // normalizeRepo().
     public const DEFAULT_REPO_URL = 'https://github.com/kane9287/joplix-xsync/releases';
     // Present in a source checkout but not part of the installed app. Removed from every package before
     // activation so a GitHub source archive installs the same files as a packaged JoplixNC_v<version>.zip.
@@ -335,7 +338,9 @@ class JoplixDevUpdateService {
                     || $match[1] !== $relVersion) {
                     continue;
                 }
-                $assets[] = ['id'=>$assetId, 'name'=>$filename, 'url'=>$url, 'size'=>(int)($a['size'] ?? 0)];
+                // GitHub publishes "sha256:<hex>" for release assets; checked after the download when present.
+                $digest = preg_match('/^sha256:([a-f0-9]{64})$/D', strtolower((string)($a['digest'] ?? '')), $dm) ? $dm[1] : '';
+                $assets[] = ['id'=>$assetId, 'name'=>$filename, 'url'=>$url, 'size'=>(int)($a['size'] ?? 0), 'sha256'=>$digest];
             }
             if (!$assets) {
                 // No packaged JoplixNC_v<version>.zip attached: use GitHub's automatic source archive of
@@ -343,7 +348,7 @@ class JoplixDevUpdateService {
                 // and installRemoteAsset() handle it like a packaged asset. Size 0 skips the size check.
                 $zipball = (string)($rel['zipball_url'] ?? '');
                 if (preg_match('/^\d+\.\d+\.\d+$/D', $relVersion) && $this->isSourceArchive($zipball, $repo, $tag)) {
-                    $assets[] = ['id'=>(int)$rel['id'], 'name'=>'JoplixNC_v' . $relVersion . ($isBeta ? '-beta' : '') . '.zip', 'url'=>$zipball, 'size'=>0];
+                    $assets[] = ['id'=>(int)$rel['id'], 'name'=>'JoplixNC_v' . $relVersion . ($isBeta ? '-beta' : '') . '.zip', 'url'=>$zipball, 'size'=>0, 'sha256'=>''];
                 }
             }
             if (!$assets) continue;
@@ -392,6 +397,9 @@ class JoplixDevUpdateService {
                 $content = $this->httpGet($asset['url'], self::MAX_ZIP_BYTES);
                 if ($asset['size'] > 0 && strlen($content) !== $asset['size']) {
                     throw new \RuntimeException('Download-Groesse stimmt nicht mit dem Release ueberein.');
+                }
+                if (($asset['sha256'] ?? '') !== '' && !hash_equals($asset['sha256'], hash('sha256', $content))) {
+                    throw new \RuntimeException('Pruefsumme des Downloads stimmt nicht mit dem Release ueberein.');
                 }
                 return $this->installArchive($content, $asset['name'], $release['version']);
             }
@@ -547,39 +555,46 @@ class JoplixDevUpdateService {
             || str_ends_with($host, '.githubusercontent.com');
     }
 
+
+    /**
+     * GET through Nextcloud's HTTP client, so the server's proxy settings apply and allow_url_fopen is not
+     * needed. GitHub answers downloads with a redirect to its storage hosts, so redirects are followed by hand
+     * and every hop must stay on HTTPS and on a GitHub host. The body is read up to $maxBytes + 1.
+     */
     private function httpGet(string $url, int $maxBytes): string {
+        $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
         for ($hop = 0; $hop < 5; $hop++) {
             if (!$this->isGitHubDownloadUrl($url)) {
                 throw new \RuntimeException('Unerlaubte Download-Adresse: ' . $url);
             }
-            $ctx = stream_context_create(['http'=>[
-                'method'=>'GET',
-                'timeout'=>30,
-                'follow_location'=>0,
-                'ignore_errors'=>true,
-                'header'=>"Accept: application/vnd.github+json, application/octet-stream, */*\r\nUser-Agent: Joplix-Updater\r\n",
-            ]]);
-            $data = @file_get_contents($url, false, $ctx, 0, $maxBytes + 1);
-            $headers = function_exists('http_get_last_response_headers')
-                ? (http_get_last_response_headers() ?? [])
-                : ($http_response_header ?? []);
-            $line = (string)($headers[0] ?? '');
-            if (preg_match('/^HTTP\/\S+ 30[1278](?:\s|$)/', $line)) {
-                $location = '';
-                foreach ($headers as $header) {
-                    if (stripos($header, 'Location:') === 0) {
-                        $location = trim(substr($header, 9));
-                    }
-                }
+            try {
+                $response = $client->get($url, [
+                    'headers' => ['Accept' => 'application/vnd.github+json, application/octet-stream, */*', 'User-Agent' => 'Joplix-Updater'],
+                    'allow_redirects' => false,
+                    'http_errors' => false,
+                    'stream' => true,
+                    'timeout' => 60,
+                ]);
+            } catch (\Throwable $e) {
+                throw new \RuntimeException('Download von GitHub fehlgeschlagen: ' . $e->getMessage(), 0, $e);
+            }
+            $status = $response->getStatusCode();
+            if (in_array($status, [301, 302, 303, 307, 308], true)) {
+                $location = trim((string)$response->getHeader('Location'));
                 if ($location === '') {
                     throw new \RuntimeException('GitHub-Weiterleitung ohne Ziel: ' . $url);
                 }
                 $url = $location;
                 continue;
             }
-            if ($line !== '' && !preg_match('/^HTTP\/\S+ 200(?:\s|$)/', $line)) {
-                $hint = preg_match('/ (403|429)(?:\s|$)/', $line) ? ' (moeglicherweise GitHub-Anfragelimit erreicht, spaeter erneut versuchen)' : '';
-                throw new \RuntimeException('GitHub meldet Fehler: ' . $line . $hint);
+            if ($status !== 200) {
+                $hint = in_array($status, [403, 429], true) ? ' (moeglicherweise GitHub-Anfragelimit erreicht, spaeter erneut versuchen)' : '';
+                throw new \RuntimeException('GitHub meldet Fehler: HTTP ' . $status . $hint);
+            }
+            $body = $response->getBody();
+            $data = is_resource($body) ? stream_get_contents($body, $maxBytes + 1) : substr((string)$body, 0, $maxBytes + 1);
+            if (is_resource($body)) {
+                fclose($body);
             }
             if ($data === false || $data === '') {
                 throw new \RuntimeException('Download von GitHub fehlgeschlagen: ' . $url);

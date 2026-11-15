@@ -26,6 +26,8 @@
 - Large attachment transfers refresh the server lock first and time out before the lock expires; if PHP stops the request in the middle, the lock is released instead of blocking other Joplin clients for three minutes.
 - The background synchronisation skips disabled accounts, and a synchronisation started in the browser and one in the background no longer run at the same time even when Nextcloud's file locking is switched off.
 - Messages of the Joplin Server synchronisation are now translated.
+- Updater (administrators): its settings now apply to the whole server instead of per administrator. The GitHub repository updates come from can no longer be changed in the browser, only on the server (`occ config:app:set joplix update_repo_url --value=…`). Downloads use Nextcloud's HTTP client, so proxy settings apply and `allow_url_fopen` is not needed, and packaged release files are checked against the SHA-256 checksum GitHub publishes.
+- Saving with Ctrl+S (or a synchronisation that received changes) no longer switches the open note back from editing to the preview a moment later, and no longer clears the undo history.
 - Internal: one parser for Joplin's item format shared by the note view and the synchronisation; one definition of the Joplix folder; one list of Office formats and of file types; a note list that is read once per request instead of up to three times.
 
 # Joplix 2026.11.81

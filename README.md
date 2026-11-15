@@ -24,7 +24,7 @@ Supported editors (any one is enough):
 
 **Settings › Office editor** chooses one when several are installed; *Automatic* takes the first available in the order above. Without an editor, Office attachments offer Download only. ONLYOFFICE converts the legacy `doc`, `xls` and `ppt` formats into a new file, so Joplix does not open those three with it.
 
-Keep the Joplix tab open until the status under the attachment says the final file was applied: changes are taken over while Joplix checks the working copy.
+Each save in the editor is written into the attachment by the server right away, also when the Joplix tab is closed meanwhile. If the attachment was changed elsewhere in the meantime, the working copy is kept for 30 days in `.joplix/editing` in your files.
 
 ## Synchronisation with Joplin Server
 
@@ -34,7 +34,8 @@ Joplix can synchronise its Nextcloud folder with a self-hosted [Joplin Server](h
 - The Joplix folder in Nextcloud is at the same time a backup of the server content. With the Nextcloud *Versions* and *Deleted files* apps enabled, earlier versions of every note and remotely deleted notes stay recoverable.
 - A Nextcloud background job keeps the folder current even when Joplix is not open. Background jobs run via cron.
 - End-to-end encryption **must** be disabled on the Joplin account.
-- If the Joplin Server has a local or private address, a Nextcloud administrator has to switch on *Allow local server addresses* in the settings tab.
+- The server address must use `https://`. If the Joplin Server has a local or private address, a Nextcloud administrator has to add it under *Local Joplin servers* in the settings tab (for example `joplin.lan` or `192.168.1.20:22300`); only those servers may also use `http://`.
+- Joplix deletes notes on the Joplin Server only when they were deleted in Joplix. Files that disappear from the folder in another way are reported as missing; *Synchronise now* asks whether to restore them from the server or delete them there.
 - Do not let a Joplin app synchronise with the Joplix folder over WebDAV while this is enabled.
 
 ## Installation

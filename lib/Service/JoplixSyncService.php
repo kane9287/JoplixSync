@@ -1,6 +1,7 @@
 <?php
 namespace OCA\Joplix\Service;
 
+use OCA\Joplix\AppInfo\Application;
 use OCA\Joplix\Sync\JoplinServerClient;
 use OCA\Joplix\Sync\JoplinServerException;
 use OCA\Joplix\Sync\SyncEngine;
@@ -11,6 +12,8 @@ use OCP\Files\NotFoundException;
 use OCP\Files\SimpleFS\ISimpleFolder;
 use OCP\Http\Client\IClientService;
 use OCP\IConfig;
+use OCP\IUserManager;
+use OCP\L10N\IFactory;
 use OCP\Lock\ILockingProvider;
 use OCP\Lock\LockedException;
 use OCP\Security\ICrypto;
@@ -21,8 +24,7 @@ use Psr\Log\LoggerInterface;
  * running the sync engine. Used by the API controller and the background job.
  */
 class JoplixSyncService {
-    private const APP_ID = 'joplix';
-    private const DEFAULT_PATH = '/JoplinV2';
+    private const APP_ID = Application::APP_ID;
 
     private IRootFolder $rootFolder;
     private IConfig $config;
@@ -32,8 +34,14 @@ class JoplixSyncService {
     private ILockingProvider $locking;
     private JoplixWriteLock $writeLock;
     private LoggerInterface $logger;
+    private JoplixFolders $folders;
+    private IFactory $l10nFactory;
+    private IUserManager $userManager;
 
-    public function __construct(IRootFolder $rootFolder, IConfig $config, ICrypto $crypto, IClientService $clientService, IAppDataFactory $appDataFactory, ILockingProvider $locking, JoplixWriteLock $writeLock, LoggerInterface $logger) {
+    public function __construct(IRootFolder $rootFolder, IConfig $config, ICrypto $crypto, IClientService $clientService, IAppDataFactory $appDataFactory, ILockingProvider $locking, JoplixWriteLock $writeLock, LoggerInterface $logger, JoplixFolders $folders, IFactory $l10nFactory, IUserManager $userManager) {
+        $this->folders = $folders;
+        $this->l10nFactory = $l10nFactory;
+        $this->userManager = $userManager;
         $this->rootFolder = $rootFolder;
         $this->config = $config;
         $this->crypto = $crypto;
@@ -142,7 +150,7 @@ class JoplixSyncService {
      * Runs one time-boxed synchronisation.
      * @return array status is one of done, partial, busy, error, disabled
      */
-    public function run(string $uid, int $budgetSeconds, bool $allowMassDelete = false): array {
+    public function run(string $uid, int $budgetSeconds, bool $allowMassDelete = false, bool $interactive = true): array {
         if ($this->get($uid, 'sync_enabled', 'no') !== 'yes' || !$this->isConfigured($uid)) {
             return ['status' => 'disabled'];
         }
@@ -154,8 +162,10 @@ class JoplixSyncService {
         }
         $client = null;
         try {
-            $path = $this->joplinPath($uid);
-            $folder = $this->joplinFolder($uid, $path);
+            $path = $this->folders->joplinPath($uid);
+            // Only a run the user started from the browser may create a missing folder; the background job
+            // must not, or a mistyped or moved path would silently fill a new folder with the server content.
+            $folder = $this->folders->joplinFolder($uid, $interactive);
             $stateFile = $this->stateFileName($uid, $path);
             $client = $this->client($uid, true);
             $engine = new SyncEngine($folder, $client, $this->loadState($stateFile), function (array $state) use ($stateFile): void {
@@ -165,6 +175,9 @@ class JoplixSyncService {
                 return $this->writeLock->run($uid, $critical, 20.0);
             });
             $result = $engine->run($budgetSeconds, $allowMassDelete);
+            if (($result['pulled'] ?? 0) > 0 || ($result['deleted_local'] ?? 0) > 0 || ($result['conflicts'] ?? 0) > 0) {
+                $this->refreshIndex($uid, $path, $folder);
+            }
         } catch (\Throwable $e) {
             $code = $e instanceof JoplinServerException ? $e->serverCode() : '';
             $result = ['status' => 'error', 'message' => $e->getMessage(), 'code' => $code];
@@ -248,28 +261,21 @@ class JoplixSyncService {
         $this->set($uid, 'sync_status', json_encode($record, JSON_UNESCAPED_SLASHES));
     }
 
-    private function joplinPath(string $uid): string {
-        $path = '/' . trim($this->get($uid, 'joplin_path', self::DEFAULT_PATH), '/');
-        return $path === '/' ? self::DEFAULT_PATH : $path;
-    }
-
-    private function joplinFolder(string $uid, string $path): Folder {
-        $node = $this->rootFolder->getUserFolder($uid);
-        foreach (explode('/', trim($path, '/')) as $segment) {
-            if ($segment === '' || $segment === '.' || $segment === '..') {
-                throw new \RuntimeException('The Joplix folder path is not valid: ' . $path);
-            }
-            try {
-                $child = $node->get($segment);
-            } catch (NotFoundException $e) {
-                $child = $node->newFolder($segment);
-            }
-            if (!$child instanceof Folder) {
-                throw new \RuntimeException('The Joplix folder path is not a folder: ' . $path);
-            }
-            $node = $child;
+    /**
+     * Rebuilds the cached index after the engine changed files, so a background run does not leave it
+     * stale until somebody opens Joplix. Labels in the index use the user's language.
+     */
+    private function refreshIndex(string $uid, string $path, Folder $folder): void {
+        try {
+            $l = $this->l10nFactory->get(self::APP_ID, $this->l10nFactory->getUserLanguage($this->userManager->get($uid)));
+            $this->writeLock->run($uid, function () use ($uid, $path, $folder, $l): void {
+                $index = (new JoplixModelService($folder, $l))->fullIndex();
+                (new JoplixIndexService($this->appDataFactory->get(self::APP_ID), $uid, $path))->write($index);
+            }, 20.0);
+        } catch (\Throwable $e) {
+            // The browser notices the changed files itself and rebuilds then.
+            $this->logger->info('Joplix index refresh after sync failed for {uid}: {message}', ['app' => self::APP_ID, 'uid' => $uid, 'message' => $e->getMessage()]);
         }
-        return $node;
     }
 
     /** State is kept in app data, not in the user's files, so it is neither versioned nor synced to desktops. */

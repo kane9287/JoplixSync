@@ -290,12 +290,9 @@ for required in appinfo/routes.php lib/AppInfo/Application.php js/app.js templat
 done
 
 # Files from the source repository that are not part of the installed app.
-for extra in tools docs install assets .github .gitignore .gitattributes; do
+for extra in tools docs install assets .github .gitignore .gitattributes project_version.json; do
     rm -rf -- "${SOURCE:?}/$extra"
 done
-if [[ -f $APP_DIR/.joplix_keep && ! -e $SOURCE/.joplix_keep ]]; then
-    cp -a -- "$APP_DIR/.joplix_keep" "$SOURCE/.joplix_keep"
-fi
 chown -R "$WEBUSER:$(id -gn "$WEBUSER")" -- "$SOURCE"
 chmod -R u=rwX,go=rX -- "$SOURCE"
 

@@ -1,6 +1,7 @@
 <?php
 namespace OCA\Joplix\Listener;
 
+use OCA\Joplix\AppInfo\Application;
 use OCA\Joplix\Service\JoplixIndexService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
@@ -26,7 +27,7 @@ class UserDeletedListener implements IEventListener {
             return;
         }
         $prefix = JoplixIndexService::userPrefix($event->getUser()->getUID());
-        $appData = $this->appDataFactory->get('joplix');
+        $appData = $this->appDataFactory->get(Application::APP_ID);
         foreach (['index', 'sync'] as $name) {
             try {
                 foreach ($appData->getFolder($name)->getDirectoryListing() as $file) {

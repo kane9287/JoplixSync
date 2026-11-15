@@ -1,20 +1,34 @@
 <?php
 namespace OCA\Joplix\Controller;
-use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService; use OCA\Joplix\Service\JoplixWriteLock;
+use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixFolders; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService; use OCA\Joplix\Service\JoplixWriteLock;
 use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP\Files\Folder; use OCP\Files\IRootFolder; use OCP\IConfig; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager; use OCP\IL10N; use OCP\Files\AppData\IAppDataFactory; use OCA\Joplix\Service\ConflictException; use OCP\App\IAppManager;
-class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService; private JoplixWriteLock $writeLock; private IAppDataFactory $appDataFactory; private IL10N $l; private IAppManager $appManager;
- public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService,JoplixWriteLock $writeLock,IAppDataFactory $appDataFactory,IL10N $l,IAppManager $appManager){parent::__construct($AppName,$request);$this->appManager=$appManager;$this->l=$l;$this->appDataFactory=$appDataFactory;$this->writeLock=$writeLock;$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
+/**
+ * Every endpoint of the browser app. Writes to the Joplin folder go through write(): under the per-user
+ * write lock (shared with the sync engine), on a model read inside that lock, followed by an index refresh.
+ * GET endpoints read only (the cached index in app data is filled on a miss, nothing in the user's files).
+ */
+class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService; private JoplixWriteLock $writeLock; private IAppDataFactory $appDataFactory; private IL10N $l; private IAppManager $appManager; private JoplixFolders $folders;
+ public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService,JoplixWriteLock $writeLock,IAppDataFactory $appDataFactory,IL10N $l,IAppManager $appManager,JoplixFolders $folders){parent::__construct($AppName,$request);$this->folders=$folders;$this->appManager=$appManager;$this->l=$l;$this->appDataFactory=$appDataFactory;$this->writeLock=$writeLock;$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
  private function uid(): string{$u=$this->userSession->getUser();if($u===null)throw new \RuntimeException($this->l->t('Not logged in'));return $u->getUID();}
  private function isAdmin(): bool{return $this->groupManager->isAdmin($this->uid());} private function setting(string $k,string $d=''): string{return $this->config->getUserValue($this->uid(),Application::APP_ID,$k,$d);} private function setSetting(string $k,string $v): void{$this->config->setUserValue($this->uid(),Application::APP_ID,$k,$v);} private function userFolder(): Folder{return $this->rootFolder->getUserFolder($this->uid());}
- private function joplinPath(): string{$p=$this->setting('joplin_path','/JoplinV2');$p='/'.trim($p,'/');return $p==='/'?'/JoplinV2':$p;} private function joplinFolder(): Folder{$rel=trim($this->joplinPath(),'/');$uf=$this->userFolder();$n=$rel===''?$uf:$uf->get($rel);if(!$n instanceof Folder)throw new \RuntimeException($this->l->t('The Joplix path is not a folder: %1$s',[$this->joplinPath()]));return $n;}
- private function workspace(): JoplixWorkspaceService{return new JoplixWorkspaceService($this->rootFolder,$this->config,$this->uid());} private function model(): JoplixModelService{return new JoplixModelService($this->joplinFolder());} private function indexSvc(): JoplixIndexService{return new JoplixIndexService($this->appDataFactory->get(Application::APP_ID),$this->uid(),$this->joplinPath(),$this->userFolder());} private function devSvc(): JoplixDevUpdateService{return new JoplixDevUpdateService($this->userFolder(),$this->setting('dev_folder','/.joplix/updates'),$this->config,$this->setting('update_backup_enabled','no')==='yes');} private function writer(): JoplixWriteService{return new JoplixWriteService($this->model());} /** Every endpoint that changes the Joplin folder runs inside this: the model is loaded, checked and written under the per-user write lock that the sync engine takes per item (JoplixWriteLock). */
- private function locked(callable $fn){return $this->writeLock->run($this->uid(),function() use ($fn){$r=$fn();$this->pruneBackupsIfDue();return $r;});}
- /** Old backup copies are removed after a write, at most once a day per user (see JoplixWriteService, "Backup retention"). */
- private function pruneBackupsIfDue(): void{
+ private function joplinPath(): string{return $this->folders->joplinPath($this->uid());} private function joplinFolder(): Folder{return $this->folders->joplinFolder($this->uid());}
+ private function workspace(): JoplixWorkspaceService{return new JoplixWorkspaceService($this->rootFolder,$this->config,$this->uid());}
+ /** One parsed model per request; dropped whenever the folder may have changed (locked(), write()). */
+ private ?JoplixModelService $model=null;
+ private function model(): JoplixModelService{return $this->model??=new JoplixModelService($this->joplinFolder(),$this->l);}
+ private function indexSvc(): JoplixIndexService{return new JoplixIndexService($this->appDataFactory->get(Application::APP_ID),$this->uid(),$this->joplinPath(),$this->userFolder());} private function devSvc(): JoplixDevUpdateService{return new JoplixDevUpdateService($this->userFolder(),$this->setting('dev_folder','/.joplix/updates'),$this->config,$this->setting('update_backup_enabled','no')==='yes');} private function writer(): JoplixWriteService{return new JoplixWriteService($this->model(),$this->l);}
+ /** Every change to the Joplin folder runs inside this: the model is read, checked and written under the per-user write lock that the sync engine takes per item (JoplixWriteLock). */
+ private function locked(callable $fn){return $this->writeLock->run($this->uid(),function() use ($fn){$this->model=null;try{$r=$fn();}finally{$this->model=null;}$this->maintenanceIfDue();return $r;});}
+ /** A change through JoplixWriteService, then the cached index rebuilt from the files as they are now. */
+ private function write(callable $change): JSONResponse{return $this->locked(function() use ($change){$r=$change($this->writer());$this->model=null;$this->storeIndex();return new JSONResponse($r);});}
+ private function storeIndex(): array{$idx=$this->model()->fullIndex();$this->indexSvc()->write($idx);return $idx;}
+ /** After a write, at most once a day per user: old backup copies (JoplixWriteService, "Backup retention") and leftovers of older versions (JoplixWorkspaceService::removeLegacy). */
+ private function maintenanceIfDue(): void{
   try{
    if((int)$this->setting('backups_pruned_at','0')>time()-86400)return;
    $this->setSetting('backups_pruned_at',(string)time());
    JoplixWriteService::pruneBackupFolder($this->joplinFolder());
+   $this->workspace()->removeLegacy();
   }catch(\Throwable $e){}
  }
  /**
@@ -32,16 +46,12 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  private function officeEditors(): array{$u=$this->userSession->getUser();if($u===null)return [];$out=[];foreach(array_keys(self::OFFICE_EDITORS) as $app){try{if($this->appManager->isEnabledForUser($app,$u))$out[]=$app;}catch(\Throwable $e){}}return $out;}
  /** The editor to use: the user's choice while it is still installed, else the first available one. */
  private function officeEditor(): ?string{$all=$this->officeEditors();$pick=$this->setting('office_editor','auto');if(in_array($pick,$all,true))return $pick;return $all[0]??null;}
- private function err(\Throwable $e,int $s=400): JSONResponse{return new JSONResponse(['error'=>$e->getMessage()],$s);}
+ private function err(\Throwable $e,?int $s=null): JSONResponse{return new JSONResponse(['error'=>$e->getMessage()],$s??($e instanceof ConflictException?409:400));}
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function getSettings(): JSONResponse{$this->workspace()->ensureWorkspace();return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_source'=>'github','update_repo_url'=>JoplixDevUpdateService::repoUrlOrDefault($this->setting('update_repo_url','')),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'office_editor'=>$this->setting('office_editor','auto'),'office_editors'=>$this->officeEditors(),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'is_admin'=>$this->isAdmin()]);}
- /**
-  * @NoAdminRequired
-  */
-
+ public function getSettings(): JSONResponse{try{return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_repo_url'=>JoplixDevUpdateService::repoUrlOrDefault($this->setting('update_repo_url','')),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'office_editor'=>$this->setting('office_editor','auto'),'office_editors'=>$this->officeEditors(),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'is_admin'=>$this->isAdmin()]);}catch(\Throwable $e){return $this->err($e);}}
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
@@ -55,7 +65,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          $keys = ['joplin_path', 'sort_order', 'remember_last_location', 'first_run_completed', 'office_open_mode', 'office_editor'];
          $isAdmin = $this->isAdmin();
          if ($isAdmin) {
-             $keys = array_merge($keys, ['dev_enabled', 'dev_folder', 'update_source', 'update_repo_url', 'update_channel', 'update_backup_enabled']);
+             $keys = array_merge($keys, ['dev_enabled', 'dev_folder', 'update_repo_url', 'update_channel', 'update_backup_enabled']);
          }
          $values = [];
          foreach ($keys as $key) {
@@ -63,6 +73,9 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
              if ($value !== null) {
                  $values[$key] = (string)$value;
              }
+         }
+         if (isset($values['joplin_path'])) {
+             $values['joplin_path'] = JoplixFolders::normalizePath($values['joplin_path']);
          }
          if (isset($values['update_repo_url'])) {
              $values['update_repo_url'] = JoplixDevUpdateService::normalizeRepo($values['update_repo_url'])['url'];
@@ -79,7 +92,6 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          if ($isAdmin && in_array($this->setting('dev_folder', ''), ['', '/JoplixUpdates'], true)) {
              $this->setSetting('dev_folder', '/.joplix/updates');
          }
-         $this->workspace()->ensureWorkspace();
          return new JSONResponse(['ok' => true]);
      } catch (\Throwable $e) {
          return $this->err($e);
@@ -89,16 +101,16 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function index(): JSONResponse{try{$this->workspace()->ensureWorkspace();$idx=$this->indexSvc()->read(); if(!$idx){$m=$this->model();$idx=$m->fullIndex($this->setting('sort_order','updated_desc'));$this->indexSvc()->write($idx);$idx['built_now']=true;$idx['stale']=false;} else {$idx['stale']=false;$idx['fast_loaded']=true;} return new JSONResponse($idx);}catch(\Throwable $e){return $this->err($e);}}
+ public function index(): JSONResponse{try{$idx=$this->indexSvc()->read();if(!$idx)$idx=$this->storeIndex();return new JSONResponse($idx);}catch(\Throwable $e){return $this->err($e);}}
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function indexStatus(): JSONResponse{try{$m=$this->model();return new JSONResponse($this->indexSvc()->status($m->fingerprint()));}catch(\Throwable $e){return $this->err($e);}}
+ public function indexStatus(): JSONResponse{try{return new JSONResponse($this->indexSvc()->status(JoplixModelService::fingerprintOf($this->joplinFolder())));}catch(\Throwable $e){return $this->err($e);}}
  /**
   * @NoAdminRequired
   */
- public function rebuildIndex(): JSONResponse{try{$m=$this->model();$idx=$m->fullIndex($this->setting('sort_order','updated_desc'));$this->indexSvc()->write($idx);return new JSONResponse(['ok'=>true,'index'=>$idx]);}catch(\Throwable $e){return $this->err($e);}}
+ public function rebuildIndex(): JSONResponse{try{return new JSONResponse(['ok'=>true,'index'=>$this->storeIndex()]);}catch(\Throwable $e){return $this->err($e);}}
  /**
   * @NoAdminRequired
   */
@@ -109,55 +121,74 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  */ public function getNote(string $id): JSONResponse{try{$n=$this->model()->note($id);return $n?new JSONResponse($n):new JSONResponse(['error'=>$this->l->t('Note not found')],404);}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function createNote(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->createNote((string)$this->request->getParam('title',$this->l->t('New note')),(string)$this->request->getParam('body',''),(string)$this->request->getParam('parent_id',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function createNote(): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->createNote((string)$this->request->getParam('title',$this->l->t('New note')),(string)$this->request->getParam('body',''),(string)$this->request->getParam('parent_id','')));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function updateNote(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->updateNote($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('body',''),(string)$this->request->getParam('known_updated_time',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e,$e instanceof ConflictException?409:400);}}
+ */ public function updateNote(string $id): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->updateNote($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('body',''),(string)$this->request->getParam('known_updated_time','')));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function deleteNote(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->permanent()?$this->writer()->deleteNote($id):$this->writer()->trashNote($id);$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function deleteNote(string $id): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$this->permanent()?$w->deleteNote($id):$w->trashNote($id));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function moveNote(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->moveNote($id,(string)$this->request->getParam('target_notebook_id',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function moveNote(string $id): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->moveNote($id,(string)$this->request->getParam('target_notebook_id','')));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function createNotebook(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->createNotebook((string)$this->request->getParam('title',$this->l->t('New notebook')),(string)$this->request->getParam('parent_id',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function createNotebook(): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->createNotebook((string)$this->request->getParam('title',$this->l->t('New notebook')),(string)$this->request->getParam('parent_id','')));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function updateNotebook(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->updateNotebook($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('known_updated_time',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e,$e instanceof ConflictException?409:400);}}
+ */ public function updateNotebook(string $id): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->updateNotebook($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('known_updated_time','')));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function deleteNotebook(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->permanent()?$this->writer()->deleteNotebook($id):$this->writer()->trashNotebook($id);$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function deleteNotebook(string $id): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$this->permanent()?$w->deleteNotebook($id):$w->trashNotebook($id));}catch(\Throwable $e){return $this->err($e);}}
  /** DELETE moves to Joplin's trash; ?permanent=1 removes the files. */
  private function permanent(): bool{return (string)$this->request->getParam('permanent','')==='1';}
  /**
  * @NoAdminRequired
- */ public function restoreNote(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->restoreNote($id,(string)$this->request->getParam('target_notebook_id',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function restoreNote(string $id): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->restoreNote($id,(string)$this->request->getParam('target_notebook_id','')));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function restoreNotebook(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->restoreNotebook($id);$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function restoreNotebook(string $id): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->restoreNotebook($id));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function emptyTrash(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->emptyTrash();$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function emptyTrash(): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->emptyTrash());}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
  * @NoCSRFRequired
  */ public function tags(): JSONResponse{try{return new JSONResponse(array_values($this->model()->tagsRaw()));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function createTag(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->createTag((string)$this->request->getParam('title',$this->l->t('New tag')));return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function createTag(): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->createTag((string)$this->request->getParam('title',$this->l->t('New tag'))));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function saveNoteTags(string $id): JSONResponse{try{return $this->locked(function() use ($id){$tags=$this->request->getParam('tag_ids',[]); if(!is_array($tags))$tags=[]; $r=$this->writer()->saveNoteTags($id,$tags);return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function saveNoteTags(string $id): JSONResponse{try{$tags=$this->request->getParam('tag_ids',[]);if(!is_array($tags))$tags=[];return $this->write(fn(JoplixWriteService $w)=>$w->saveNoteTags($id,$tags));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function removeNoteTag(string $id,string $tagId): JSONResponse{try{return $this->locked(function() use ($id,$tagId){$r=$this->writer()->removeNoteTag($id,$tagId);return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function removeNoteTag(string $id,string $tagId): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->removeNoteTag($id,$tagId));}catch(\Throwable $e){return $this->err($e);}}
+ /**
+  * Assigns a tag by name, creating it when no tag of that name (case-insensitive) exists yet.
+  * @NoAdminRequired
+  */
+ public function createAndAssignTag(string $id): JSONResponse{
+  try{
+   $title=trim((string)$this->request->getParam('title',''));
+   if($title==='')throw new \RuntimeException($this->l->t('The tag name must not be empty.'));
+   return $this->write(function(JoplixWriteService $writer) use ($id,$title){
+    $tagId='';$canonicalTitle=$title;$created=false;
+    foreach($this->model()->tagsRaw() as $tag){$existingTitle=trim((string)($tag['_title']??$tag['_body']??''));if($existingTitle!==''&&mb_strtolower($existingTitle,'UTF-8')===mb_strtolower($title,'UTF-8')){$tagId=(string)($tag['id']??'');$canonicalTitle=$existingTitle;break;}}
+    if($tagId===''){
+     $tagId=(string)($writer->createTag($title)['id']??'');$created=true;
+     // The writer's model was read before the tag existed; assigning it needs one that knows it.
+     $this->model=null;$writer=$this->writer();
+    }
+    if($tagId==='')throw new \RuntimeException($this->l->t('The tag could not be created.'));
+    $writer->saveNoteTags($id,[$tagId]);
+    return ['ok'=>true,'id'=>$tagId,'title'=>$canonicalTitle,'created'=>$created];
+   });
+  }catch(\Throwable $e){return $this->err($e);}
+ }
  /**
  * @NoAdminRequired
- */ public function createAndAssignTag(string $id): JSONResponse{try{return $this->locked(function() use ($id){$title=trim((string)$this->request->getParam('title',''));if($title==='')throw new \RuntimeException($this->l->t('The tag name must not be empty.'));$model=$this->model();$writer=new JoplixWriteService($model);$tagId='';$canonicalTitle=$title;$created=false;foreach($model->tagsRaw() as $tag){$existingTitle=trim((string)($tag['_title']??$tag['_body']??''));if($existingTitle!==''&&mb_strtolower($existingTitle,'UTF-8')===mb_strtolower($title,'UTF-8')){$tagId=(string)($tag['id']??'');$canonicalTitle=$existingTitle;break;}}if($tagId===''){$createdTag=$writer->createTag($title);$tagId=(string)($createdTag['id']??'');$created=true;}if($tagId==='')throw new \RuntimeException($this->l->t('The tag could not be created.'));$writer->saveNoteTags($id,[$tagId]);return new JSONResponse(['ok'=>true,'id'=>$tagId,'title'=>$canonicalTitle,'created'=>$created]);});}catch(\Throwable $e){return $this->err($e);}}
- /**
- * @NoAdminRequired
- */ public function uploadResource(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->uploadResource((string)$this->request->getParam('filename','upload.bin'),(string)$this->request->getParam('mime','application/octet-stream'),(string)$this->request->getParam('data_base64',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
+ */ public function uploadResource(): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->uploadResource((string)$this->request->getParam('filename','upload.bin'),(string)$this->request->getParam('mime','application/octet-stream'),(string)$this->request->getParam('data_base64','')));}catch(\Throwable $e){return $this->err($e);}}
 
  // ---- Attach from Nextcloud. Paths are relative to the user's files root ("/Documents/a.pdf").
  // The Joplin sync folder and the .joplix workspace are not offered and cannot be attached from.
@@ -199,11 +230,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
    if($path==='/'||$this->isHiddenFilesPath($path))throw new \RuntimeException($this->l->t('This file cannot be attached'));
    $node=$this->filesNode($path);
    if(!$node instanceof \OCP\Files\File)throw new \RuntimeException($this->l->t('Not a file: %1$s',[$path]));
-   return $this->locked(function() use ($node){
-    $r=$this->writer()->createResourceFromStream($node->getName(),(string)$node->getMimeType(),$node->fopen('r'),(int)$node->getSize());
-    $this->rebuildIndex();
-    return new JSONResponse($r);
-   });
+   return $this->write(fn(JoplixWriteService $w)=>$w->createResourceFromStream($node->getName(),(string)$node->getMimeType(),$node->fopen('r'),(int)$node->getSize()));
   }catch(\Throwable $e){return $this->err($e);}
  }
 
@@ -229,9 +256,6 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          if (!$this->isAdmin()) {
              return new JSONResponse(['error' => $this->l->t('Administrator rights required.')], 403);
          }
-         if (!in_array($this->setting('update_source', 'github'), ['', 'github', 'codeberg'], true)) {
-             throw new \RuntimeException($this->l->t('Only GitHub is supported as update source'));
-         }
          $releaseId = filter_var($this->request->getParam('release_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
          $assetId = filter_var($this->request->getParam('asset_id'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
          if ($releaseId === false || $assetId === false) {
@@ -256,7 +280,6 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          if ($this->setting('dev_enabled', 'no') !== 'yes') {
              return new JSONResponse(['enabled' => false, 'packages' => []]);
          }
-         $this->workspace()->ensureWorkspace();
          return new JSONResponse([
              'enabled' => true,
              'folder' => $this->setting('dev_folder', '/.joplix/updates'),
@@ -275,7 +298,6 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          if ($this->setting('dev_enabled', 'no') !== 'yes') {
              throw new \RuntimeException($this->l->t('The development environment is not enabled'));
          }
-         $this->workspace()->ensureWorkspace();
          return new JSONResponse($this->devSvc()->deletePackage((string)$this->request->getParam('name', '')));
      } catch (\Throwable $e) {
          return $this->err($e);
@@ -290,7 +312,6 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          if ($this->setting('dev_enabled', 'no') !== 'yes') {
              throw new \RuntimeException($this->l->t('The development environment is not enabled'));
          }
-         $this->workspace()->ensureWorkspace();
          return new JSONResponse($this->devSvc()->installPackage((string)$this->request->getParam('name', '')));
      } catch (\Throwable $e) {
          return $this->err($e);
@@ -304,11 +325,10 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  /**
  * @NoAdminRequired
  */ public function startOfficeEdit(string $id): JSONResponse{try{
-  
   $payload=$this->model()->resourcePayload($id);
   if(!$payload||isset($payload['error']))throw new \RuntimeException((string)($payload['error']??$this->l->t('Attachment not found')));
   $ext=strtolower((string)($payload['file_extension']??''));
-  if(!in_array($ext,['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp'],true))throw new \RuntimeException($this->l->t('This attachment is not a supported Office file.'));
+  if(!in_array($ext,JoplixModelService::OFFICE_EXTENSIONS,true))throw new \RuntimeException($this->l->t('This attachment is not a supported Office file.'));
   $editor=$this->officeEditor();
   if($editor===null)throw new \RuntimeException($this->l->t('No office editor is installed. Ask your administrator to enable Nextcloud Office, ONLYOFFICE or Euro Office.'));
   if($editor==='onlyoffice'&&in_array($ext,self::ONLYOFFICE_CONVERTS,true))throw new \RuntimeException($this->l->t('ONLYOFFICE can only edit .%1$s files by converting them to a new file, so the changes would not reach the attachment. Download the file instead, or choose another editor in the settings.',[$ext]));
@@ -316,25 +336,23 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   $comma=strpos($dataUrl,',');
   $binary=$comma===false?false:base64_decode(substr($dataUrl,$comma+1),true);
   if($binary===false)throw new \RuntimeException($this->l->t('The attachment could not be read.'));
-  $editing=$this->editingFolder();$this->cleanupEditingSessions($editing);
+  $editing=$this->workspace()->editingFolder();$this->cleanupEditingSessions($editing);
   $sessionId=bin2hex(random_bytes(16));$sessionFolder=$editing->newFolder($sessionId);
   $title=preg_replace('/[\\\/:*?"<>|]+/','_',trim((string)($payload['title']??$id)))?:$id;
   if($ext!==''&&!str_ends_with(strtolower($title),'.'.$ext))$title.='.'.$ext;
   $file=$sessionFolder->newFile($title,$binary);$hash=hash('sha256',$binary);
   $session=['session_id'=>$sessionId,'resource_id'=>$id,'file_name'=>$title,'file_id'=>$file->getId(),'working_hash'=>$hash,'resource_hash'=>$hash,'started_at'=>time(),'last_import_at'=>0];
-  $sessionFolder->newFile('session.json',json_encode($session,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
-  $sessionFolder->newFile('.lock',json_encode(['created_at'=>time(),'resource_id'=>$id,'sha256'=>$hash],JSON_UNESCAPED_SLASHES));
   $sessions=json_decode($this->setting('office_sessions','{}'),true);if(!is_array($sessions))$sessions=[];$sessions[$id]=$session;
   $this->setSetting('office_sessions',json_encode($sessions,JSON_UNESCAPED_SLASHES));
   return new JSONResponse(['ok'=>true,'resource_id'=>$id,'session_id'=>$sessionId,'file_id'=>$file->getId(),'file_name'=>$title,'edit_dir'=>'/.joplix/editing/'.$sessionId,'editor'=>$editor,'editor_path'=>str_replace('{id}',(string)$file->getId(),self::OFFICE_EDITORS[$editor])]);
  }catch(\Throwable $e){return $this->err($e);}}
 
  /**
+  * Imports the working copy when it changed. POST since it writes (CSRF-protected); the browser polls it.
  * @NoAdminRequired
- * @NoCSRFRequired
  */ public function officeEditStatus(string $id): JSONResponse{try{
   $sessions=json_decode($this->setting('office_sessions','{}'),true);if(!is_array($sessions)||!isset($sessions[$id]))return new JSONResponse(['active'=>false]);
-  $session=$sessions[$id];$editing=$this->editingFolder();$this->cleanupEditingSessions($editing);
+  $session=$sessions[$id];$editing=$this->workspace()->editingFolder();$this->cleanupEditingSessions($editing);
   $sessionId=(string)($session['session_id']??'');
   if($sessionId===''||!$editing->nodeExists($sessionId))return new JSONResponse(['active'=>false,'error'=>$this->l->t('The editing session is missing')]);
   $folder=$editing->get($sessionId);if(!$folder instanceof Folder||!$folder->nodeExists((string)$session['file_name']))return new JSONResponse(['active'=>false,'error'=>$this->l->t('The working file is missing')]);
@@ -405,11 +423,6 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
      }
  }
 
- private function editingFolder(): Folder{
-  $uf=$this->userFolder();if(!$uf->nodeExists('.joplix'))$uf->newFolder('.joplix');$base=$uf->get('.joplix');if(!$base instanceof Folder)throw new \RuntimeException($this->l->t('.joplix is not a folder'));
-  foreach(['editing','backups','cache','logs','updates','updater'] as $name)if(!$base->nodeExists($name))$base->newFolder($name);
-  $editing=$base->get('editing');if(!$editing instanceof Folder)throw new \RuntimeException($this->l->t('The Joplix working folder is not valid'));return $editing;
- }
  private function cleanupEditingSessions(Folder $editing): void{
   $cutoff=time()-86400;foreach($editing->getDirectoryListing() as $node){if(!$node instanceof Folder)continue;if($node->getMTime()<$cutoff){try{$node->delete();}catch(\Throwable $e){}}}
  }

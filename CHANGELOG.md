@@ -1,3 +1,15 @@
+# Joplix 2026.11.82
+
+- Settings: one implementation instead of two that ran side by side. Changing the sort order or the Joplix folder saves once and rebuilds the index once (before: up to four requests and rebuilds). Closing the settings no longer re-sends settings nobody changed. The folder list is loaded once per visit.
+- Removed code and files that nothing used: the PDF overlay, several unused functions, the legacy per-version installers in `tools/`, the upstream notes in `docs/`, `nextcloud/beta-update.json`, `RELEASE_NOTES_1.0.56.md` and a second copy of the app icon.
+- Opening Joplix no longer writes anything into your files. The `.joplix` folder is created only when an Office attachment is edited; the files `version.json` and `lock.json` and the empty folders `backups`, `cache`, `logs` and `updater` that older versions kept there are removed once.
+- Assigning a tag that does not exist yet to a note works again (it failed with "Tag not found" since 2026.11.79).
+- After a synchronisation that received changes, the server refreshes the note index itself, also for synchronisations in the background. Before, the index stayed outdated until Joplix was opened.
+- The background synchronisation no longer creates the Joplix folder when it is missing (for example after a typo in the path); it reports an error instead. A synchronisation started in the browser still creates it.
+- Item files with Windows (CRLF) line endings, written by other tools, are now read correctly. Before, such notes did not appear.
+- Saved notes carry modification times with milliseconds, so two saves within one second are told apart by the conflict check.
+- Internal: one parser for Joplin's item format shared by the note view and the synchronisation; one definition of the Joplix folder; one list of Office formats and of file types; a note list that is read once per request instead of up to three times.
+
 # Joplix 2026.11.81
 
 - Office attachments can now be edited with Nextcloud Office (Collabora Online, built-in CODE server or a separate Collabora) and ONLYOFFICE, not only with Euro Office. Joplix finds out which of these apps are enabled for you.

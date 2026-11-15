@@ -1,6 +1,7 @@
 <?php
 namespace OCA\Joplix\BackgroundJob;
 
+use OCA\Joplix\AppInfo\Application;
 use OCA\Joplix\Service\JoplixSyncService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
@@ -40,9 +41,9 @@ class SyncJob extends TimedJob {
                 break;
             }
             try {
-                $this->sync->run((string)$uid, min(self::PER_USER_BUDGET_SECONDS, $remaining));
+                $this->sync->run((string)$uid, min(self::PER_USER_BUDGET_SECONDS, $remaining), false, false);
             } catch (\Throwable $e) {
-                $this->logger->warning('Joplix background sync failed for {uid}: {message}', ['app' => 'joplix', 'uid' => $uid, 'message' => $e->getMessage()]);
+                $this->logger->warning('Joplix background sync failed for {uid}: {message}', ['app' => Application::APP_ID, 'uid' => $uid, 'message' => $e->getMessage()]);
             }
         }
     }

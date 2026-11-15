@@ -1,6 +1,7 @@
 <?php
 namespace OCA\Joplix\Service;
 
+use OCA\Joplix\AppInfo\Application;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\App\IAppManager;
@@ -13,7 +14,7 @@ class JoplixDevUpdateService {
     public const DEFAULT_REPO_URL = 'https://github.com/kane9287/joplix-xsync/releases';
     // Present in a source checkout but not part of the installed app. Removed from every package before
     // activation so a GitHub source archive installs the same files as a packaged JoplixNC_v<version>.zip.
-    private const NON_APP_ENTRIES = ['tools', 'docs', 'install', 'assets', '.github', '.gitignore', '.gitattributes'];
+    private const NON_APP_ENTRIES = ['tools', 'docs', 'install', 'assets', '.github', '.gitignore', '.gitattributes', 'project_version.json'];
 
     private Folder $userFolder;
     private string $devPath;
@@ -80,7 +81,7 @@ class JoplixDevUpdateService {
             throw new \RuntimeException('ZIP ist leer oder zu gross.');
         }
         $appDir = realpath(__DIR__ . '/../../');
-        if ($appDir === false || basename($appDir) !== 'joplix' || !is_writable(dirname($appDir))) {
+        if ($appDir === false || basename($appDir) !== Application::APP_ID || !is_writable(dirname($appDir))) {
             throw new \RuntimeException('App-Verzeichnis kann nicht ersetzt werden. Bitte CLI-Installer verwenden.');
         }
         $work = dirname($appDir) . '/.joplix-update';
@@ -133,10 +134,6 @@ class JoplixDevUpdateService {
                     || $this->compareVersions($candidate, $installed) <= 0) {
                     throw new \RuntimeException('ZIP-Version passt nicht zum Release oder ist bereits installiert.');
                 }
-            }
-            if (is_file($appDir . '/.joplix_keep') && !file_exists($source . '/.joplix_keep')
-                && !copy($appDir . '/.joplix_keep', $source . '/.joplix_keep')) {
-                throw new \RuntimeException('Lokale Markierungsdatei konnte nicht uebernommen werden.');
             }
             if ($this->backupEnabled) {
                 $backup = $this->backupRoot() . '/joplix.webupdate_' . date('Ymd_His') . '_' . basename($stage);
@@ -228,7 +225,7 @@ class JoplixDevUpdateService {
         // loader is replaced by one that loads nothing, so simplexml_load_file() fails for every file.
         $xml = $source === '' ? false : @file_get_contents($source . '/appinfo/info.xml');
         $info = ($xml === false || $xml === '') ? false : @simplexml_load_string($xml, \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
-        if ($info === false || (string)$info->id !== 'joplix' || !preg_match('/^\d+\.\d+\.\d+$/D', (string)$info->version)) {
+        if ($info === false || (string)$info->id !== Application::APP_ID || !preg_match('/^\d+\.\d+\.\d+$/D', (string)$info->version)) {
             throw new \RuntimeException('ZIP enthaelt keine gueltige Joplix-App.');
         }
         foreach (['appinfo/routes.php', 'lib/AppInfo/Application.php', 'js/app.js', 'templates/main.php'] as $required) {
@@ -251,10 +248,10 @@ class JoplixDevUpdateService {
             throw new \RuntimeException('Joplix-Version fuer den Nextcloud-App-Abschluss fehlt');
         }
         $manager = $this->appManager ?? \OC::$server->get(IAppManager::class);
-        if (!$manager->upgradeApp('joplix')) {
+        if (!$manager->upgradeApp(Application::APP_ID)) {
             throw new \RuntimeException('Nextcloud konnte die Joplix-App-Aktualisierung nicht abschliessen');
         }
-        $installedVersion = (string)$this->config->getAppValue('joplix', 'installed_version', '');
+        $installedVersion = (string)$this->config->getAppValue(Application::APP_ID, 'installed_version', '');
         if (version_compare($installedVersion, $expectedVersion, '!=')) {
             throw new \RuntimeException('Nextcloud meldet nach dem Joplix-Update Version ' . $installedVersion . ' statt ' . $expectedVersion);
         }
@@ -642,7 +639,7 @@ class JoplixDevUpdateService {
             return ['valid' => false, 'message' => 'appinfo/info.xml fehlt'];
         }
         $meta = $this->parseAppInfoXml($info);
-        if (($meta['id'] ?? '') !== 'joplix') {
+        if (($meta['id'] ?? '') !== Application::APP_ID) {
             return ['valid' => false, 'message' => 'Keine gueltige Joplix-App'];
         }
         return ['valid' => true, 'version' => (string)($meta['version'] ?? ''), 'message' => 'OK'];

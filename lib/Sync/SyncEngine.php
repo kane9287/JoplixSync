@@ -1,6 +1,7 @@
 <?php
 namespace OCA\Joplix\Sync;
 
+use OCA\Joplix\Service\JoplinItem;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\NotFoundException;
@@ -603,21 +604,12 @@ class SyncEngine {
     }
 
     /**
-     * Reads the metadata block of a serialized Joplin item: the "key: value"
-     * lines after the last blank line (or the whole text for body-less items).
+     * Metadata of a serialised Joplin item. Same parser as JoplixModelService, so what the engine uploads
+     * and what Joplix shows agree on id and type_.
      * @return array<string, string>
      */
     public static function meta(string $content): array {
-        $content = rtrim(str_replace("\r\n", "\n", $content));
-        $pos = strrpos($content, "\n\n");
-        $block = $pos === false ? $content : substr($content, $pos + 2);
-        $out = [];
-        foreach (explode("\n", $block) as $line) {
-            if (preg_match('/^([A-Za-z0-9_]+):\s?(.*)$/', $line, $m)) {
-                $out[$m[1]] = $m[2];
-            }
-        }
-        return $out;
+        return JoplinItem::meta($content);
     }
 
     /** Converts Joplin's ISO timestamps (or millisecond numbers) to milliseconds. */

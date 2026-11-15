@@ -29,7 +29,7 @@ return ['routes'=>[
  ['name'=>'api#browse_files','url'=>'/api/files','verb'=>'GET'],
  ['name'=>'api#resource_data','url'=>'/api/resources/{id}/data','verb'=>'GET'],
  ['name'=>'api#start_office_edit','url'=>'/api/resources/{id}/office/start','verb'=>'POST'],
- ['name'=>'api#office_edit_status','url'=>'/api/resources/{id}/office/status','verb'=>'GET'],
+ ['name'=>'api#office_edit_status','url'=>'/api/resources/{id}/office/status','verb'=>'POST'],
  ['name'=>'api#dev_packages','url'=>'/api/dev/packages','verb'=>'GET'],
  ['name'=>'api#dev_delete_package','url'=>'/api/dev/packages/delete','verb'=>'POST'],
  ['name'=>'api#dev_install_package','url'=>'/api/dev/packages/install','verb'=>'POST'],

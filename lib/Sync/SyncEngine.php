@@ -3,6 +3,7 @@ namespace OCA\Joplix\Sync;
 
 use OCP\Files\File;
 use OCP\Files\Folder;
+use OCP\Files\NotFoundException;
 
 /**
  * Two-way synchronisation between a Nextcloud folder holding Joplin sync
@@ -13,6 +14,13 @@ use OCP\Files\Folder;
  *
  * A run is time-boxed and resumable: when the budget is used up it returns
  * "partial" and the next run continues where this one stopped.
+ *
+ * The folder is edited by users while a run is in progress. The listing taken
+ * in scanLocal() only says which files to look at; whether a file was changed
+ * locally is always decided from a fresh lookup (current()) immediately before
+ * the engine writes or deletes it, inside the write lock ($guard) that the API
+ * takes for its own writes. Never decide from the nodes cached in $md alone:
+ * their etags are as old as the scan.
  *
  * State layout:
  *   clientId     stable id used for the server-side sync lock
@@ -39,6 +47,8 @@ class SyncEngine {
     private array $state;
     /** @var callable|null */
     private $persist;
+    /** @var callable|null runs a closure under the per-user write lock; null = run it directly */
+    private $guard;
 
     /** @var array<string, File> */
     private array $md = [];
@@ -54,8 +64,10 @@ class SyncEngine {
 
     /**
      * @param callable|null $persist called with the current state at safe points so progress survives an abort
+     * @param callable|null $guard fn(callable $critical): mixed, runs $critical while holding the lock that
+     *                             API writes to the same folder take (JoplixWriteLock)
      */
-    public function __construct(Folder $folder, JoplinServerClient $client, array $state, ?callable $persist = null) {
+    public function __construct(Folder $folder, JoplinServerClient $client, array $state, ?callable $persist = null, ?callable $guard = null) {
         $this->folder = $folder;
         $this->client = $client;
         $this->state = $state + ['cursor' => '', 'items' => [], 'blobs' => [], 'blobPending' => [], 'rejected' => [], 'resync' => false];
@@ -68,6 +80,7 @@ class SyncEngine {
             $this->state['clientId'] = bin2hex(random_bytes(16));
         }
         $this->persist = $persist;
+        $this->guard = $guard;
     }
 
     public function state(): array {
@@ -239,31 +252,10 @@ class SyncEngine {
             return;
         }
         $id = substr($name, 0, 32);
-        $node = $this->md[$name] ?? null;
         $known = $this->state['items'][$name] ?? null;
-        $localModified = $node !== null && ($known === null || (string)($known['e'] ?? '') !== $node->getEtag());
 
         if ((int)($change['type'] ?? 0) === 3) {
-            if ($node !== null && $localModified) {
-                // Edited here after the last sync and deleted elsewhere: keep the edit.
-                // Dropping the record makes the push phase upload it again.
-                unset($this->state['items'][$name]);
-                return;
-            }
-            if ($node !== null) {
-                if ($this->client->exists($name)) {
-                    // Deleted and created again since; a later change describes the current version.
-                    return;
-                }
-                $node->delete();
-                unset($this->md[$name]);
-                $this->stats['deleted_local']++;
-            }
-            if (isset($this->blobs[$id])) {
-                $this->blobs[$id]->delete();
-                unset($this->blobs[$id]);
-            }
-            unset($this->state['items'][$name], $this->state['blobs'][$id], $this->state['blobPending'][$id], $this->state['rejected'][$name]);
+            $this->applyRemoteDelete($name, $id);
             return;
         }
 
@@ -274,6 +266,7 @@ class SyncEngine {
             return;
         }
 
+        // Network first, outside the write lock.
         $remote = $this->client->getText($name);
         if ($remote === null) {
             // Gone again in the meantime; a delete change follows.
@@ -284,30 +277,34 @@ class SyncEngine {
             $remoteTime = self::toMillis((string)($meta['updated_time'] ?? ''));
         }
 
-        if ($localModified) {
-            $local = $node->getContent();
-            $localMeta = self::meta($local);
-            $sameVersion = $local === $remote
-                || (($localMeta['updated_time'] ?? '') !== '' && self::toMillis((string)$localMeta['updated_time']) === $remoteTime);
-            if (!$sameVersion && ($localMeta['type_'] ?? '') === '1') {
-                // Both sides changed the note. The server version wins; the local
-                // edit survives as a conflict note, as Joplin itself does.
-                $this->writeConflictCopy($local, $id);
-                $this->stats['conflicts']++;
+        // Look at the file and replace it in one locked step, so a save that lands
+        // during this run is either seen here (conflict copy) or happens afterwards
+        // against the new version (the API then reports the conflict to the user).
+        $etag = $this->guarded(function () use ($name, $id, $known, $remote, $remoteTime): string {
+            $node = $this->current($name);
+            $localModified = $node !== null && ($known === null || (string)($known['e'] ?? '') !== $node->getEtag());
+            $local = $node !== null ? $node->getContent() : null;
+            if ($localModified && $local !== $remote) {
+                $localMeta = self::meta((string)$local);
+                $sameVersion = ($localMeta['updated_time'] ?? '') !== '' && self::toMillis((string)$localMeta['updated_time']) === $remoteTime;
+                if (!$sameVersion && ($localMeta['type_'] ?? '') === '1') {
+                    // Both sides changed the note. The server version wins; the local
+                    // edit survives as a conflict note, as Joplin itself does.
+                    $this->writeConflictCopy((string)$local, $id);
+                    $this->stats['conflicts']++;
+                }
             }
-        }
-
-        if ($node !== null) {
-            if ($node->getContent() !== $remote) {
+            if ($node === null) {
+                $this->folder->newFile($name, $remote);
+            } elseif ($local !== $remote) {
                 $node->putContent($remote);
             }
-        } else {
-            $this->folder->newFile($name, $remote);
-        }
-        $node = $this->freshFile($this->folder, $name);
-        $this->md[$name] = $node;
+            $node = $this->freshFile($this->folder, $name);
+            $this->md[$name] = $node;
+            return $node->getEtag();
+        });
 
-        $record = ['e' => $node->getEtag(), 'r' => $remoteTime];
+        $record = ['e' => $etag, 'r' => $remoteTime];
         if (($meta['type_'] ?? '') === '4') {
             $blobTime = (string)($meta['blob_updated_time'] ?? '');
             $record['b'] = $blobTime;
@@ -319,6 +316,46 @@ class SyncEngine {
         $this->state['items'][$name] = $record;
         unset($this->state['rejected'][$name]);
         $this->stats['pulled']++;
+    }
+
+    private function applyRemoteDelete(string $name, string $id): void {
+        $known = $this->state['items'][$name] ?? null;
+        $node = $this->current($name);
+        if ($node !== null && ($known === null || (string)($known['e'] ?? '') !== $node->getEtag())) {
+            // Edited here after the last sync and deleted elsewhere: keep the edit.
+            // Dropping the record makes the push phase upload it again.
+            unset($this->state['items'][$name]);
+            return;
+        }
+        if ($node !== null) {
+            if ($this->client->exists($name)) {
+                // Deleted and created again since; a later change describes the current version.
+                return;
+            }
+            $deleted = $this->guarded(function () use ($name, $known): bool {
+                // Same check again under the lock: a save may have arrived during the request above.
+                $node = $this->current($name);
+                if ($node === null) {
+                    return true;
+                }
+                if ((string)($known['e'] ?? '') !== $node->getEtag()) {
+                    return false;
+                }
+                $node->delete();
+                unset($this->md[$name]);
+                $this->stats['deleted_local']++;
+                return true;
+            });
+            if (!$deleted) {
+                unset($this->state['items'][$name]);
+                return;
+            }
+        }
+        if (isset($this->blobs[$id])) {
+            $this->blobs[$id]->delete();
+            unset($this->blobs[$id]);
+        }
+        unset($this->state['items'][$name], $this->state['blobs'][$id], $this->state['blobPending'][$id], $this->state['rejected'][$name]);
     }
 
     private function fetchBlob(string $id): void {
@@ -373,18 +410,33 @@ class SyncEngine {
             }
             $cursor = $page['cursor'];
         }
-        foreach ($this->md as $name => $node) {
+        foreach (array_keys($this->md) as $name) {
+            $name = (string)$name;
             if (isset($remote[$name])) {
                 continue;
             }
             $known = $this->state['items'][$name] ?? null;
-            if ($known === null || (string)($known['e'] ?? '') !== $node->getEtag()) {
+            $removed = $this->guarded(function () use ($name, $known): ?bool {
+                $node = $this->current($name);
+                if ($node === null) {
+                    return null;
+                }
+                if ($known === null || (string)($known['e'] ?? '') !== $node->getEtag()) {
+                    return false;
+                }
+                $node->delete();
+                return true;
+            });
+            if ($removed === null) {
+                // Disappeared since the scan; the push phase handles it.
+                continue;
+            }
+            if ($removed === false) {
                 // New or edited here: the push phase uploads it.
                 unset($this->state['items'][$name]);
                 continue;
             }
             $id = substr($name, 0, 32);
-            $node->delete();
             unset($this->md[$name], $this->state['items'][$name]);
             if (isset($this->blobs[$id])) {
                 $this->blobs[$id]->delete();
@@ -420,21 +472,33 @@ class SyncEngine {
             if ($this->timeUp()) {
                 return false;
             }
-            $etag = $node->getEtag();
+            $name = (string)$name;
             $known = $this->state['items'][$name] ?? null;
-            if ($known !== null && (string)($known['e'] ?? '') === $etag) {
-                continue;
-            }
             $rejected = $this->state['rejected'][$name] ?? null;
-            if ($rejected !== null && (string)($rejected['e'] ?? '') === $etag) {
+            // The scan's etag is enough to skip unchanged files; a save made since then
+            // changes it and is picked up by the next run at the latest.
+            $scanEtag = $node->getEtag();
+            if (($known !== null && (string)($known['e'] ?? '') === $scanEtag) || ($rejected !== null && (string)($rejected['e'] ?? '') === $scanEtag)) {
                 continue;
             }
-            $this->uploadItem((string)$name, $node, $etag);
+            // Etag and content must describe the same version, so read both under the lock.
+            $snapshot = $this->guarded(function () use ($name): ?array {
+                $fresh = $this->current($name);
+                return $fresh === null ? null : [$fresh->getEtag(), $fresh->getContent()];
+            });
+            if ($snapshot === null) {
+                continue;
+            }
+            $this->uploadItem($name, $snapshot[1], $snapshot[0]);
         }
 
         foreach ($gone as $name) {
             if ($this->timeUp()) {
                 return false;
+            }
+            if ($this->current($name) !== null) {
+                // Back again since the scan (restored or re-created): not a deletion.
+                continue;
             }
             $id = substr($name, 0, 32);
             $this->client->delete($name);
@@ -451,9 +515,8 @@ class SyncEngine {
         return true;
     }
 
-    private function uploadItem(string $name, File $node, string $etag): void {
+    private function uploadItem(string $name, string $content, string $etag): void {
         $id = substr($name, 0, 32);
-        $content = $node->getContent();
         $meta = self::meta($content);
         $type = (string)($meta['type_'] ?? '');
         if ($type === '' || (string)($meta['id'] ?? '') !== $id) {
@@ -586,6 +649,26 @@ class SyncEngine {
             $this->resourceFolder = $node;
         }
         return $this->resourceFolder;
+    }
+
+    /** The item file as it is right now (fresh lookup, never the node cached by scanLocal), or null. */
+    private function current(string $name): ?File {
+        try {
+            $node = $this->folder->get($name);
+        } catch (NotFoundException $e) {
+            unset($this->md[$name]);
+            return null;
+        }
+        if (!$node instanceof File) {
+            return null;
+        }
+        $this->md[$name] = $node;
+        return $node;
+    }
+
+    /** Runs $critical while holding the write lock shared with the API, when one was supplied. */
+    private function guarded(callable $critical) {
+        return $this->guard !== null ? ($this->guard)($critical) : $critical();
     }
 
     private function freshFile(Folder $folder, string $name): File {

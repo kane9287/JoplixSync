@@ -3,6 +3,9 @@
 - Unsaved changes are no longer lost silently: closing or reloading the tab, or leaving Joplix, asks first while a note has unsaved text.
 - When a note was changed elsewhere (synchronisation or another window) while it was open, saving now offers a choice instead of failing over and over: save your version as a separate copy, overwrite the other version, load the other version, or keep editing.
 - The browser cache of notes and of the note index is now tied to the Nextcloud account. If a different account uses the same browser without a regular logout in between (expired session, closed browser), the previous account's cached notebooks and notes are removed before anything is shown.
+- Synchronisation no longer overwrites a note that is saved while a synchronisation is running. The file is checked again at the moment it is replaced; if it changed, your version is kept as a conflict note, as before for changes made between two runs. Saving and synchronising now take turns per note instead of running into each other.
+- A change saved at the very moment a note is received from the server is no longer skipped by the next upload.
+- Notes can only be created in or moved to an existing notebook, and tags can only be assigned to an existing note and tag.
 
 # Joplix 2026.11.78
 

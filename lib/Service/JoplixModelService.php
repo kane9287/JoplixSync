@@ -24,7 +24,7 @@ class JoplixModelService {
  public function formatPreserving(array $item,array $allowedFields=[]): string{ if(!isset($item['_meta_raw'])||trim((string)$item['_meta_raw'])==='')return $this->format($item); $body=rtrim((string)($item['_body']??'')); $meta=str_replace(["
 ","
 "],"
-",(string)$item['_meta_raw']); $meta=trim($meta,"\n"); $allowed=array_fill_keys($allowedFields,true); foreach($allowed as $field=>$_){ if(array_key_exists($field,$item)){ $value=(string)$item[$field]; $pattern='/^'.preg_quote((string)$field,'/').':.*$/m'; if(preg_match($pattern,$meta))$meta=preg_replace($pattern,$field.': '.$value,$meta,1); elseif(preg_match('/^type_:.*$/m',$meta))$meta=preg_replace_callback('/^type_:.*$/m',fn($m)=>$field.': '.$value."
+",(string)$item['_meta_raw']); $meta=trim($meta,"\n"); $allowed=array_fill_keys($allowedFields,true); foreach($allowed as $field=>$_){ if(array_key_exists($field,$item)){ $value=(string)$item[$field]; $pattern='/^'.preg_quote((string)$field,'/').':.*$/m'; if(preg_match($pattern,$meta))$meta=preg_replace_callback($pattern,fn($m)=>$field.': '.$value,$meta,1); elseif(preg_match('/^type_:.*$/m',$meta))$meta=preg_replace_callback('/^type_:.*$/m',fn($m)=>$field.': '.$value."
 ".$m[0],$meta,1); else $meta=rtrim($meta,"
 ")."
 ".$field.': '.$value; } } $type=(string)($item['type_']??''); if($type==='1'&&!preg_match('/^type_:\s*1\s*$/m',$meta))throw new \RuntimeException('Joplin-Metadatenfehler: type_ fehlt nach dem Speichern'); if(isset($item['id'])&&!preg_match('/^id:\s*'.preg_quote((string)$item['id'],'/').'\s*$/m',$meta))throw new \RuntimeException('Joplin-Metadatenfehler: id fehlt nach dem Speichern'); foreach(explode("

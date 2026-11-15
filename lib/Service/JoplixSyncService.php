@@ -30,15 +30,17 @@ class JoplixSyncService {
     private IClientService $clientService;
     private IAppDataFactory $appDataFactory;
     private ILockingProvider $locking;
+    private JoplixWriteLock $writeLock;
     private LoggerInterface $logger;
 
-    public function __construct(IRootFolder $rootFolder, IConfig $config, ICrypto $crypto, IClientService $clientService, IAppDataFactory $appDataFactory, ILockingProvider $locking, LoggerInterface $logger) {
+    public function __construct(IRootFolder $rootFolder, IConfig $config, ICrypto $crypto, IClientService $clientService, IAppDataFactory $appDataFactory, ILockingProvider $locking, JoplixWriteLock $writeLock, LoggerInterface $logger) {
         $this->rootFolder = $rootFolder;
         $this->config = $config;
         $this->crypto = $crypto;
         $this->clientService = $clientService;
         $this->appDataFactory = $appDataFactory;
         $this->locking = $locking;
+        $this->writeLock = $writeLock;
         $this->logger = $logger;
     }
 
@@ -158,6 +160,9 @@ class JoplixSyncService {
             $client = $this->client($uid, true);
             $engine = new SyncEngine($folder, $client, $this->loadState($stateFile), function (array $state) use ($stateFile): void {
                 $this->saveState($stateFile, $state);
+            }, function (callable $critical) use ($uid) {
+                // Per item, not per run: users keep saving while a long synchronisation is in progress.
+                return $this->writeLock->run($uid, $critical, 20.0);
             });
             $result = $engine->run($budgetSeconds, $allowMassDelete);
         } catch (\Throwable $e) {

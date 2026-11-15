@@ -1,13 +1,15 @@
 <?php
 namespace OCA\Joplix\Controller;
-use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService;
+use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService; use OCA\Joplix\Service\JoplixWriteLock;
 use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP\Files\Folder; use OCP\Files\IRootFolder; use OCP\IConfig; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager;
-class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService;
- public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService){parent::__construct($AppName,$request);$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
+class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService; private JoplixWriteLock $writeLock;
+ public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService,JoplixWriteLock $writeLock){parent::__construct($AppName,$request);$this->writeLock=$writeLock;$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
  private function uid(): string{$u=$this->userSession->getUser();if($u===null)throw new \RuntimeException('Nicht angemeldet');return $u->getUID();}
  private function isAdmin(): bool{return $this->groupManager->isAdmin($this->uid());} private function setting(string $k,string $d=''): string{return $this->config->getUserValue($this->uid(),Application::APP_ID,$k,$d);} private function setSetting(string $k,string $v): void{$this->config->setUserValue($this->uid(),Application::APP_ID,$k,$v);} private function userFolder(): Folder{return $this->rootFolder->getUserFolder($this->uid());}
  private function joplinPath(): string{$p=$this->setting('joplin_path','/JoplinV2');$p='/'.trim($p,'/');return $p==='/'?'/JoplinV2':$p;} private function joplinFolder(): Folder{$rel=trim($this->joplinPath(),'/');$uf=$this->userFolder();$n=$rel===''?$uf:$uf->get($rel);if(!$n instanceof Folder)throw new \RuntimeException('Joplix-Pfad ist kein Ordner: '.$this->joplinPath());return $n;}
- private function workspace(): JoplixWorkspaceService{return new JoplixWorkspaceService($this->rootFolder,$this->config,$this->uid());} private function model(): JoplixModelService{return new JoplixModelService($this->joplinFolder());} private function indexSvc(): JoplixIndexService{return new JoplixIndexService($this->userFolder(),$this->joplinPath());} private function devSvc(): JoplixDevUpdateService{return new JoplixDevUpdateService($this->userFolder(),$this->setting('dev_folder','/.joplix/updates'),$this->config,$this->setting('update_backup_enabled','no')==='yes');} private function writer(): JoplixWriteService{return new JoplixWriteService($this->model());} private function err(\Throwable $e,int $s=400): JSONResponse{return new JSONResponse(['error'=>$e->getMessage()],$s);}
+ private function workspace(): JoplixWorkspaceService{return new JoplixWorkspaceService($this->rootFolder,$this->config,$this->uid());} private function model(): JoplixModelService{return new JoplixModelService($this->joplinFolder());} private function indexSvc(): JoplixIndexService{return new JoplixIndexService($this->userFolder(),$this->joplinPath());} private function devSvc(): JoplixDevUpdateService{return new JoplixDevUpdateService($this->userFolder(),$this->setting('dev_folder','/.joplix/updates'),$this->config,$this->setting('update_backup_enabled','no')==='yes');} private function writer(): JoplixWriteService{return new JoplixWriteService($this->model());} /** Every endpoint that changes the Joplin folder runs inside this: the model is loaded, checked and written under the per-user write lock that the sync engine takes per item (JoplixWriteLock). */
+ private function locked(callable $fn){return $this->writeLock->run($this->uid(),$fn);}
+ private function err(\Throwable $e,int $s=400): JSONResponse{return new JSONResponse(['error'=>$e->getMessage()],$s);}
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
@@ -81,55 +83,55 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  */ public function getNote(string $id): JSONResponse{try{$n=$this->model()->note($id);return $n?new JSONResponse($n):new JSONResponse(['error'=>'Notiz nicht gefunden'],404);}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function createNote(): JSONResponse{try{$r=$this->writer()->createNote((string)$this->request->getParam('title','Neue Notiz'),(string)$this->request->getParam('body',''),(string)$this->request->getParam('parent_id',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function createNote(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->createNote((string)$this->request->getParam('title','Neue Notiz'),(string)$this->request->getParam('body',''),(string)$this->request->getParam('parent_id',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function updateNote(string $id): JSONResponse{try{$r=$this->writer()->updateNote($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('body',''),(string)$this->request->getParam('known_updated_time',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e,str_starts_with($e->getMessage(),'Konflikt')?409:400);}}
+ */ public function updateNote(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->updateNote($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('body',''),(string)$this->request->getParam('known_updated_time',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e,str_starts_with($e->getMessage(),'Konflikt')?409:400);}}
  /**
  * @NoAdminRequired
- */ public function deleteNote(string $id): JSONResponse{try{$r=$this->permanent()?$this->writer()->deleteNote($id):$this->writer()->trashNote($id);$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function deleteNote(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->permanent()?$this->writer()->deleteNote($id):$this->writer()->trashNote($id);$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function moveNote(string $id): JSONResponse{try{$r=$this->writer()->moveNote($id,(string)$this->request->getParam('target_notebook_id',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function moveNote(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->moveNote($id,(string)$this->request->getParam('target_notebook_id',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function createNotebook(): JSONResponse{try{$r=$this->writer()->createNotebook((string)$this->request->getParam('title','Neues Notizbuch'),(string)$this->request->getParam('parent_id',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function createNotebook(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->createNotebook((string)$this->request->getParam('title','Neues Notizbuch'),(string)$this->request->getParam('parent_id',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function updateNotebook(string $id): JSONResponse{try{$r=$this->writer()->updateNotebook($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('known_updated_time',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e,str_starts_with($e->getMessage(),'Konflikt')?409:400);}}
+ */ public function updateNotebook(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->updateNotebook($id,(string)$this->request->getParam('title',''),(string)$this->request->getParam('known_updated_time',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e,str_starts_with($e->getMessage(),'Konflikt')?409:400);}}
  /**
  * @NoAdminRequired
- */ public function deleteNotebook(string $id): JSONResponse{try{$r=$this->permanent()?$this->writer()->deleteNotebook($id):$this->writer()->trashNotebook($id);$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function deleteNotebook(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->permanent()?$this->writer()->deleteNotebook($id):$this->writer()->trashNotebook($id);$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /** DELETE moves to Joplin's trash; ?permanent=1 removes the files. */
  private function permanent(): bool{return (string)$this->request->getParam('permanent','')==='1';}
  /**
  * @NoAdminRequired
- */ public function restoreNote(string $id): JSONResponse{try{$r=$this->writer()->restoreNote($id,(string)$this->request->getParam('target_notebook_id',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function restoreNote(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->restoreNote($id,(string)$this->request->getParam('target_notebook_id',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function restoreNotebook(string $id): JSONResponse{try{$r=$this->writer()->restoreNotebook($id);$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function restoreNotebook(string $id): JSONResponse{try{return $this->locked(function() use ($id){$r=$this->writer()->restoreNotebook($id);$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function emptyTrash(): JSONResponse{try{$r=$this->writer()->emptyTrash();$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function emptyTrash(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->emptyTrash();$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
  * @NoCSRFRequired
  */ public function tags(): JSONResponse{try{return new JSONResponse(array_values($this->model()->tagsRaw()));}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function createTag(): JSONResponse{try{$r=$this->writer()->createTag((string)$this->request->getParam('title','Neuer Tag'));return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function createTag(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->createTag((string)$this->request->getParam('title','Neuer Tag'));return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function saveNoteTags(string $id): JSONResponse{try{$tags=$this->request->getParam('tag_ids',[]); if(!is_array($tags))$tags=[]; $r=$this->writer()->saveNoteTags($id,$tags);return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function saveNoteTags(string $id): JSONResponse{try{return $this->locked(function() use ($id){$tags=$this->request->getParam('tag_ids',[]); if(!is_array($tags))$tags=[]; $r=$this->writer()->saveNoteTags($id,$tags);return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function removeNoteTag(string $id,string $tagId): JSONResponse{try{$r=$this->writer()->removeNoteTag($id,$tagId);return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function removeNoteTag(string $id,string $tagId): JSONResponse{try{return $this->locked(function() use ($id,$tagId){$r=$this->writer()->removeNoteTag($id,$tagId);return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function createAndAssignTag(string $id): JSONResponse{try{$title=trim((string)$this->request->getParam('title',''));if($title==='')throw new \RuntimeException('Tag-Name darf nicht leer sein.');$model=$this->model();$writer=new JoplixWriteService($model);$tagId='';$canonicalTitle=$title;$created=false;foreach($model->tagsRaw() as $tag){$existingTitle=trim((string)($tag['_title']??$tag['_body']??''));if($existingTitle!==''&&mb_strtolower($existingTitle,'UTF-8')===mb_strtolower($title,'UTF-8')){$tagId=(string)($tag['id']??'');$canonicalTitle=$existingTitle;break;}}if($tagId===''){$createdTag=$writer->createTag($title);$tagId=(string)($createdTag['id']??'');$created=true;}if($tagId==='')throw new \RuntimeException('Tag konnte nicht erstellt werden.');$writer->saveNoteTags($id,[$tagId]);return new JSONResponse(['ok'=>true,'id'=>$tagId,'title'=>$canonicalTitle,'created'=>$created]);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function createAndAssignTag(string $id): JSONResponse{try{return $this->locked(function() use ($id){$title=trim((string)$this->request->getParam('title',''));if($title==='')throw new \RuntimeException('Tag-Name darf nicht leer sein.');$model=$this->model();$writer=new JoplixWriteService($model);$tagId='';$canonicalTitle=$title;$created=false;foreach($model->tagsRaw() as $tag){$existingTitle=trim((string)($tag['_title']??$tag['_body']??''));if($existingTitle!==''&&mb_strtolower($existingTitle,'UTF-8')===mb_strtolower($title,'UTF-8')){$tagId=(string)($tag['id']??'');$canonicalTitle=$existingTitle;break;}}if($tagId===''){$createdTag=$writer->createTag($title);$tagId=(string)($createdTag['id']??'');$created=true;}if($tagId==='')throw new \RuntimeException('Tag konnte nicht erstellt werden.');$writer->saveNoteTags($id,[$tagId]);return new JSONResponse(['ok'=>true,'id'=>$tagId,'title'=>$canonicalTitle,'created'=>$created]);});}catch(\Throwable $e){return $this->err($e);}}
  /**
  * @NoAdminRequired
- */ public function uploadResource(): JSONResponse{try{$r=$this->writer()->uploadResource((string)$this->request->getParam('filename','upload.bin'),(string)$this->request->getParam('mime','application/octet-stream'),(string)$this->request->getParam('data_base64',''));$this->rebuildIndex();return new JSONResponse($r);}catch(\Throwable $e){return $this->err($e);}}
+ */ public function uploadResource(): JSONResponse{try{return $this->locked(function(){$r=$this->writer()->uploadResource((string)$this->request->getParam('filename','upload.bin'),(string)$this->request->getParam('mime','application/octet-stream'),(string)$this->request->getParam('data_base64',''));$this->rebuildIndex();return new JSONResponse($r);});}catch(\Throwable $e){return $this->err($e);}}
 
  // ---- Attach from Nextcloud. Paths are relative to the user's files root ("/Documents/a.pdf").
  // The Joplin sync folder and the .joplix workspace are not offered and cannot be attached from.
@@ -171,9 +173,11 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
    if($path==='/'||$this->isHiddenFilesPath($path))throw new \RuntimeException('Diese Datei kann nicht angehaengt werden');
    $node=$this->filesNode($path);
    if(!$node instanceof \OCP\Files\File)throw new \RuntimeException('Keine Datei: '.$path);
-   $r=$this->writer()->createResourceFromStream($node->getName(),(string)$node->getMimeType(),$node->fopen('r'),(int)$node->getSize());
-   $this->rebuildIndex();
-   return new JSONResponse($r);
+   return $this->locked(function() use ($node){
+    $r=$this->writer()->createResourceFromStream($node->getName(),(string)$node->getMimeType(),$node->fopen('r'),(int)$node->getSize());
+    $this->rebuildIndex();
+    return new JSONResponse($r);
+   });
   }catch(\Throwable $e){return $this->err($e);}
  }
 
@@ -308,7 +312,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   $file=$folder->get((string)$session['file_name']);if(!$file instanceof \OCP\Files\File)return new JSONResponse(['active'=>false,'error'=>'Arbeitsdatei ist ungültig']);
   $binary=$file->getContent();$hash=hash('sha256',$binary);$updated=false;
   if(!hash_equals((string)$session['working_hash'],$hash)){
-    $result=$this->writer()->updateResourceBinary($id,$binary,(string)$session['resource_hash']);
+    $result=$this->locked(fn()=>$this->writer()->updateResourceBinary($id,$binary,(string)$session['resource_hash']));
     $session['working_hash']=$hash;$session['resource_hash']=$result['sha256'];$session['last_import_at']=time();$sessions[$id]=$session;
     $this->setSetting('office_sessions',json_encode($sessions,JSON_UNESCAPED_SLASHES));$updated=!((bool)($result['already_applied']??false));
     $alreadyApplied=(bool)($result['already_applied']??false);

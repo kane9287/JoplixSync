@@ -10,10 +10,21 @@ Joplix provides a central workspace for creating, editing, organizing, and synch
 
 Joplix is best for self-hosted environments where privacy, data ownership, and independence are important. Your data remains in your own Nextcloud environment, synchronization with a Joplin server keeps your Joplix workspace available across your devices.
 
-## Edit With Office 
-### EuroOffice **ONLY** Other self hosted office editors are on the roadmap.
+## Edit With Office
 
-Office documents can also be opened and edited with external Office applications and then seamlessly returned to Joplix. 
+Office attachments (`docx`, `xlsx`, `pptx`, `odt`, `ods`, `odp`, and the legacy `doc`, `xls`, `ppt`) can be edited in an Office editor installed on the same Nextcloud. Joplix opens a working copy in the editor and writes each save back into the attachment, so the change syncs to Joplin like any other edit.
+
+Supported editors (any one is enough):
+
+| Editor | Nextcloud app |
+|---|---|
+| Nextcloud Office / Collabora Online (built-in CODE server or a separate Collabora) | `richdocuments` |
+| ONLYOFFICE | `onlyoffice` |
+| Euro Office | `eurooffice` |
+
+**Settings › Office editor** chooses one when several are installed; *Automatic* takes the first available in the order above. Without an editor, Office attachments offer Download only. ONLYOFFICE converts the legacy `doc`, `xls` and `ppt` formats into a new file, so Joplix does not open those three with it.
+
+Keep the Joplix tab open until the status under the attachment says the final file was applied: changes are taken over while Joplix checks the working copy.
 
 ## Synchronisation with Joplin Server
 

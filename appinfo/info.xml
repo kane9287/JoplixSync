@@ -24,7 +24,7 @@ End-to-end encryption must be switched off on the Joplin account. Joplix is a fo
 - Office-Anhänge können mit einer installierten Office-App bearbeitet werden
 
 Die Ende-zu-Ende-Verschlüsselung muss im Joplin-Konto ausgeschaltet sein. Joplix ist ein Fork der Joplix-App von Stoneubi.]]></description>
-    <version>2026.11.80</version>
+    <version>2026.11.81</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Stoneubi</author>
     <namespace>Joplix</namespace>

@@ -213,7 +213,7 @@ function normalizeUpdateRepoUrlInput(value){
   return v;
 }
 
-function jpLocalSettings(){let local={};try{local=JSON.parse(localStorage.getItem('joplix.settings')||'{}')||{};}catch(e){local={};}return Object.assign({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2',update_source:'github',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',update_backup_enabled:'no'},local,window.JoplixServerSettings||{});}
+function jpLocalSettings(){let local={};try{local=JSON.parse(localStorage.getItem('joplix.settings')||'{}')||{};}catch(e){local={};}return Object.assign({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2',update_source:'github',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',office_editor:'auto',update_backup_enabled:'no'},local,window.JoplixServerSettings||{});}
 function jpSetLocalSettings(local){try{localStorage.setItem('joplix.settings',JSON.stringify(local));}catch(e){}}
 async function jpApplySettingsFromUi(forceReindex){
   const pathEl=document.getElementById('jp-setting-joplin-path');
@@ -644,7 +644,7 @@ function applyIndexPreservingFocus(idx,reason=''){
   if(reason)status(reason,'ok');
 }
 async function load(){
-  state.settings=await api('/api/settings').catch(()=>({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2'})); window.JoplixServerSettings=Object.assign({},state.settings);
+  state.settings=await api('/api/settings').catch(()=>({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2'})); window.JoplixServerSettings=Object.assign({},state.settings); syncOfficeEditorUi(currentLocalSettings());
   state.sort=state.settings.sort_order||(storage.get('settings',{}).sort_order)||'updated_desc';
   fillSettings();
   const cached=rememberedIndex();
@@ -913,7 +913,7 @@ async function finalizeOfficeEdit(resourceId,statusEl){
   const sync=officeSyncState(resourceId);
   if(sync.inFlight)await sync.inFlight;
   officeStatusText(statusEl,t('joplix','Office was closed. Waiting for the final Office save...'),'busy');
-  // EuroOffice/Document Server may write the final file several seconds after
+  // Every editor (Collabora via WOPI, ONLYOFFICE/Euro Office via callback) may write the final file several seconds after
   // its browser window has already closed. Keep checking the working copy until
   // it stayed unchanged for three checks and a minimum grace period elapsed.
   const started=Date.now();
@@ -937,87 +937,28 @@ async function finalizeOfficeEdit(resourceId,statusEl){
   scheduleBackgroundRefresh(350);
   return lastResult;
 }
-function cssEscapeValue(value){
-  const text=String(value||'');
-  if(window.CSS&&typeof window.CSS.escape==='function')return window.CSS.escape(text);
-  return text.replace(/([\"'\[\]#.:>+~*=()])/g,'\\$1');
-}
-function findNextcloudFileRow(doc,fileId,fileName){
-  const id=String(fileId||'');
-  const name=String(fileName||'');
-  const selectors=[
-    '[data-cy-files-list-row-fileid="'+cssEscapeValue(id)+'"]',
-    '[data-fileid="'+cssEscapeValue(id)+'"]',
-    '[data-id="'+cssEscapeValue(id)+'"]',
-    'tr[data-id="'+cssEscapeValue(id)+'"]',
-    '.files-list__row[data-id="'+cssEscapeValue(id)+'"]'
-  ];
-  for(const selector of selectors){try{const row=doc.querySelector(selector);if(row)return row;}catch(e){}}
-  const rows=Array.from(doc.querySelectorAll('tr,.files-list__row,[data-cy-files-list-row]'));
-  return rows.find(row=>String(row.textContent||'').includes(name))||null;
-}
-function activateNextcloudFileRow(row,fileName){
-  if(!row)return false;
-  const name=String(fileName||'');
-  const candidates=[
-    '[data-cy-files-list-row-name]',
-    '.files-list__row-name-link',
-    '.files-list__row-name',
-    'a[href]',
-    'button'
-  ];
-  let target=null;
-  for(const selector of candidates){
-    const items=Array.from(row.querySelectorAll(selector));
-    target=items.find(item=>!name||String(item.textContent||'').trim().includes(name))||items[0]||null;
-    if(target)break;
-  }
-  target=target||row;
-  try{target.dispatchEvent(new MouseEvent('click',{view:row.ownerDocument.defaultView,bubbles:true,cancelable:true,button:0}));return true;}catch(e){}
-  try{target.click();return true;}catch(e){}
-  return false;
-}
-function triggerNextcloudDefaultFileAction(editorWindow,fileId,fileName,statusEl){
-  let attempts=0;
-  const timer=setInterval(()=>{
-    attempts++;
-    if(!editorWindow||editorWindow.closed){clearInterval(timer);return;}
-    try{
-      const doc=editorWindow.document;
-      if(!doc||!doc.body)return;
-      const row=findNextcloudFileRow(doc,fileId,fileName);
-      if(row&&activateNextcloudFileRow(row,fileName)){
-        clearInterval(timer);
-        officeStatusText(statusEl,t('joplix','Nextcloud file action started. Saved changes are transferred back to Joplix automatically.'),'busy');
-        return;
-      }
-    }catch(e){
-      // Sobald Nextcloud Office in einen anderen Dokumentkontext wechselt, ist die Dateiaktion bereits gestartet.
-      if(attempts>3){clearInterval(timer);return;}
-    }
-    if(attempts>=40){
-      clearInterval(timer);
-      officeStatusText(statusEl,t('joplix','The working copy was opened. If the Office editor does not start automatically, please click the file name once.'),'warning');
-    }
-  },500);
-}
+const JP_OFFICE_EDITOR_NAMES={eurooffice:'Euro Office',richdocuments:'Nextcloud Office',onlyoffice:'ONLYOFFICE'};
+function officeEditorName(id){return JP_OFFICE_EDITOR_NAMES[id]||t('joplix','the office editor');}
+function officeEditorsAvailable(){const list=currentLocalSettings().office_editors;return Array.isArray(list)?list.filter(id=>JP_OFFICE_EDITOR_NAMES[id]):[];}
+/** The editor the server will pick: the chosen one while installed, else the first available (same rule as ApiController::officeEditor). */
+function officeEditorExpected(){const all=officeEditorsAvailable();const pick=currentLocalSettings().office_editor;return all.includes(pick)?pick:(all[0]||'');}
 async function startOfficeEdit(r,statusEl){
   const openMode=(currentLocalSettings().office_open_mode==='tab')?'tab':'window';
   const popupFeatures='popup=yes,width='+Math.max(900,Math.min(1500,Math.floor((window.screen&&screen.availWidth||1400)*0.88)))+',height='+Math.max(700,Math.min(1000,Math.floor((window.screen&&screen.availHeight||900)*0.88)))+',left=40,top=30,resizable=yes,scrollbars=yes';
   const windowName=openMode==='window'?('joplix-office-'+r.id):'_blank';
   const editorWindow=window.open('about:blank',windowName,openMode==='window'?popupFeatures:'noopener');
   if(!editorWindow){officeStatusText(statusEl,t('joplix','The Office window was blocked by the browser. Please allow pop-ups for this Nextcloud address.'),'error');throw new Error(t('joplix','Office window was blocked by the browser.'));}
-  try{editorWindow.document.title=t('joplix','Joplix – preparing Office');editorWindow.document.body.innerHTML='<p style="font-family:system-ui;padding:24px">'+t('joplix','Preparing Nextcloud Office…')+'</p>';}catch(e){}
-  officeStatusText(statusEl,t('joplix','Preparing working copy for Nextcloud Office...'),'busy');
+  const expectedName=officeEditorName(officeEditorExpected());
+  try{editorWindow.document.title=t('joplix','Joplix – preparing Office');const p=editorWindow.document.createElement('p');p.style.cssText='font-family:system-ui;padding:24px';p.textContent=t('joplix','Preparing {editor}…',{editor:expectedName});editorWindow.document.body.replaceChildren(p);}catch(e){}
+  officeStatusText(statusEl,t('joplix','Preparing working copy for {editor}...',{editor:expectedName}),'busy');
   try{
     const result=await api('/api/resources/'+r.id+'/office/start',{method:'POST',body:{}});
-    const rawFileId=String(result.file_id||'');
-    const fileId=encodeURIComponent(rawFileId);
-    const fileName=String(result.file_name||resourceFileName(r,result));
-    if(!fileId)throw new Error(t('joplix','The Nextcloud file ID of the working copy is missing.'));
-    const officeUrl=OC.generateUrl(String(result.editor_path||('/apps/eurooffice/'+fileId)));
+    const fileId=String(result.file_id||'');
+    if(!fileId||!result.editor_path)throw new Error(t('joplix','The Nextcloud file ID of the working copy is missing.'));
+    const editorName=officeEditorName(result.editor);
+    const officeUrl=OC.generateUrl(String(result.editor_path));
     editorWindow.location.replace(officeUrl);
-    officeStatusText(statusEl,(openMode==='window'?t('joplix','Editing was requested in a separate window. '):t('joplix','Editing is running in a new tab. '))+t('joplix','EuroOffice opens directly. Saved changes are transferred back to Joplix automatically.'),'busy');
+    officeStatusText(statusEl,(openMode==='window'?t('joplix','Editing was requested in a separate window. '):t('joplix','Editing is running in a new tab. '))+t('joplix','{editor} opens directly. Saved changes are transferred back to Joplix automatically.',{editor:editorName}),'busy');
     stopOfficePolling(r.id);
     state.officeSyncs[r.id]={inFlight:null,closed:false,lastHash:''};
     state.officePollers[r.id]=setInterval(()=>pollOfficeEdit(r.id,statusEl).catch(()=>{}),3000);
@@ -1053,7 +994,7 @@ function renderResources(rs){
     main.appendChild(title);main.appendChild(meta);row.appendChild(main);box.appendChild(row);
     if(!r.exists)return;
     const actions=document.createElement('div');actions.className='jp-resource-actions';row.appendChild(actions);
-    const primary=resourcePrimaryLabel(kind);
+    const primary=(kind==='office'&&!officeEditorsAvailable().length)?'':resourcePrimaryLabel(kind);
     if(primary){
       const b=document.createElement('button');b.type='button';b.className='jp-resource-action jp-resource-action-primary';b.textContent=primary;actions.appendChild(b);
       if(kind==='office'){const status=document.createElement('div');status.className='jp-resource-edit-status';row.appendChild(status);b.onclick=async()=>{b.disabled=true;try{await startOfficeEdit(r,status);}catch(e){jpAlert(e.message);}finally{b.disabled=false;}};}
@@ -1616,7 +1557,7 @@ async function backgroundRefresh(){
 }
 async function saveLastLocation(){const loc={notebook_id:state.notebookId||'',note_id:state.noteId||''};storage.set('lastLocation',loc);api('/api/state/last-location',{method:'POST',body:loc}).catch(()=>{});}
 function setSwitch(el,on){if(!el)return;el.classList.toggle('active',!!on);el.setAttribute('aria-checked',on?'true':'false');}
-function currentLocalSettings(){return Object.assign({remember_last_location:'yes',sort_order:state.sort||'updated_desc',joplin_path:'/JoplinV2',update_source:'github',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',update_backup_enabled:'no',language:'system',is_admin:false},storage.get('settings',{}),state.settings||{});}
+function currentLocalSettings(){return Object.assign({remember_last_location:'yes',sort_order:state.sort||'updated_desc',joplin_path:'/JoplinV2',update_source:'github',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',office_editor:'auto',update_backup_enabled:'no',language:'system',is_admin:false},storage.get('settings',{}),state.settings||{});}
 async function persistSettings(extra={}){
   const local=Object.assign(currentLocalSettings(),extra);
   local.sort_order=local.sort_order||state.sort||'updated_desc';
@@ -1624,13 +1565,17 @@ async function persistSettings(extra={}){
   local.joplin_path=normalizePath(local.joplin_path||'/JoplinV2');
   storage.set('settings',local);
   state.settings=Object.assign(state.settings||{},local);
+  // The older settings code (jpApplySettingsFromUi, on close) posts window.JoplixServerSettings; keep it current or it reverts this change.
+  window.JoplixServerSettings=Object.assign({},window.JoplixServerSettings||{},local);
   await api('/api/settings',{method:'POST',body:local}).catch(e=>{status(t('joplix','Settings could not be saved: ')+e.message,'error');throw e;});
 }
 function normalizePath(p){p=String(p||'').trim();if(!p)return '/JoplinV2';if(!p.startsWith('/'))p='/'+p;return p.replace(/\/+/g,'/').replace(/\/\/+/, '/').replace(/\s+$/,'');}
 function openSettings(){const o=$('jp-settings-overlay');if(!o){jpAlert(t('joplix','Settings area was not found.'));return;}syncSettingsUi();loadFoldersForSettings();o.classList.add('open');o.setAttribute('aria-hidden','false');}
 function closeSettings(){const o=$('jp-settings-overlay');if(!o)return;o.classList.remove('open');o.setAttribute('aria-hidden','true');}
 function activateSettingsTab(tab){document.querySelectorAll('[data-settings-tab]').forEach(b=>b.classList.toggle('active',b.dataset.settingsTab===tab));document.querySelectorAll('[data-settings-section]').forEach(sec=>sec.classList.toggle('active',sec.dataset.settingsSection===tab));}
-function syncSettingsUi(){const local=currentLocalSettings();if($('jp-setting-sort'))$('jp-setting-sort').value=local.sort_order||state.sort||'updated_desc';if($('jp-setting-joplin-path'))$('jp-setting-joplin-path').value=local.joplin_path||'/JoplinV2';if($('jp-setting-office-open-mode'))$('jp-setting-office-open-mode').value=local.office_open_mode==='tab'?'tab':'window';if($('jp-setting-update-backup'))$('jp-setting-update-backup').value=local.update_backup_enabled==='yes'?'yes':'no';setSwitch($('jp-setting-remember-toggle'),(local.remember_last_location||'yes')==='yes');syncUpdateUi();}
+/** Fills the editor select with the installed editors; both office cards hide when there is none. */
+function syncOfficeEditorUi(local){const sel=$('jp-setting-office-editor');const all=officeEditorsAvailable();document.querySelectorAll('#joplix .jp-office-setting').forEach(el=>{el.hidden=!all.length;});if(!sel)return;sel.replaceChildren();const auto=document.createElement('option');auto.value='auto';auto.textContent=all.length?t('joplix','Automatic ({editor})',{editor:officeEditorName(all[0])}):t('joplix','Automatic');sel.appendChild(auto);all.forEach(id=>{const o=document.createElement('option');o.value=id;o.textContent=officeEditorName(id);sel.appendChild(o);});sel.value=all.includes(local.office_editor)?local.office_editor:'auto';}
+function syncSettingsUi(){const local=currentLocalSettings();if($('jp-setting-sort'))$('jp-setting-sort').value=local.sort_order||state.sort||'updated_desc';if($('jp-setting-joplin-path'))$('jp-setting-joplin-path').value=local.joplin_path||'/JoplinV2';if($('jp-setting-office-open-mode'))$('jp-setting-office-open-mode').value=local.office_open_mode==='tab'?'tab':'window';syncOfficeEditorUi(local);if($('jp-setting-update-backup'))$('jp-setting-update-backup').value=local.update_backup_enabled==='yes'?'yes':'no';setSwitch($('jp-setting-remember-toggle'),(local.remember_last_location||'yes')==='yes');syncUpdateUi();}
 async function loadFoldersForSettings(){try{const data=await api('/api/folders');const list=$('jp-folder-list');if(list){list.innerHTML='';(data.folders||[]).forEach(f=>{const o=document.createElement('option');o.value=f;list.appendChild(o);});}if($('jp-setting-joplin-path')&&!$('jp-setting-joplin-path').value)$('jp-setting-joplin-path').value=data.current||'/JoplinV2';}catch(e){status(t('joplix','Folder list could not be loaded: ')+e.message,'warning');}}
 async function applyJoplinPathFromInput(){const el=$('jp-setting-joplin-path');if(!el)return;const newPath=normalizePath(el.value);el.value=newPath;const oldPath=(state.settings&&state.settings.joplin_path)||'/JoplinV2';await persistSettings({joplin_path:newPath});if(newPath!==oldPath){storage.del('lastGoodIndex');state.index=null;status(t('joplix','Joplix folder changed. Rebuilding index...'),'warning');await rebuildAndRestore(true).catch(e=>status(t('joplix','Index rebuild failed: ')+e.message,'error'));}}
 function showWelcomeIfNeeded(){
@@ -1778,7 +1723,7 @@ function setupSettings(){
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!jpDialogOpen())closeSettings();});
   document.querySelectorAll('[data-settings-tab]').forEach(b=>b.addEventListener('click',()=>activateSettingsTab(b.dataset.settingsTab)));
   const sortEl=$('jp-setting-sort'); if(sortEl)sortEl.addEventListener('change',async e=>{state.sort=e.target.value;await persistSettings({sort_order:state.sort});if(state.notebookId)selectNotebook(state.notebookId);});
-  const officeMode=$('jp-setting-office-open-mode'); if(officeMode)officeMode.addEventListener('change',async e=>{await persistSettings({office_open_mode:e.target.value==='tab'?'tab':'window'});jpStatusText(t('joplix','Office opening mode saved.'),'ok');});const backupMode=$('jp-setting-update-backup');if(backupMode)backupMode.addEventListener('change',async e=>{await persistSettings({update_backup_enabled:e.target.value==='yes'?'yes':'no'});jpStatusText(t('joplix','Backup setting saved.'),'ok');});
+  const officeMode=$('jp-setting-office-open-mode'); if(officeMode)officeMode.addEventListener('change',async e=>{await persistSettings({office_open_mode:e.target.value==='tab'?'tab':'window'});jpStatusText(t('joplix','Office opening mode saved.'),'ok');});const officeEditor=$('jp-setting-office-editor');if(officeEditor)officeEditor.addEventListener('change',async e=>{await persistSettings({office_editor:e.target.value||'auto'});jpStatusText(t('joplix','Office editor saved.'),'ok');});const backupMode=$('jp-setting-update-backup');if(backupMode)backupMode.addEventListener('change',async e=>{await persistSettings({update_backup_enabled:e.target.value==='yes'?'yes':'no'});jpStatusText(t('joplix','Backup setting saved.'),'ok');});
   const pathEl=$('jp-setting-joplin-path'); if(pathEl){pathEl.addEventListener('change',()=>applyJoplinPathFromInput().catch(e=>jpAlert(e.message)));pathEl.addEventListener('blur',()=>applyJoplinPathFromInput().catch(e=>jpAlert(e.message)));}
   const remember=$('jp-setting-remember-toggle'); if(remember)remember.addEventListener('click',async()=>{const local=currentLocalSettings();local.remember_last_location=(local.remember_last_location||'yes')==='yes'?'no':'yes';setSwitch(remember,local.remember_last_location==='yes');await persistSettings({remember_last_location:local.remember_last_location});});
   const reset=$('jp-layout-reset'); if(reset)reset.addEventListener('click',()=>{storage.del('columnWidths2');applyColumnWidths();});

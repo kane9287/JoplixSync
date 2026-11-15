@@ -152,7 +152,11 @@ if (is_readable($infoXml)) {
             <option value="title_asc"><?php p($l->t('Title A-Z')); ?></option>
           </select>
         </div>
-        <div class="jp-setting-card">
+        <div class="jp-setting-card jp-office-setting" hidden>
+          <label for="jp-setting-office-editor"><strong><?php p($l->t('Office editor')); ?></strong><span><?php p($l->t('Which installed Nextcloud app edits Office attachments. Automatic uses the first available one.')); ?></span></label>
+          <select id="jp-setting-office-editor"><option value="auto"><?php p($l->t('Automatic')); ?></option></select>
+        </div>
+        <div class="jp-setting-card jp-office-setting" hidden>
           <label for="jp-setting-office-open-mode"><strong><?php p($l->t('Open Office files')); ?></strong><span><?php p($l->t('Choose whether editing opens in a separate window or a new browser tab.')); ?></span></label>
           <select id="jp-setting-office-open-mode">
             <option value="window"><?php p($l->t('Separate window')); ?></option>

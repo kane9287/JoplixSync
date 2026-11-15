@@ -1,9 +1,9 @@
 <?php
 namespace OCA\Joplix\Controller;
 use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService; use OCA\Joplix\Service\JoplixWriteLock;
-use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP\Files\Folder; use OCP\Files\IRootFolder; use OCP\IConfig; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager; use OCP\IL10N; use OCP\Files\AppData\IAppDataFactory; use OCA\Joplix\Service\ConflictException;
-class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService; private JoplixWriteLock $writeLock; private IAppDataFactory $appDataFactory; private IL10N $l;
- public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService,JoplixWriteLock $writeLock,IAppDataFactory $appDataFactory,IL10N $l){parent::__construct($AppName,$request);$this->l=$l;$this->appDataFactory=$appDataFactory;$this->writeLock=$writeLock;$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
+use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP\Files\Folder; use OCP\Files\IRootFolder; use OCP\IConfig; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager; use OCP\IL10N; use OCP\Files\AppData\IAppDataFactory; use OCA\Joplix\Service\ConflictException; use OCP\App\IAppManager;
+class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService; private JoplixWriteLock $writeLock; private IAppDataFactory $appDataFactory; private IL10N $l; private IAppManager $appManager;
+ public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService,JoplixWriteLock $writeLock,IAppDataFactory $appDataFactory,IL10N $l,IAppManager $appManager){parent::__construct($AppName,$request);$this->appManager=$appManager;$this->l=$l;$this->appDataFactory=$appDataFactory;$this->writeLock=$writeLock;$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
  private function uid(): string{$u=$this->userSession->getUser();if($u===null)throw new \RuntimeException($this->l->t('Not logged in'));return $u->getUID();}
  private function isAdmin(): bool{return $this->groupManager->isAdmin($this->uid());} private function setting(string $k,string $d=''): string{return $this->config->getUserValue($this->uid(),Application::APP_ID,$k,$d);} private function setSetting(string $k,string $v): void{$this->config->setUserValue($this->uid(),Application::APP_ID,$k,$v);} private function userFolder(): Folder{return $this->rootFolder->getUserFolder($this->uid());}
  private function joplinPath(): string{$p=$this->setting('joplin_path','/JoplinV2');$p='/'.trim($p,'/');return $p==='/'?'/JoplinV2':$p;} private function joplinFolder(): Folder{$rel=trim($this->joplinPath(),'/');$uf=$this->userFolder();$n=$rel===''?$uf:$uf->get($rel);if(!$n instanceof Folder)throw new \RuntimeException($this->l->t('The Joplix path is not a folder: %1$s',[$this->joplinPath()]));return $n;}
@@ -17,12 +17,27 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
    JoplixWriteService::pruneBackupFolder($this->joplinFolder());
   }catch(\Throwable $e){}
  }
+ /**
+  * Office editors Joplix can hand a working copy to, in preference order, with the page that opens a file by id.
+  * richdocuments is Nextcloud Office; it covers both the built-in CODE server and a separate Collabora Online.
+  * It has no stand-alone editor page any more: /apps/richdocuments/index needs a CSRF token (fails on navigation),
+  * and its own "edit online" routes redirect to /f/<id>, i.e. the Files app, whose viewer opens Collabora. That works
+  * for files in the hidden .joplix folder too (tested with richdocuments 9.2 on Nextcloud 32).
+  * All of them run as a top-level page, so the browser's window-closed watcher works the same for each.
+  */
+ private const OFFICE_EDITORS=['eurooffice'=>'/apps/eurooffice/{id}','richdocuments'=>'/f/{id}','onlyoffice'=>'/apps/onlyoffice/{id}'];
+ /** Legacy formats ONLYOFFICE only opens by converting into a new file, which the import never sees. */
+ private const ONLYOFFICE_CONVERTS=['doc','xls','ppt'];
+ /** @return string[] ids of the editors enabled for the current user, in preference order */
+ private function officeEditors(): array{$u=$this->userSession->getUser();if($u===null)return [];$out=[];foreach(array_keys(self::OFFICE_EDITORS) as $app){try{if($this->appManager->isEnabledForUser($app,$u))$out[]=$app;}catch(\Throwable $e){}}return $out;}
+ /** The editor to use: the user's choice while it is still installed, else the first available one. */
+ private function officeEditor(): ?string{$all=$this->officeEditors();$pick=$this->setting('office_editor','auto');if(in_array($pick,$all,true))return $pick;return $all[0]??null;}
  private function err(\Throwable $e,int $s=400): JSONResponse{return new JSONResponse(['error'=>$e->getMessage()],$s);}
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function getSettings(): JSONResponse{$this->workspace()->ensureWorkspace();return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_source'=>'github','update_repo_url'=>JoplixDevUpdateService::repoUrlOrDefault($this->setting('update_repo_url','')),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'is_admin'=>$this->isAdmin()]);}
+ public function getSettings(): JSONResponse{$this->workspace()->ensureWorkspace();return new JSONResponse(['joplin_path'=>$this->joplinPath(),'sort_order'=>$this->setting('sort_order','updated_desc'),'remember_last_location'=>$this->setting('remember_last_location','yes'),'last_notebook_id'=>$this->setting('last_notebook_id',''),'last_note_id'=>$this->setting('last_note_id',''),'dev_enabled'=>$this->isAdmin()?$this->setting('dev_enabled','no'):'no','dev_folder'=>$this->isAdmin()?$this->setting('dev_folder','/.joplix/updates'):'/.joplix/updates','first_run_completed'=>$this->setting('first_run_completed','no'),'update_source'=>'github','update_repo_url'=>JoplixDevUpdateService::repoUrlOrDefault($this->setting('update_repo_url','')),'update_channel'=>$this->setting('update_channel','main'),'office_open_mode'=>$this->setting('office_open_mode','window'),'office_editor'=>$this->setting('office_editor','auto'),'office_editors'=>$this->officeEditors(),'update_backup_enabled'=>$this->setting('update_backup_enabled','no'),'is_admin'=>$this->isAdmin()]);}
  /**
   * @NoAdminRequired
   */
@@ -37,7 +52,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   */
  public function saveSettings(): JSONResponse {
      try {
-         $keys = ['joplin_path', 'sort_order', 'remember_last_location', 'first_run_completed', 'office_open_mode'];
+         $keys = ['joplin_path', 'sort_order', 'remember_last_location', 'first_run_completed', 'office_open_mode', 'office_editor'];
          $isAdmin = $this->isAdmin();
          if ($isAdmin) {
              $keys = array_merge($keys, ['dev_enabled', 'dev_folder', 'update_source', 'update_repo_url', 'update_channel', 'update_backup_enabled']);
@@ -51,6 +66,9 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
          }
          if (isset($values['update_repo_url'])) {
              $values['update_repo_url'] = JoplixDevUpdateService::normalizeRepo($values['update_repo_url'])['url'];
+         }
+         if (isset($values['office_editor']) && $values['office_editor'] !== 'auto' && !array_key_exists($values['office_editor'], self::OFFICE_EDITORS)) {
+             throw new \RuntimeException($this->l->t('Invalid office editor.'));
          }
          if (isset($values['update_channel']) && !in_array($values['update_channel'], ['main', 'beta'], true)) {
              throw new \RuntimeException($this->l->t('Invalid update channel.'));
@@ -291,6 +309,9 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   if(!$payload||isset($payload['error']))throw new \RuntimeException((string)($payload['error']??$this->l->t('Attachment not found')));
   $ext=strtolower((string)($payload['file_extension']??''));
   if(!in_array($ext,['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp'],true))throw new \RuntimeException($this->l->t('This attachment is not a supported Office file.'));
+  $editor=$this->officeEditor();
+  if($editor===null)throw new \RuntimeException($this->l->t('No office editor is installed. Ask your administrator to enable Nextcloud Office, ONLYOFFICE or Euro Office.'));
+  if($editor==='onlyoffice'&&in_array($ext,self::ONLYOFFICE_CONVERTS,true))throw new \RuntimeException($this->l->t('ONLYOFFICE can only edit .%1$s files by converting them to a new file, so the changes would not reach the attachment. Download the file instead, or choose another editor in the settings.',[$ext]));
   $dataUrl=(string)($payload['data_url']??'');
   $comma=strpos($dataUrl,',');
   $binary=$comma===false?false:base64_decode(substr($dataUrl,$comma+1),true);
@@ -305,7 +326,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   $sessionFolder->newFile('.lock',json_encode(['created_at'=>time(),'resource_id'=>$id,'sha256'=>$hash],JSON_UNESCAPED_SLASHES));
   $sessions=json_decode($this->setting('office_sessions','{}'),true);if(!is_array($sessions))$sessions=[];$sessions[$id]=$session;
   $this->setSetting('office_sessions',json_encode($sessions,JSON_UNESCAPED_SLASHES));
-  return new JSONResponse(['ok'=>true,'resource_id'=>$id,'session_id'=>$sessionId,'file_id'=>$file->getId(),'file_name'=>$title,'edit_dir'=>'/.joplix/editing/'.$sessionId,'editor_path'=>'/apps/eurooffice/'.$file->getId()]);
+  return new JSONResponse(['ok'=>true,'resource_id'=>$id,'session_id'=>$sessionId,'file_id'=>$file->getId(),'file_name'=>$title,'edit_dir'=>'/.joplix/editing/'.$sessionId,'editor'=>$editor,'editor_path'=>str_replace('{id}',(string)$file->getId(),self::OFFICE_EDITORS[$editor])]);
  }catch(\Throwable $e){return $this->err($e);}}
 
  /**

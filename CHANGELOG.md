@@ -1,3 +1,12 @@
+# Joplix 2026.11.81
+
+- Office attachments can now be edited with Nextcloud Office (Collabora Online, built-in CODE server or a separate Collabora) and ONLYOFFICE, not only with Euro Office. Joplix finds out which of these apps are enabled for you.
+- New setting *Office editor* under Settings › General: *Automatic* (the first available editor) or a specific installed editor. The Office settings are hidden when no editor is installed.
+- Without an Office editor, Office attachments offer Download only instead of an Edit button that could not work.
+- Status messages while editing name the editor that is actually used.
+- ONLYOFFICE is not used for the old `doc`, `xls` and `ppt` formats: it can only edit them by converting them to a new file, so the changes would never reach the attachment. A message explains this.
+- A setting changed in the General tab (Office opening mode, Office editor) could be reset when the settings were closed. Fixed.
+
 # Joplix 2026.11.80
 
 - New app icon in the monochrome style of current Nextcloud apps. It follows the theme: white in the top bar, dark on light pages and light on dark pages (app list, Joplix sidebar, welcome and about dialogs). The browser tab icon is blue and adapts to a dark browser theme.

@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.80",
+  "version": "2026.11.81",
   "release_type": "beta",
   "created_by": "Stoneubi",
-  "date": "2026-11-14",
+  "date": "2026-11-15",
   "channel": "beta",
-  "base_version": "2026.11.79",
-  "build_date": "2026-11-14",
-  "release_date": "2026-11-14",
-  "summary": "New app icon in the Nextcloud monochrome style, matching light and dark themes.",
-  "updated": "2026-11-14",
+  "base_version": "2026.11.80",
+  "build_date": "2026-11-15",
+  "release_date": "2026-11-15",
+  "summary": "Office attachments can be edited with Nextcloud Office (Collabora Online) and ONLYOFFICE as well as Euro Office.",
+  "updated": "2026-11-15",
   "notes": "See CHANGELOG.md."
 }

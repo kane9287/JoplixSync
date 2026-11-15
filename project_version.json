@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.81",
+  "version": "2026.11.82",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-15",
   "channel": "beta",
-  "base_version": "2026.11.80",
+  "base_version": "2026.11.81",
   "build_date": "2026-11-15",
   "release_date": "2026-11-15",
-  "summary": "Office attachments can be edited with Nextcloud Office (Collabora Online) and ONLYOFFICE as well as Euro Office.",
+  "summary": "Structure clean-up and the remaining review findings: Office edits imported on the server, safer synchronisation deletions, attachments streamed instead of base64.",
   "updated": "2026-11-15",
   "notes": "See CHANGELOG.md."
 }

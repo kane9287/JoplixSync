@@ -162,34 +162,6 @@ function formatJoplixDateTime(value){
   const pad=n=>String(n).padStart(2,'0');
   return pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
 }
-function jpOverlay(){return document.getElementById('jp-settings-overlay');}
-function jpForceOpenSettings(){
-  const o=jpOverlay();
-  if(!o){jpAlert(t('joplix','Settings area was not found.'));return;}
-  const p=document.getElementById('jp-setting-joplin-path');
-  if(p&&!p.value)p.value='/JoplinV2';
-  o.classList.add('open');
-  o.setAttribute('aria-hidden','false');
-  jpLoadFolderDatalist();
-}
-function jpForceCloseSettings(){const o=jpOverlay();if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}}
-async function jpLoadFolderDatalist(){
-  try{
-    const r=await fetch(route('/api/folders'),{headers:{'requesttoken':OC.requestToken||''}});
-    if(!r.ok)return;
-    const data=await r.json();
-    const list=document.getElementById('jp-folder-list');
-    if(list){list.innerHTML='';(data.folders||[]).forEach(f=>{const opt=document.createElement('option');opt.value=f;list.appendChild(opt);});}
-    const p=document.getElementById('jp-setting-joplin-path');
-    if(p&&!p.value)p.value=data.current||'/JoplinV2';
-  }catch(e){}
-}
-window.JoplixOpenSettings=jpForceOpenSettings;
-window.JoplixCloseSettings=jpForceCloseSettings;
-let jpPathApplyTimer=null;
-function jpStatusText(t,cls){const el=document.getElementById('jp-index-status');if(el){el.textContent=t;el.className='jp-index-status '+(cls||'');}}
-function jpNormalizePath(p){p=String(p||'').trim();if(!p)return '/JoplinV2';if(!p.startsWith('/'))p='/'+p;return p.replace(/\\/g,'/').replace(/\/+/g, '/').replace(/\s+$/,'');}
-async function jpApi(p,o={}){o.headers=Object.assign({'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);let d={};try{d=await r.json();}catch(e){}if(!r.ok||d.error)throw new Error(d.error||('HTTP '+r.status));return d;}
 
 // Update source: GitHub releases. Must match JoplixDevUpdateService::DEFAULT_REPO_URL (PHP).
 const JP_UPDATE_REPO_URL='https://github.com/kane9287/joplix-xsync/releases';
@@ -212,69 +184,6 @@ function normalizeUpdateRepoUrlInput(value){
   if(m)return 'https://github.com/'+m[1]+'/'+m[2].replace(/\.git$/i,'')+'/releases';
   return v;
 }
-
-function jpLocalSettings(){let local={};try{local=JSON.parse(localStorage.getItem('joplix.settings')||'{}')||{};}catch(e){local={};}return Object.assign({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2',update_source:'github',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',office_editor:'auto',update_backup_enabled:'no'},local,window.JoplixServerSettings||{});}
-function jpSetLocalSettings(local){try{localStorage.setItem('joplix.settings',JSON.stringify(local));}catch(e){}}
-async function jpApplySettingsFromUi(forceReindex){
-  const pathEl=document.getElementById('jp-setting-joplin-path');
-  const sortEl=document.getElementById('jp-setting-sort');
-  const old=(window.JoplixServerSettings&&window.JoplixServerSettings.joplin_path)||jpLocalSettings().joplin_path||'/JoplinV2';
-  const local=jpLocalSettings();
-  local.joplin_path=jpNormalizePath(pathEl?pathEl.value:local.joplin_path);
-  local.sort_order=sortEl?sortEl.value:(local.sort_order||'updated_desc');
-  local.remember_last_location=local.remember_last_location||'yes';
-  const urlEl=document.getElementById('jp-update-repo-url'); const chEl=document.getElementById('jp-update-channel');
-  local.update_source='github'; local.update_repo_url=urlEl?urlEl.value:(local.update_repo_url||JP_UPDATE_REPO_URL); local.update_channel=chEl?chEl.value:(local.update_channel||'main');
-  if(pathEl)pathEl.value=local.joplin_path;
-  jpSetLocalSettings(local);
-  window.JoplixServerSettings=Object.assign({},local,window.JoplixServerSettings||{});
-  await jpApi('/api/settings',{method:'POST',body:local});
-  const pathChanged=local.joplin_path!==old;
-  if(pathChanged||forceReindex){
-    try{localStorage.removeItem('joplix.lastGoodIndex');localStorage.removeItem('joplix.lastLocation');}catch(e){}
-    jpStatusText(t('joplix','Settings applied. Rebuilding index with {path}...',{path:local.joplin_path}),'warning');
-    try{
-      const r=await jpApi('/api/index/rebuild',{method:'POST'});
-      if(window.JoplixAfterRebuild)window.JoplixAfterRebuild(r.index||r);
-      else location.reload();
-      jpStatusText(t('joplix','Settings applied, index updated'),'ok');
-    }catch(e){jpStatusText(t('joplix','Settings saved, but index rebuild failed: ')+e.message,'error');}
-  } else {
-    jpStatusText(t('joplix','Settings applied'),'ok');
-  }
-}
-function jpActivateSettingsTab(tab){
-  document.querySelectorAll('[data-settings-tab]').forEach(b=>b.classList.toggle('active',b.dataset.settingsTab===tab));
-  document.querySelectorAll('[data-settings-section]').forEach(sec=>sec.classList.toggle('active',sec.dataset.settingsSection===tab));
-}
-document.addEventListener('click',function(ev){
-  const openBtn=ev.target&&ev.target.closest?ev.target.closest('#jp-open-settings'):null;
-  if(openBtn){ev.preventDefault();ev.stopPropagation();jpForceOpenSettings();return;}
-  const closeBtn=ev.target&&ev.target.closest?ev.target.closest('#jp-close-settings'):null;
-  if(closeBtn){ev.preventDefault();ev.stopPropagation();jpApplySettingsFromUi(false).finally(()=>jpForceCloseSettings());return;}
-  const backdrop=ev.target&&ev.target.id==='jp-settings-backdrop';
-  if(backdrop){ev.preventDefault();jpApplySettingsFromUi(false).finally(()=>jpForceCloseSettings());return;}
-  const tab=ev.target&&ev.target.closest?ev.target.closest('[data-settings-tab]'):null;
-  if(tab){ev.preventDefault();ev.stopPropagation();jpActivateSettingsTab(tab.dataset.settingsTab);return;}
-  const rebuild=ev.target&&ev.target.closest?ev.target.closest('#jp-settings-rebuild'):null;
-  if(rebuild){ev.preventDefault();ev.stopPropagation();jpApplySettingsFromUi(true);return;}
-  const remember=ev.target&&ev.target.closest?ev.target.closest('#jp-setting-remember-toggle'):null;
-  if(remember){ev.preventDefault();ev.stopPropagation();const local=jpLocalSettings();local.remember_last_location=(local.remember_last_location||'yes')==='yes'?'no':'yes';remember.classList.toggle('active',local.remember_last_location==='yes');remember.setAttribute('aria-checked',local.remember_last_location==='yes'?'true':'false');jpSetLocalSettings(local);jpApi('/api/settings',{method:'POST',body:local}).then(()=>jpStatusText(t('joplix','Settings applied'),'ok')).catch(e=>jpStatusText(t('joplix','Settings could not be saved: ')+e.message,'error'));return;}
-},true);
-document.addEventListener('change',function(ev){
-  if(ev.target&&ev.target.id==='jp-setting-sort'){jpApplySettingsFromUi(false);}
-  if(ev.target&&ev.target.id==='jp-setting-joplin-path'){jpApplySettingsFromUi(true);}
-},true);
-document.addEventListener('keydown',function(ev){
-  if(ev.key==='Escape'&&jpSettingsOpen()&&!jpDialogOpen()){jpApplySettingsFromUi(false).finally(()=>jpForceCloseSettings());}
-  if(ev.key==='Enter'&&ev.target&&ev.target.id==='jp-setting-joplin-path'){ev.preventDefault();jpApplySettingsFromUi(true);}
-},true);
-document.addEventListener('input',function(ev){
-  if(ev.target&&ev.target.id==='jp-setting-joplin-path'){
-    clearTimeout(jpPathApplyTimer);
-    jpPathApplyTimer=setTimeout(()=>jpApplySettingsFromUi(true),1200);
-  }
-},true);
 const storage={
   get(k,d=null){try{const v=localStorage.getItem('joplix.'+k);return v?JSON.parse(v):d;}catch(e){return d;}},
   set(k,v){try{localStorage.setItem('joplix.'+k,JSON.stringify(v));}catch(e){}},
@@ -520,7 +429,7 @@ function noteSnapshot(){return {title:($('jp-title')?$('jp-title').value:''),bod
 function sameSnapshot(a,b){return !!a&&!!b&&String(a.title||'')===String(b.title||'')&&String(a.body||'')===String(b.body||'');}
 function setOriginalFromEditor(){state.originalNote=noteSnapshot();state.dirty=false;updateSaveButton();}
 function markDirty(){state.dirty=!sameSnapshot(state.originalNote,noteSnapshot());updateSaveButton();}
-function updateSaveButton(){const buttons=[$('jp-save-note'),$('jp-save-note-top')].filter(Boolean);const active=!!state.dirty&&!state.saving;buttons.forEach(btn=>{btn.disabled=!active;btn.classList.toggle('is-dirty',active);btn.title=active?t('joplix','Save changes'):t('joplix','No changes to save');});const app=$('joplix-app');if(app)app.classList.toggle('jp-note-dirty',active);}
+function updateSaveButton(){const buttons=[$('jp-save-note')].filter(Boolean);const active=!!state.dirty&&!state.saving;buttons.forEach(btn=>{btn.disabled=!active;btn.classList.toggle('is-dirty',active);btn.title=active?t('joplix','Save changes'):t('joplix','No changes to save');});const app=$('joplix-app');if(app)app.classList.toggle('jp-note-dirty',active);}
 function setSavingUi(active){
   const app=$('joplix-app');
   if(app)app.classList.toggle('jp-saving',!!active);
@@ -570,8 +479,6 @@ function apiNote(id){
   }).finally(()=>{delete state.noteFetches[id];});
   return state.noteFetches[id];
 }
-function prefetchNote(id){if(!id||noteMemoryGet(id)||cachedNote(id)||state.noteFetches[id])return;apiNote(id).catch(()=>{});}
-function prefetchVisibleNotes(notes){(notes||[]).slice(0,4).forEach((n,i)=>setTimeout(()=>prefetchNote(n.id),250+i*350));}
 function findNoteMeta(id){return ((state.index&&state.index.notes)||[]).find(n=>n.id===id)||{};}
 function showNoteLoading(id,title=''){
   state.noteLoading=true;
@@ -644,9 +551,8 @@ function applyIndexPreservingFocus(idx,reason=''){
   if(reason)status(reason,'ok');
 }
 async function load(){
-  state.settings=await api('/api/settings').catch(()=>({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2'})); window.JoplixServerSettings=Object.assign({},state.settings); syncOfficeEditorUi(currentLocalSettings());
+  state.settings=await api('/api/settings').catch(()=>({remember_last_location:'yes',sort_order:'updated_desc',joplin_path:'/JoplinV2'})); syncOfficeEditorUi(currentLocalSettings());
   state.sort=state.settings.sort_order||(storage.get('settings',{}).sort_order)||'updated_desc';
-  fillSettings();
   const cached=rememberedIndex();
   let usedCached=false;
   if(cached&&hasFullTextIndex(cached)&&hasCurrentCountIndex(cached)){
@@ -693,7 +599,6 @@ function restoreLocation(idx){
     if(loc.note_id)openNote(loc.note_id,{preferCache:true,silent:true}).catch(()=>{});
   }
 }
-function fillSettings(){/* Einstellungen in 1.0.6 voruebergehend deaktiviert */}
 function renderIndex(idx){rememberIndex(idx);renderTree(idx.tree||[]);renderNotes([]);}
 // Notebook tree: each node is its row followed by a .jp-tree-children group holding its sub-notebooks.
 // Collapsed notebooks (ids in localStorage joplix.collapsedNotebooks) keep that group hidden; every
@@ -831,8 +736,9 @@ function renderTags(tags){
   const add=document.createElement('button');add.type='button';add.className='jp-tag-add';add.title=t('joplix','New tag');add.appendChild(jpIconEl('plus'));add.appendChild(document.createTextNode('Tag'));add.onclick=addTag;box.appendChild(add);
 }
 function resourceIsPdf(r){return !!(r&&((r.is_pdf===true)||String(r.mime||'').toLowerCase()==='application/pdf'||String(r.file_extension||'').toLowerCase()==='pdf'||String(r.title||'').toLowerCase().endsWith('.pdf')));}
-function resourceIsOffice(r){const ext=String(r&&r.file_extension||'').toLowerCase();const title=String(r&&r.title||'').toLowerCase();return !!(r&&((r.is_office===true)||['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp'].includes(ext)||['.doc','.docx','.xls','.xlsx','.ppt','.pptx','.odt','.ods','.odp'].some(e=>title.endsWith(e))));}
-function resourceIsExternallyOpenable(r){return resourceIsPdf(r)||resourceIsOffice(r)||(r&&r.is_openable===true);}
+// Same list as JoplixModelService::OFFICE_EXTENSIONS (PHP); the server's is_office flag is the primary signal.
+const JP_OFFICE_EXTENSIONS=['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp'];
+function resourceIsOffice(r){const ext=String(r&&r.file_extension||'').toLowerCase();const title=String(r&&r.title||'').toLowerCase();return !!(r&&((r.is_office===true)||JP_OFFICE_EXTENSIONS.includes(ext)||JP_OFFICE_EXTENSIONS.some(e=>title.endsWith('.'+e))));}
 function resourceFileName(r,p){let name=String((p&&p.title)||r.title||r.id||'resource').trim()||'resource';const ext=String((p&&p.file_extension)||r.file_extension||'').trim().replace(/^\./,'');if(ext&&!name.toLowerCase().endsWith('.'+ext.toLowerCase()))name+='.'+ext;return name.replace(/[\\/:*?"<>|]+/g,'_');}
 function dataUrlToBlobUrl(dataUrl,mime){const parts=String(dataUrl||'').split(',');if(parts.length<2)throw new Error(t('joplix','Attachment could not be read.'));const bin=atob(parts[1]);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return URL.createObjectURL(new Blob([bytes],{type:mime||'application/octet-stream'}));}
 function formatBytes(n){n=Number(n||0);if(!n)return '';const u=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):Math.round(n))+' '+u[i];}
@@ -887,7 +793,7 @@ async function pollOfficeEdit(resourceId,statusEl,options={}){
   if(sync.inFlight)return sync.inFlight;
   sync.inFlight=(async()=>{
     try{
-      const result=await api('/api/resources/'+resourceId+'/office/status');
+      const result=await api('/api/resources/'+resourceId+'/office/status',{method:'POST',body:{}});
       if(!result.active){
         stopOfficePolling(resourceId);
         if(!options.silentInactive)officeStatusText(statusEl,result.error||t('joplix','Editing session ended.'),'warning');
@@ -1003,8 +909,6 @@ function renderResources(rs){
     const dl=document.createElement('button');dl.type='button';dl.className='jp-resource-action jp-icon-btn';dl.title='Download';dl.setAttribute('aria-label','Download');dl.appendChild(jpIconEl('download'));dl.onclick=()=>downloadResource(r).catch(e=>jpAlert(e.message));actions.appendChild(dl);
   });
 }
-function openPdfViewer(p){return;}
-function closePdfViewer(){const o=$('jp-pdf-viewer-overlay'),f=$('jp-pdf-viewer-frame');if(f)f.src='about:blank';if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}}
 
 function closeNotebookMenu(){
   const old=document.querySelector('.jp-context-menu');
@@ -1184,7 +1088,6 @@ async function saveNote(options={}){
 async function newNote(){if(state.notebookId===JP_TRASH_ID)return;if(!(await handleDirtyBeforeNoteChange('__new__')))return;state.note=null;state.noteId='';setHasNote(true);setPane('note');setNoteMode('edit');$('jp-title').value=t('joplix','New note');$('jp-body').classList.remove('jp-note-loading');$('jp-body').value='';renderDisplayMode();$('jp-body').placeholder=t('joplix','Note content');$('jp-meta').textContent=t('joplix','New note in this notebook');$('jp-tags').innerHTML='';$('jp-resources').innerHTML='';updateNotePath();state.originalNote={title:'',body:''};resetEditorHistory('');state.dirty=true;updateSaveButton();}
 async function deleteNote(){if(!state.note)return;if(state.note.is_deleted)return purgeTrashedNote(state.note.id,state.note.title);const id=state.note.id;if(!(await jpConfirm(state.note.title||'',{title:t('joplix','Move this note to the trash?'),confirmLabel:t('joplix','Move to trash')})))return;await api('/api/notes/'+id,{method:'DELETE'});forgetNote(id);await rebuildAndRestore(true);clearNote();status(t('joplix','Moved to trash'),'ok');}
 async function newNotebook(parent){const title=await jpPrompt(parent?t('joplix','New sub-notebook'):t('joplix','New notebook'),'',{confirmLabel:t('joplix','Create')});if(!title)return;await api('/api/notebooks',{method:'POST',body:{title,parent_id:parent||''}});if(parent)jpSetCollapsed(parent,false);await rebuildAndRestore();}
-async function renameNotebook(){if(!state.notebookId){jpAlert(t('joplix','Please select a notebook.'));return;}const nb=(state.index.notebooks||[]).find(n=>n.id===state.notebookId);const title=await jpPrompt(t('joplix','New name'),nb?nb.title:'');if(!title)return;await api('/api/notebooks/'+state.notebookId,{method:'PUT',body:{title,known_updated_time:nb?nb.updated_time:''}});await rebuildAndRestore();}
 function mimeFromFilename(name){const ext=String(name||'').toLowerCase().split('.').pop();const map={pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',doc:'application/msword',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',xls:'application/vnd.ms-excel',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',ppt:'application/vnd.ms-powerpoint',odt:'application/vnd.oasis.opendocument.text',ods:'application/vnd.oasis.opendocument.spreadsheet',odp:'application/vnd.oasis.opendocument.presentation'};return map[ext]||'application/octet-stream';}
 async function uploadResource(file){
   if(!state.note){jpAlert(t('joplix','Please open a note first.'));return;}
@@ -1531,7 +1434,6 @@ async function editTagsByPrompt(id){
   }
 }
 async function rebuildAndRestore(clear=false){status(t('joplix','Rebuilding index...'),'warning');const r=await api('/api/index/rebuild',{method:'POST'});const idx=r.index||r;if(clear){state.index=idx;rememberIndex(idx);renderTree(idx.tree||[]);if(state.notebookId)selectNotebook(state.notebookId);else restoreLocation(idx);status(t('joplix','Index updated'),'ok');}else{applyIndexPreservingFocus(idx,t('joplix','Index updated'));}if(!clear&&state.noteId&&!state.dirty)openNote(state.noteId,{silent:true,preferCache:true}).catch(()=>{});if($('jp-search')&&$('jp-search').value.trim())runFullTextSearch($('jp-search').value);}
-window.JoplixAfterRebuild=function(idx){applyIndexPreservingFocus(idx,t('joplix','Index updated'));if($('jp-search')&&$('jp-search').value.trim())runFullTextSearch($('jp-search').value);};
 function scheduleBackgroundRefresh(delay=1200){setTimeout(()=>backgroundRefresh().catch(()=>{}),delay);}
 async function backgroundRefresh(){
   if(state.backgroundBusy)return;
@@ -1557,26 +1459,24 @@ async function backgroundRefresh(){
 }
 async function saveLastLocation(){const loc={notebook_id:state.notebookId||'',note_id:state.noteId||''};storage.set('lastLocation',loc);api('/api/state/last-location',{method:'POST',body:loc}).catch(()=>{});}
 function setSwitch(el,on){if(!el)return;el.classList.toggle('active',!!on);el.setAttribute('aria-checked',on?'true':'false');}
-function currentLocalSettings(){return Object.assign({remember_last_location:'yes',sort_order:state.sort||'updated_desc',joplin_path:'/JoplinV2',update_source:'github',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',office_editor:'auto',update_backup_enabled:'no',language:'system',is_admin:false},storage.get('settings',{}),state.settings||{});}
-async function persistSettings(extra={}){
-  const local=Object.assign(currentLocalSettings(),extra);
-  local.sort_order=local.sort_order||state.sort||'updated_desc';
-  local.remember_last_location=local.remember_last_location||'yes';
-  local.joplin_path=normalizePath(local.joplin_path||'/JoplinV2');
-  storage.set('settings',local);
-  state.settings=Object.assign(state.settings||{},local);
-  // The older settings code (jpApplySettingsFromUi, on close) posts window.JoplixServerSettings; keep it current or it reverts this change.
-  window.JoplixServerSettings=Object.assign({},window.JoplixServerSettings||{},local);
-  await api('/api/settings',{method:'POST',body:local}).catch(e=>{status(t('joplix','Settings could not be saved: ')+e.message,'error');throw e;});
+function currentLocalSettings(){return Object.assign({remember_last_location:'yes',sort_order:state.sort||'updated_desc',joplin_path:'/JoplinV2',update_repo_url:JP_UPDATE_REPO_URL,update_channel:'main',office_open_mode:'window',office_editor:'auto',update_backup_enabled:'no',is_admin:false},storage.get('settings',{}),state.settings||{});}
+// Saves the given settings only (server and local copy). Values not passed are left as they are.
+async function persistSettings(changes={}){
+  const values=Object.assign({},changes);
+  if('joplin_path' in values)values.joplin_path=normalizePath(values.joplin_path);
+  storage.set('settings',Object.assign(storage.get('settings',{}),values));
+  state.settings=Object.assign(state.settings||{},values);
+  await api('/api/settings',{method:'POST',body:values}).catch(e=>{status(t('joplix','Settings could not be saved: ')+e.message,'error');throw e;});
 }
-function normalizePath(p){p=String(p||'').trim();if(!p)return '/JoplinV2';if(!p.startsWith('/'))p='/'+p;return p.replace(/\/+/g,'/').replace(/\/\/+/, '/').replace(/\s+$/,'');}
+// Same rule as JoplixFolders::normalizePath (PHP): leading slash, forward slashes, no trailing slash, default /JoplinV2.
+function normalizePath(p){p=String(p||'').trim().replace(/\\/g,'/').replace(/\/+/g,'/').replace(/\/+$/,'');if(!p||p==='/')return '/JoplinV2';return p.startsWith('/')?p:'/'+p;}
 function openSettings(){const o=$('jp-settings-overlay');if(!o){jpAlert(t('joplix','Settings area was not found.'));return;}syncSettingsUi();loadFoldersForSettings();o.classList.add('open');o.setAttribute('aria-hidden','false');}
 function closeSettings(){const o=$('jp-settings-overlay');if(!o)return;o.classList.remove('open');o.setAttribute('aria-hidden','true');}
 function activateSettingsTab(tab){document.querySelectorAll('[data-settings-tab]').forEach(b=>b.classList.toggle('active',b.dataset.settingsTab===tab));document.querySelectorAll('[data-settings-section]').forEach(sec=>sec.classList.toggle('active',sec.dataset.settingsSection===tab));}
 /** Fills the editor select with the installed editors; both office cards hide when there is none. */
 function syncOfficeEditorUi(local){const sel=$('jp-setting-office-editor');const all=officeEditorsAvailable();document.querySelectorAll('#joplix .jp-office-setting').forEach(el=>{el.hidden=!all.length;});if(!sel)return;sel.replaceChildren();const auto=document.createElement('option');auto.value='auto';auto.textContent=all.length?t('joplix','Automatic ({editor})',{editor:officeEditorName(all[0])}):t('joplix','Automatic');sel.appendChild(auto);all.forEach(id=>{const o=document.createElement('option');o.value=id;o.textContent=officeEditorName(id);sel.appendChild(o);});sel.value=all.includes(local.office_editor)?local.office_editor:'auto';}
 function syncSettingsUi(){const local=currentLocalSettings();if($('jp-setting-sort'))$('jp-setting-sort').value=local.sort_order||state.sort||'updated_desc';if($('jp-setting-joplin-path'))$('jp-setting-joplin-path').value=local.joplin_path||'/JoplinV2';if($('jp-setting-office-open-mode'))$('jp-setting-office-open-mode').value=local.office_open_mode==='tab'?'tab':'window';syncOfficeEditorUi(local);if($('jp-setting-update-backup'))$('jp-setting-update-backup').value=local.update_backup_enabled==='yes'?'yes':'no';setSwitch($('jp-setting-remember-toggle'),(local.remember_last_location||'yes')==='yes');syncUpdateUi();}
-async function loadFoldersForSettings(){try{const data=await api('/api/folders');const list=$('jp-folder-list');if(list){list.innerHTML='';(data.folders||[]).forEach(f=>{const o=document.createElement('option');o.value=f;list.appendChild(o);});}if($('jp-setting-joplin-path')&&!$('jp-setting-joplin-path').value)$('jp-setting-joplin-path').value=data.current||'/JoplinV2';}catch(e){status(t('joplix','Folder list could not be loaded: ')+e.message,'warning');}}
+async function loadFoldersForSettings(){if(state.foldersLoaded)return;try{const data=await api('/api/folders');state.foldersLoaded=true;const list=$('jp-folder-list');if(list){list.innerHTML='';(data.folders||[]).forEach(f=>{const o=document.createElement('option');o.value=f;list.appendChild(o);});}if($('jp-setting-joplin-path')&&!$('jp-setting-joplin-path').value)$('jp-setting-joplin-path').value=data.current||'/JoplinV2';}catch(e){status(t('joplix','Folder list could not be loaded: ')+e.message,'warning');}}
 async function applyJoplinPathFromInput(){const el=$('jp-setting-joplin-path');if(!el)return;const newPath=normalizePath(el.value);el.value=newPath;const oldPath=(state.settings&&state.settings.joplin_path)||'/JoplinV2';await persistSettings({joplin_path:newPath});if(newPath!==oldPath){storage.del('lastGoodIndex');state.index=null;status(t('joplix','Joplix folder changed. Rebuilding index...'),'warning');await rebuildAndRestore(true).catch(e=>status(t('joplix','Index rebuild failed: ')+e.message,'error'));}}
 function showWelcomeIfNeeded(){
   const key='joplix.welcome.1.0.43.done';
@@ -1584,7 +1484,7 @@ function showWelcomeIfNeeded(){
   const o=$('jp-welcome-overlay');if(!o)return;
   o.classList.add('open');o.setAttribute('aria-hidden','false');
 }
-function closeWelcome(){const key='joplix.welcome.1.0.43.done';try{localStorage.setItem(key,'yes');}catch(e){}const o=$('jp-welcome-overlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}const local=currentLocalSettings();local.first_run_completed='yes';storage.set('settings',local);api('/api/settings',{method:'POST',body:local}).catch(()=>{});}
+function closeWelcome(){const key='joplix.welcome.1.0.43.done';try{localStorage.setItem(key,'yes');}catch(e){}const o=$('jp-welcome-overlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}persistSettings({first_run_completed:'yes'}).catch(()=>{});}
 function setupWelcome(){const done=$('jp-welcome-done');if(done)done.onclick=closeWelcome;const close=$('jp-welcome-close');if(close)close.onclick=closeWelcome;const settings=$('jp-welcome-settings');if(settings)settings.onclick=()=>{closeWelcome();openSettings();};setTimeout(showWelcomeIfNeeded,600);}
 
 
@@ -1720,12 +1620,13 @@ function setupSettings(){
   const openBtn=$('jp-open-settings'); if(openBtn)openBtn.addEventListener('click',ev=>{ev.preventDefault();openSettings();});
   const closeBtn=$('jp-close-settings'); if(closeBtn)closeBtn.addEventListener('click',ev=>{ev.preventDefault();closeSettings();});
   const backdrop=$('jp-settings-backdrop'); if(backdrop)backdrop.addEventListener('click',()=>closeSettings());
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!jpDialogOpen())closeSettings();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&jpSettingsOpen()&&!jpDialogOpen())closeSettings();});
   document.querySelectorAll('[data-settings-tab]').forEach(b=>b.addEventListener('click',()=>activateSettingsTab(b.dataset.settingsTab)));
   const sortEl=$('jp-setting-sort'); if(sortEl)sortEl.addEventListener('change',async e=>{state.sort=e.target.value;await persistSettings({sort_order:state.sort});if(state.notebookId)selectNotebook(state.notebookId);});
-  const officeMode=$('jp-setting-office-open-mode'); if(officeMode)officeMode.addEventListener('change',async e=>{await persistSettings({office_open_mode:e.target.value==='tab'?'tab':'window'});jpStatusText(t('joplix','Office opening mode saved.'),'ok');});const officeEditor=$('jp-setting-office-editor');if(officeEditor)officeEditor.addEventListener('change',async e=>{await persistSettings({office_editor:e.target.value||'auto'});jpStatusText(t('joplix','Office editor saved.'),'ok');});const backupMode=$('jp-setting-update-backup');if(backupMode)backupMode.addEventListener('change',async e=>{await persistSettings({update_backup_enabled:e.target.value==='yes'?'yes':'no'});jpStatusText(t('joplix','Backup setting saved.'),'ok');});
-  const pathEl=$('jp-setting-joplin-path'); if(pathEl){pathEl.addEventListener('change',()=>applyJoplinPathFromInput().catch(e=>jpAlert(e.message)));pathEl.addEventListener('blur',()=>applyJoplinPathFromInput().catch(e=>jpAlert(e.message)));}
-  const remember=$('jp-setting-remember-toggle'); if(remember)remember.addEventListener('click',async()=>{const local=currentLocalSettings();local.remember_last_location=(local.remember_last_location||'yes')==='yes'?'no':'yes';setSwitch(remember,local.remember_last_location==='yes');await persistSettings({remember_last_location:local.remember_last_location});});
+  const officeMode=$('jp-setting-office-open-mode'); if(officeMode)officeMode.addEventListener('change',async e=>{await persistSettings({office_open_mode:e.target.value==='tab'?'tab':'window'});status(t('joplix','Office opening mode saved.'),'ok');});const officeEditor=$('jp-setting-office-editor');if(officeEditor)officeEditor.addEventListener('change',async e=>{await persistSettings({office_editor:e.target.value||'auto'});status(t('joplix','Office editor saved.'),'ok');});const backupMode=$('jp-setting-update-backup');if(backupMode)backupMode.addEventListener('change',async e=>{await persistSettings({update_backup_enabled:e.target.value==='yes'?'yes':'no'});status(t('joplix','Backup setting saved.'),'ok');});
+  // change fires once per edit: on Enter or when the field loses focus with a new value.
+  const pathEl=$('jp-setting-joplin-path'); if(pathEl)pathEl.addEventListener('change',()=>applyJoplinPathFromInput().catch(e=>jpAlert(e.message)));
+  const remember=$('jp-setting-remember-toggle'); if(remember)remember.addEventListener('click',async()=>{const next=(currentLocalSettings().remember_last_location||'yes')==='yes'?'no':'yes';setSwitch(remember,next==='yes');await persistSettings({remember_last_location:next}).then(()=>status(t('joplix','Settings applied'),'ok')).catch(()=>{});});
   const reset=$('jp-layout-reset'); if(reset)reset.addEventListener('click',()=>{storage.del('columnWidths2');applyColumnWidths();});
   const rebuild=$('jp-settings-rebuild'); if(rebuild)rebuild.addEventListener('click',()=>rebuildAndRestore().catch(e=>jpAlert(e.message)));
   const upd=$('jp-update-check'); if(upd)upd.addEventListener('click',()=>checkUpdates());
@@ -1862,8 +1763,9 @@ function scheduleSync(delay=2500){
 // Called by api() after every successful request: local edits are sent to the server shortly afterwards.
 function noteLocalChangeForSync(path,options,data){
   const method=String((options&&options.method)||'GET').toUpperCase();
+  // The Office status poll is a POST too, but it only changes something when it imported a new version.
+  if(/\/office\/status$/.test(path)){if(data&&data.updated)scheduleSync(2500);return;}
   if(method!=='GET'&&/^\/api\/(notes|notebooks|tags|resources|trash)(\/|$)/.test(path))scheduleSync(2500);
-  else if(/\/office\/status$/.test(path)&&data&&data.updated)scheduleSync(2500);
 }
 function setupSync(){
   const toggle=id=>{const el=$(id);if(el)el.addEventListener('click',()=>setSwitch(el,!el.classList.contains('active')));};
@@ -1905,10 +1807,10 @@ function setupChrome(){
 window.addEventListener('beforeunload',ev=>{if(state.dirty||state.savePromise){ev.preventDefault();ev.returnValue='';}});
 document.addEventListener('DOMContentLoaded',()=>{
   try{hydrateIcons(jpRoot());setupChrome();}catch(e){console.error('Joplix chrome init failed',e);}
-  try{setupResizableColumns();}catch(e){console.error('Joplix resizable init failed',e);} try{setupEditorFormatbar();}catch(e){console.error('Joplix editor toolbar init failed',e);} try{setupSettings();}catch(e){console.error('Joplix settings init failed',e);} try{setupWelcome();}catch(e){console.error('Joplix welcome init failed',e);} try{setupSync();}catch(e){console.error('Joplix sync init failed',e);} try{setTimeout(()=>checkUpdateOnStart(),1200);}catch(e){console.warn('Joplix update startup init failed',e);} if($('jp-pdf-viewer-close'))$('jp-pdf-viewer-close').onclick=closePdfViewer; if($('jp-pdf-viewer-backdrop'))$('jp-pdf-viewer-backdrop').onclick=closePdfViewer;
+  try{setupResizableColumns();}catch(e){console.error('Joplix resizable init failed',e);} try{setupEditorFormatbar();}catch(e){console.error('Joplix editor toolbar init failed',e);} try{setupSettings();}catch(e){console.error('Joplix settings init failed',e);} try{setupWelcome();}catch(e){console.error('Joplix welcome init failed',e);} try{setupSync();}catch(e){console.error('Joplix sync init failed',e);} try{setTimeout(()=>checkUpdateOnStart(),1200);}catch(e){console.warn('Joplix update startup init failed',e);}
   if($('jp-new-root'))$('jp-new-root').onclick=()=>newNotebook('');
   if($('jp-new-note-main'))$('jp-new-note-main').onclick=newNote;
-  if($('jp-save-note'))$('jp-save-note').onclick=()=>saveNote({keepMode:true,skipReload:true}).then(ok=>{if(ok)jpToast(t('joplix','Note saved'));}).catch(e=>jpAlert(e.message)); if($('jp-save-note-top'))$('jp-save-note-top').onclick=()=>saveNote({keepMode:true,skipReload:true,fastDirtySave:true}).catch(e=>jpAlert(e.message)); if($('jp-edit-note'))$('jp-edit-note').onclick=()=>setNoteMode('edit'); if($('jp-cancel-edit'))$('jp-cancel-edit').onclick=()=>setNoteMode('view'); if($('jp-title'))$('jp-title').addEventListener('input',()=>{markDirty();updateNotePath();}); if($('jp-body'))$('jp-body').addEventListener('input',()=>{markDirty();});
+  if($('jp-save-note'))$('jp-save-note').onclick=()=>saveNote({keepMode:true,skipReload:true}).then(ok=>{if(ok)jpToast(t('joplix','Note saved'));}).catch(e=>jpAlert(e.message)); if($('jp-edit-note'))$('jp-edit-note').onclick=()=>setNoteMode('edit'); if($('jp-cancel-edit'))$('jp-cancel-edit').onclick=()=>setNoteMode('view'); if($('jp-title'))$('jp-title').addEventListener('input',()=>{markDirty();updateNotePath();}); if($('jp-body'))$('jp-body').addEventListener('input',()=>{markDirty();});
   if($('jp-delete-note'))$('jp-delete-note').onclick=()=>deleteNote().catch(e=>jpAlert(e.message));
   if($('jp-trash-restore'))$('jp-trash-restore').onclick=()=>{if(state.note&&state.note.is_deleted)restoreTrashedNote(state.note.id).catch(e=>jpAlert(e.message));};
   if($('jp-trash-purge'))$('jp-trash-purge').onclick=()=>{if(state.note&&state.note.is_deleted)purgeTrashedNote(state.note.id,state.note.title).catch(e=>jpAlert(e.message));};

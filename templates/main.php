@@ -39,7 +39,7 @@ if (is_readable($infoXml)) {
   <!-- Below 1025px the sidebar is a drawer over the list (class jp-nav-open on #joplix-app); this dims the rest. -->
   <div class="jp-nav-backdrop" id="jp-nav-backdrop"></div>
 
-  <div class="jp-resizer" id="jp-resize-left" data-resize="nav" title="<?php p($l->t('Resize column')); ?>"></div>
+  <div class="jp-resizer" data-resize="nav" title="<?php p($l->t('Resize column')); ?>"></div>
 
   <section class="jp-list" data-jp-col="list">
     <div class="jp-list-head">
@@ -54,7 +54,7 @@ if (is_readable($infoXml)) {
     <div id="jp-index-status" class="jp-index-status"><?php p($l->t('Loading index...')); ?></div>
   </section>
 
-  <div class="jp-resizer" id="jp-resize-right" data-resize="list" title="<?php p($l->t('Resize column')); ?>"></div>
+  <div class="jp-resizer" data-resize="list" title="<?php p($l->t('Resize column')); ?>"></div>
 
   <main class="jp-content" data-jp-col="note">
     <section id="jp-editor-view" class="jp-editor-view">
@@ -288,20 +288,4 @@ if (is_readable($infoXml)) {
 
 <div id="jp-note-context-menu" class="jp-note-context-menu jp-menu" role="menu" aria-hidden="true"></div>
 
-<div id="jp-pdf-viewer-overlay" class="jp-pdf-viewer-overlay jp-overlay" aria-hidden="true">
-  <div class="jp-pdf-viewer-backdrop jp-backdrop" id="jp-pdf-viewer-backdrop"></div>
-  <section class="jp-pdf-viewer-modal" role="dialog" aria-modal="true" aria-labelledby="jp-pdf-viewer-title">
-    <header class="jp-pdf-viewer-head">
-      <div>
-        <strong id="jp-pdf-viewer-title"><?php p($l->t('View PDF')); ?></strong>
-        <span id="jp-pdf-viewer-meta"></span>
-      </div>
-      <div class="jp-pdf-viewer-actions">
-        <a id="jp-pdf-viewer-open" href="#" target="_blank" rel="noopener"><?php p($l->t('Open externally')); ?></a>
-        <button id="jp-pdf-viewer-close" class="jp-icon-btn" type="button" title="<?php p($l->t('Close PDF')); ?>" aria-label="<?php p($l->t('Close PDF')); ?>"><span class="jp-icon" data-icon="close"></span></button>
-      </div>
-    </header>
-    <iframe id="jp-pdf-viewer-frame" title="<?php p($l->t('PDF view')); ?>"></iframe>
-  </section>
-</div>
 </div>

@@ -418,12 +418,6 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 #joplix .jp-welcome-steps span { color: var(--jp-muted); }
 #joplix .jp-welcome-steps code { padding: 1px 5px; border-radius: 4px; background: var(--color-background-dark); }
 
-#joplix .jp-pdf-viewer-modal { position: relative; display: grid; grid-template-rows: auto 1fr; width: 100%; height: 100%; overflow: hidden; border-radius: var(--jp-radius-lg); background: var(--color-main-background); box-shadow: var(--jp-shadow); }
-#joplix .jp-pdf-viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px 8px 16px; border-bottom: 1px solid var(--color-border); }
-#joplix .jp-pdf-viewer-head span { display: block; color: var(--jp-muted); font-size: 12px; }
-#joplix .jp-pdf-viewer-actions { display: flex; align-items: center; gap: 8px; }
-#joplix .jp-pdf-viewer-actions a { color: var(--color-primary-element); }
-#joplix #jp-pdf-viewer-frame { width: 100%; height: 100%; border: 0; }
 
 /* 10 — settings --------------------------------------------------------------------------------------- */
 #joplix .jp-settings-modal {

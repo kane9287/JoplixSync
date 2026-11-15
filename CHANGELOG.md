@@ -14,6 +14,8 @@
 - Files from a share whose owner disabled downloading are no longer offered under *Attach from Nextcloud* and cannot be attached.
 - Error messages no longer show server paths; unexpected internal errors show a short notice and are written to the Nextcloud log.
 - The folder suggestions in the settings look three levels deep and skip hidden folders, so the settings open quickly with large file trees.
+- Deleting a note or notebook permanently, or emptying the trash, now also removes the attachments that only those notes used (as the Joplin apps do). Attachments still used by another note, a note in the trash or a revision stay.
+- Permanently deleting a notebook checks all its files before removing the first one, and moving a notebook to the trash or restoring it is undone completely if it fails halfway, instead of leaving it half done.
 - Internal: one parser for Joplin's item format shared by the note view and the synchronisation; one definition of the Joplix folder; one list of Office formats and of file types; a note list that is read once per request instead of up to three times.
 
 # Joplix 2026.11.81

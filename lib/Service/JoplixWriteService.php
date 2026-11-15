@@ -21,7 +21,8 @@ class JoplixWriteService {
   return ['id'=>$id,'trashed'=>true];
  }
  /** Marks the notebook, every sub-notebook and every note in them, with one shared timestamp. */
- public function trashNotebook(string $id): array{
+ public function trashNotebook(string $id): array{return $this->transaction(fn()=>$this->trashNotebookNow($id));}
+ private function trashNotebookNow(string $id): array{
   $item=$this->must($id,'2');
   if(isset($this->model->trashedRaw()[$id]))return ['id'=>$id,'trashed'=>true,'trashed_items'=>['notebooks'=>0,'notes'=>0]];
   $books=$this->model->notebooksRaw(); $ids=$this->withDescendants($id,$books); $when=$this->nowMs(); $count=['notebooks'=>0,'notes'=>0];
@@ -38,7 +39,8 @@ class JoplixWriteService {
   return ['id'=>$id,'restored'=>true,'notebook_id'=>$parent];
  }
  /** Restores the notebook with everything in the trash below it; top level when its parent is not available. */
- public function restoreNotebook(string $id): array{
+ public function restoreNotebook(string $id): array{return $this->transaction(fn()=>$this->restoreNotebookNow($id));}
+ private function restoreNotebookNow(string $id): array{
   $item=$this->trashedItem($id,'2'); $trashed=$this->model->trashedRaw(); $parent=(string)($item['parent_id']??''); $count=['notebooks'=>0,'notes'=>0];
   $trashedBooks=array_filter($trashed,fn($t)=>($t['type_']??'')==='2'); $ids=$this->withDescendants($id,$trashedBooks);
   foreach($ids as $bookId=>$_){ $reparent=($bookId===$id&&$parent!==''&&!isset($this->model->notebooksRaw()[$parent]))?'':null; $this->mark((string)$bookId,$trashed[$bookId],'0',$reparent); $count['notebooks']++; }
@@ -47,10 +49,18 @@ class JoplixWriteService {
  }
  /** Permanently removes everything in the trash. */
  public function emptyTrash(): array{
-  $count=['notebooks'=>0,'notes'=>0];
-  foreach($this->model->trashedRaw() as $id=>$t){ if(($t['type_']??'')==='1'){ $this->deleteNoteRelations((string)$id); $this->deleteSyncItem((string)$id); $count['notes']++; } }
-  foreach($this->model->trashedRaw() as $id=>$t){ if(($t['type_']??'')==='2'){ $this->deleteSyncItem((string)$id); $count['notebooks']++; } }
-  return ['ok'=>true,'deleted_items'=>$count];
+  $plan=[];
+  foreach($this->model->trashedRaw() as $id=>$t){ if(($t['type_']??'')==='1')$this->planNoteDeletion((string)$id,$plan); }
+  foreach($this->model->trashedRaw() as $id=>$t){ if(($t['type_']??'')==='2')$plan[(string)$id]='2'; }
+  return ['ok'=>true,'deleted_items'=>$this->executeDeletion($plan)];
+ }
+ /** Original content of every file rewritten inside transaction(), for rolling back. @var array<int,array{0:\OCP\Files\File,1:string}>|null */
+ private ?array $journal=null;
+ /** Runs a change that rewrites several files; if it fails midway, the files already rewritten get their old content back. */
+ private function transaction(callable $fn){
+  $this->journal=[];
+  try{$r=$fn();$this->journal=null;return $r;}
+  catch(\Throwable $e){foreach(array_reverse($this->journal??[]) as [$file,$content]){try{$file->putContent($content);}catch(\Throwable $ignore){}}$this->journal=null;throw $e;}
  }
  private function nowMs(): string{return (string)(int)round(microtime(true)*1000);}
  private function trashedItem(string $id,string $type): array{$t=$this->model->trashedRaw()[$id]??null;if(!$t||($t['type_']??'')!==$type)throw new \RuntimeException($this->l->t('Item not found in the trash'));return $t;}
@@ -64,7 +74,7 @@ class JoplixWriteService {
  public function createNote(string $title,string $body,string $parentId): array{$this->notebookId($parentId);$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>$this->compose($title,$body),'id'=>$id,'parent_id'=>$parentId,'created_time'=>$now,'updated_time'=>$now,'is_conflict'=>'0','latitude'=>'0.00000000','longitude'=>'0.00000000','altitude'=>'0.0000','author'=>'','source_url'=>'','is_todo'=>'0','todo_due'=>'0','todo_completed'=>'0','source'=>'joplix','source_application'=>'joplix','application_data'=>'','order'=>(string)time(),'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','markup_language'=>'1','is_shared'=>'0','share_id'=>'','conflict_original_id'=>'','master_key_id'=>'','user_data'=>'','type_'=>'1'];$this->writeNew($id,$item);return ['id'=>$id];}
  public function updateNote(string $id,string $title,string $body,string $known=''): array{$item=$this->must($id,'1');$this->conflict($item,$known,$this->l->t('Conflict: the note was changed in the meantime'));$this->backup($id);$item['_body']=$this->compose($title,$body);$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time']);return ['id'=>$id,'updated_time'=>$item['updated_time']];}
  public function moveNote(string $id,string $targetNotebookId): array{$item=$this->must($id,'1');$this->notebookId($targetNotebookId);$this->backup($id);$item['parent_id']=$targetNotebookId;$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time','parent_id']);return ['id'=>$id];}
- public function deleteNote(string $id): array{$this->must($id,'1');$relations=$this->deleteNoteRelations($id);$this->deleteSyncItem($id);return ['id'=>$id,'deleted'=>true,'deleted_relations'=>$relations];}
+ public function deleteNote(string $id): array{$this->must($id,'1');$plan=[];$this->planNoteDeletion($id,$plan);$count=$this->executeDeletion($plan);return ['id'=>$id,'deleted'=>true,'deleted_relations'=>$count['relations'],'deleted_attachments'=>$count['attachments']];}
  public function createTag(string $title): array{$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>trim($title)?:$this->l->t('New tag'),'id'=>$id,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','is_shared'=>'0','parent_id'=>'','type_'=>'5'];$this->writeNew($id,$item);return ['id'=>$id];}
  public function saveNoteTags(string $noteId,array $tagIds): array{ $this->must($noteId,'1'); foreach($tagIds as $tagId){ if(!is_string($tagId)||!self::isId($tagId)||!isset($this->model->tagsRaw()[$tagId]))throw new \RuntimeException($this->l->t('Tag not found'));$exists=false;foreach($this->model->noteTagsRaw() as $rel){if(($rel['note_id']??'')===$noteId&&($rel['tag_id']??'')===$tagId)$exists=true;} if(!$exists){$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>'','id'=>$id,'note_id'=>$noteId,'tag_id'=>$tagId,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','is_shared'=>'0','type_'=>'6'];$this->writeNew($id,$item);}} return ['ok'=>true];}
  public function removeNoteTag(string $noteId,string $tagId): array{
@@ -72,7 +82,7 @@ class JoplixWriteService {
   foreach($this->model->noteTagsRaw() as $relationId=>$rel){
    if((string)($rel['note_id']??'')!==$noteId||(string)($rel['tag_id']??'')!==$tagId)continue;
    $file=$this->model->fileFor((string)$relationId);
-   if($file){$this->backup((string)$relationId);$file->delete();$removed++;}
+   if($file){$this->backup((string)$relationId);$file->delete();$this->removed[(string)$relationId]=true;$removed++;}
   }
   return ['ok'=>true,'note_id'=>$noteId,'tag_id'=>$tagId,'removed'=>$removed];
  }
@@ -164,25 +174,70 @@ class JoplixWriteService {
  // Inverse of JoplixModelService::titleAndBody(): nothing is trimmed and no default title is invented, so
  // an unedited note is written back unchanged. The title is one line by definition.
  private function compose(string $title,string $body): string{$title=str_replace(["\r\n","\r","\n"],' ',$title);$body=str_replace("\r\n","\n",$body);return $body===''?$title:$title."\n\n".$body;}
+ // ---- Permanent deletion. The ids to remove are collected first and every file is checked before the
+ // first one is deleted, so a missing file stops the operation before anything is gone (deletions cannot
+ // be rolled back). Attachments that only the removed notes used go as well (purgeOrphanResources).
  private function deleteNotebookRecursive(string $id): array{
-  $deleted=['notebooks'=>0,'notes'=>0];
-  $children=[];
+  $this->must($id,'2');
+  $plan=[]; $this->planNotebookDeletion($id,$plan);
+  return $this->executeDeletion($plan);
+ }
+ /** @param array<string,string> $plan id => '1' note, '2' notebook, '6' note-tag link, in deletion order */
+ private function planNotebookDeletion(string $id,array &$plan): void{
   // Live and trashed children alike, so purging a notebook never leaves items behind in the trash.
   $trashed=$this->model->trashedRaw();
-  foreach($this->model->notebooksRaw()+array_filter($trashed,fn($t)=>($t['type_']??'')==='2') as $childId=>$nb){ if(($nb['parent_id']??'')===$id)$children[]=(string)$childId; }
-  foreach($children as $childId){ $sub=$this->deleteNotebookRecursive($childId); $deleted['notebooks']+=$sub['notebooks']; $deleted['notes']+=$sub['notes']; }
-  foreach($this->model->notesRaw()+array_filter($trashed,fn($t)=>($t['type_']??'')==='1') as $noteId=>$note){ if(($note['parent_id']??'')===$id){ $this->deleteNoteRelations((string)$noteId); $this->deleteSyncItem((string)$noteId); $deleted['notes']++; } }
-  $this->must($id,'2'); $this->deleteSyncItem($id); $deleted['notebooks']++;
-  return $deleted;
+  foreach($this->model->notebooksRaw()+array_filter($trashed,fn($t)=>($t['type_']??'')==='2') as $childId=>$nb){ if(($nb['parent_id']??'')===$id)$this->planNotebookDeletion((string)$childId,$plan); }
+  foreach($this->model->notesRaw()+array_filter($trashed,fn($t)=>($t['type_']??'')==='1') as $noteId=>$note){ if(($note['parent_id']??'')===$id)$this->planNoteDeletion((string)$noteId,$plan); }
+  $plan[$id]='2';
  }
- private function deleteNoteRelations(string $noteId): int{
+ private function planNoteDeletion(string $noteId,array &$plan): void{
+  foreach($this->model->noteTagsRaw() as $relationId=>$relation){ if((string)($relation['note_id']??'')===$noteId)$plan[(string)$relationId]='6'; }
+  $plan[$noteId]='1';
+ }
+ /** @return array{notebooks:int,notes:int,relations:int,attachments:int} */
+ private function executeDeletion(array $plan): array{
+  foreach($plan as $id=>$_){ if(!$this->model->fileFor((string)$id))throw new \RuntimeException($this->l->t('File not found: %1$s',[(string)$id])); }
+  $count=['notebooks'=>0,'notes'=>0,'relations'=>0,'attachments'=>0]; $bodies=[];
+  foreach($plan as $id=>$type){
+   $id=(string)$id;
+   if($type==='1')$bodies[]=(string)($this->model->item($id)['_body']??'');
+   $this->deleteSyncItem($id);
+   $count[$type==='1'?'notes':($type==='2'?'notebooks':'relations')]++;
+  }
+  $count['attachments']=$this->purgeOrphanResources($bodies);
+  return $count;
+ }
+ /**
+  * Removes attachments referenced by the deleted note bodies that no remaining item mentions any more
+  * (notes, trashed notes, revisions and every other item file are searched for the id). Joplin's own
+  * clients delete such orphans too; without this, "delete permanently" kept the files forever.
+  */
+ private function purgeOrphanResources(array $bodies): int{
+  $candidates=[];
+  foreach($bodies as $body){ if(preg_match_all('/:\/([a-f0-9]{32})/i',$body,$m))foreach($m[1] as $rid)$candidates[strtolower($rid)]=true; }
+  $candidates=array_filter($candidates,fn($_,$rid)=>($this->model->item((string)$rid)['type_']??'')==='4'&&!isset($this->removed[(string)$rid]),ARRAY_FILTER_USE_BOTH);
+  if(!$candidates)return 0;
+  foreach($this->model->allItems() as $itemId=>$item){
+   if(isset($this->removed[(string)$itemId])||isset($candidates[(string)$itemId]))continue;
+   $text=(string)($item['_body']??'')."\n".(string)($item['_meta_raw']??'');
+   foreach($candidates as $rid=>$_){ if(stripos($text,(string)$rid)!==false)unset($candidates[$rid]); }
+   if(!$candidates)return 0;
+  }
   $removed=0;
-  foreach($this->model->noteTagsRaw() as $relationId=>$relation){
-   if((string)($relation['note_id']??'')!==$noteId)continue;
-   $this->deleteSyncItem((string)$relationId);$removed++;
+  foreach($candidates as $rid=>$_){
+   $rid=(string)$rid;
+   try{
+    $rf=$this->folder->nodeExists('.resource')?$this->folder->get('.resource'):null;
+    if($rf instanceof Folder&&$rf->nodeExists($rid))$rf->get($rid)->delete();
+    $this->deleteSyncItem($rid);$removed++;
+   }catch(\Throwable $e){}
   }
   return $removed;
  }
+ /** Ids of the item files this writer deleted (the sync engine deletes exactly these on the server). @var array<string,true> */
+ private array $removed=[];
+ /** @return string[] file names ("<id>.md") of the items deleted by this writer */
+ public function deletedItemNames(): array{return array_map(fn($id)=>$id.'.md',array_keys($this->removed));}
  private function deleteSyncItem(string $id): void{
   $file=$this->model->fileFor($id);
   if(!$file)throw new \RuntimeException($this->l->t('File not found: %1$s',[$id]));
@@ -190,6 +245,7 @@ class JoplixWriteService {
   // "delete permanently" would leave the text readable in .joplix_backups. (Joplin's own "move to
   // trash" instead keeps the item with deleted_time set; the model hides those.)
   $file->delete();
+  $this->removed[$id]=true;
   $this->dropBackups($id);
  }
 
@@ -202,7 +258,7 @@ class JoplixWriteService {
  /** $message is the translated text for the user; the controller answers a ConflictException with HTTP 409. */
  private function conflict(array $item,string $known,string $message): void{if($known!==''&&($item['updated_time']??'')!==$known)throw new ConflictException($message);}
  private function writeNew(string $id,array $item): void{$this->folder->newFile($id.'.md',$this->model->format($item));}
- private function writeExisting(string $id,array $item,array $allowedFields=['updated_time','user_updated_time']): void{if(($item['type_']??'')==='13')throw new \RuntimeException($this->l->t('Revisions must not be written by Joplix'));$f=$this->model->fileFor($id);if(!$f)throw new \RuntimeException($this->l->t('File not found'));$content=$this->model->formatPreserving($item,$allowedFields);if(($item['type_']??'')==='1'&&!preg_match('/\n\nid:\s*'.preg_quote($id,'/').'/',$content))throw new \RuntimeException($this->l->t('Saving aborted: the Joplin separator before the metadata is missing'));$f->putContent($content);}
+ private function writeExisting(string $id,array $item,array $allowedFields=['updated_time','user_updated_time']): void{if(($item['type_']??'')==='13')throw new \RuntimeException($this->l->t('Revisions must not be written by Joplix'));$f=$this->model->fileFor($id);if(!$f)throw new \RuntimeException($this->l->t('File not found'));$content=$this->model->formatPreserving($item,$allowedFields);if(($item['type_']??'')==='1'&&!preg_match('/\n\nid:\s*'.preg_quote($id,'/').'/',$content))throw new \RuntimeException($this->l->t('Saving aborted: the Joplin separator before the metadata is missing'));if($this->journal!==null)$this->journal[]=[$f,$f->getContent()];$f->putContent($content);}
  private function backup(string $id): void{$f=$this->model->fileFor($id);if(!$f)return;if(!$this->folder->nodeExists('.joplix_backups'))$this->folder->newFolder('.joplix_backups');$b=$this->folder->get('.joplix_backups');if($b instanceof Folder)$b->newFile(gmdate('Ymd_His').'_'.$id.'.md',$f->getContent());}
  // ---- Backup retention. backup() copies an item into <Joplin folder>/.joplix_backups before it is
  // changed ("<Ymd_His>_<id>.md"; replaced attachments go to resources/"<Ymd_His>_<id>"). Copies are kept

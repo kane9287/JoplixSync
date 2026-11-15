@@ -26,6 +26,14 @@ Supported editors (any one is enough):
 
 Each save in the editor is written into the attachment by the server right away, also when the Joplix tab is closed meanwhile. If the attachment was changed elsewhere in the meantime, the working copy is kept for 30 days in `.joplix/editing` in your files.
 
+## Do Not Edit the Joplix Folder Directly
+
+The Joplix folder (default `/JoplinV2`) holds Joplin's sync files: one `<id>.md` per note, notebook, tag and attachment, plus the attachments in `.resource`. They look like Markdown but are not ordinary Markdown documents: the lines at the end (`id: …`, `parent_id: …`, `type_: 5`) are metadata that Joplin and Joplix read exactly.
+
+**Do not open these files with Nextcloud Text or another Markdown editor in the Files app.** Saving them there rewrites the file as Markdown, for example `type_: 5` becomes `type\_: 5`, and the item is then broken. Joplix shows such an item under *Settings › Synchronisation* as *Not accepted by the Joplin Server: … Not a valid Joplin item (id or type_ missing)*, and the Joplin apps cannot read it either. Nextcloud cannot restrict which app opens files in a folder, so this is up to you. Open notes in Joplix instead.
+
+If a file was damaged this way: download it, correct the metadata lines in a plain text editor (Notepad, VS Code, …), for example `type\_:` back to `type_:`, and upload it again, replacing the file. Nextcloud's *Versions* also keeps the previous, intact version of the file. Do not rename, move or delete files in the folder by hand either: Joplix treats a file that disappears without being deleted in Joplix as *missing* and asks whether to restore it from the Joplin Server.
+
 ## Synchronisation with Joplin Server
 
 Joplix can synchronise its Nextcloud folder with a self-hosted [Joplin Server](https://github.com/laurent22/joplin/tree/dev/packages/server) account. Open **Settings › Synchronisation**, enter the server address, e-mail and password, test the connection and enable synchronisation.

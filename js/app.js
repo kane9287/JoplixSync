@@ -81,7 +81,7 @@ function jpSettingsOpen(){const o=document.getElementById('jp-settings-overlay')
 function jpDialogOpen(){return !!document.querySelector('.jp-dialog-overlay');}
 // One modal for every question. opts: title, message, input (string => text field), select ([{value,label}])
 // with value, buttons ([{label,value,primary,danger,submit}]; submit resolves with the field value) and
-// cancelValue (resolved on Escape or a click on the backdrop). mount(modal,finish): adds custom content
+// cancelValue (resolved on Escape or a click on the backdrop). className: extra class on the modal. mount(modal,finish): adds custom content
 // after the message, may resolve the dialog through finish(value), returns the element to focus.
 function jpDialog(opts){
   opts=opts||{};
@@ -89,7 +89,7 @@ function jpDialog(opts){
     const previous=document.activeElement;
     const overlay=document.createElement('div');overlay.className='jp-overlay jp-dialog-overlay open';
     const backdrop=document.createElement('div');backdrop.className='jp-backdrop';
-    const modal=document.createElement('section');modal.className='jp-modal';modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
+    const modal=document.createElement('section');modal.className='jp-modal'+(opts.className?' '+opts.className:'');modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
     if(opts.title){const h=document.createElement('h2');h.textContent=opts.title;modal.appendChild(h);}
     if(opts.message){const p=document.createElement('p');p.className='jp-dialog-message';p.textContent=opts.message;modal.appendChild(p);}
     let field=null;
@@ -357,6 +357,9 @@ function jpInlineMarkdown(src){
   let s=String(src==null?'':src).replace(/\u0001/g,'');
   s=s.replace(/`([^`]+)`/g,(m,c)=>keep('<code>'+jpEscapeHtml(c)+'</code>'));
   s=jpEscapeHtml(s);
+  // Joplin desktop writes a resized image as raw HTML: <img src=":/id" width="300" ...>. Only this form is
+  // rendered; any other HTML stays text.
+  s=s.replace(/&lt;img\s(?:(?!&gt;).)*?src=(?:&quot;|&#39;):\/([0-9a-fA-F]{32})(?:&quot;|&#39;)(?:(?!&gt;).)*&gt;/gi,(m,id)=>{const w=m.match(/\swidth=(?:&quot;|&#39;)?(\d{1,4})/i);const alt=m.match(/\salt=(?:&quot;|&#39;)((?:(?!&quot;|&#39;).)*)/i);return keep('<img class="jp-md-res" data-jp-res="'+id.toLowerCase()+'" alt="'+(alt?alt[1]:'')+'"'+(w?' width="'+w[1]+'"':'')+'>');});
   s=s.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+[^)]*)?\)/g,(m,alt,u)=>{const tg=target(u);if(!tg)return m;if(tg.res)return keep('<img class="jp-md-res" data-jp-res="'+tg.res+'" alt="'+plain(alt)+'">');return keep('<a href="'+tg.url+'" target="_blank" rel="noopener noreferrer">')+(alt||tg.url)+keep('</a>');});
   // Link text may contain backslash-escaped brackets: Joplin writes note titles as [A \[draft\]](:/id).
   s=s.replace(/\[((?:[^\]\\]|\\.)+)\]\(\s*([^)\s]+)(?:\s+[^)]*)?\)/g,(m,text,u)=>{const tg=target(u);if(!tg)return m;return keep(tg.res?'<a href="#" data-jp-res-link="'+tg.res+'">':'<a href="'+tg.url+'" target="_blank" rel="noopener noreferrer">')+text.replace(/\\([\[\]])/g,'$1')+keep('</a>');});
@@ -460,7 +463,7 @@ function hydratePreviewResources(root){
   root.querySelectorAll('img[data-jp-res]').forEach(img=>{
     const known=findResource(img.dataset.jpRes);
     if(known.mime&&!String(known.mime).toLowerCase().startsWith('image/')){img.classList.add('jp-md-missing');return;}
-    resourceData(img.dataset.jpRes).then(p=>{if(p&&/^data:image\//i.test(String(p.data_url||'')))img.src=p.data_url;else img.classList.add('jp-md-missing');}).catch(()=>img.classList.add('jp-md-missing'));
+    resourceData(img.dataset.jpRes).then(p=>{if(p&&/^data:image\//i.test(String(p.data_url||''))){img.src=p.data_url;img.classList.add('jp-md-res-ready');img.title=t('Vorschau');img.addEventListener('click',()=>previewResource(findResource(img.dataset.jpRes)).catch(e=>jpAlert(e.message)));}else img.classList.add('jp-md-missing');}).catch(()=>img.classList.add('jp-md-missing'));
   });
   root.querySelectorAll('a[data-jp-res-link]').forEach(a=>{
     const id=a.dataset.jpResLink;
@@ -471,7 +474,7 @@ function hydratePreviewResources(root){
       if(findNoteLink(id)){openLinkedNote(id).catch(e=>jpAlert(e.message));return;}
       const nb=((state.index&&state.index.notebooks)||[]).find(n=>String(n.id).toLowerCase()===String(id).toLowerCase());
       if(nb){handleDirtyBeforeNoteChange('').then(ok=>{if(ok)selectNotebook(nb.id);});return;}
-      openResourceExternal(findResource(id)).catch(e=>jpAlert(e.message));
+      openResource(findResource(id));
     });
   });
 }
@@ -825,7 +828,46 @@ function resourceIsExternallyOpenable(r){return resourceIsPdf(r)||resourceIsOffi
 function resourceFileName(r,p){let name=String((p&&p.title)||r.title||r.id||'resource').trim()||'resource';const ext=String((p&&p.file_extension)||r.file_extension||'').trim().replace(/^\./,'');if(ext&&!name.toLowerCase().endsWith('.'+ext.toLowerCase()))name+='.'+ext;return name.replace(/[\\/:*?"<>|]+/g,'_');}
 function dataUrlToBlobUrl(dataUrl,mime){const parts=String(dataUrl||'').split(',');if(parts.length<2)throw new Error(t('Ressource konnte nicht gelesen werden.'));const bin=atob(parts[1]);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return URL.createObjectURL(new Blob([bytes],{type:mime||'application/octet-stream'}));}
 function formatBytes(n){n=Number(n||0);if(!n)return '';const u=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):Math.round(n))+' '+u[i];}
-async function openResourceExternal(r){const p=await api('/api/resources/'+r.id+'/data');if(p.error)throw new Error(p.error);const mime=p.mime||r.mime||'application/octet-stream';const objectUrl=dataUrlToBlobUrl(p.data_url,mime);const filename=resourceFileName(r,p);const a=document.createElement('a');a.href=objectUrl;a.target='_blank';a.rel='noopener';a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);}
+// Download is the only path that saves a file. "Open" previews images, audio and video in a dialog and
+// shows PDFs in a new browser tab; other files have nothing to show, so opening them downloads.
+async function downloadResource(r){const p=await resourceData(r.id);if(!p||p.error||!p.data_url)throw new Error((p&&p.error)||t('Ressource konnte nicht gelesen werden.'));const mime=p.mime||r.mime||'application/octet-stream';const objectUrl=dataUrlToBlobUrl(p.data_url,mime);const a=document.createElement('a');a.href=objectUrl;a.download=resourceFileName(r,p);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);}
+function resourcePreviewKind(r){const k=resourceKind(r);return ['image','audio','video'].includes(k)?k:'';}
+function openResource(r){
+  const fail=e=>jpAlert(e.message);
+  if(resourcePreviewKind(r))return previewResource(r).catch(fail);
+  if(resourceKind(r)==='pdf')return openResourceInTab(r).catch(fail);
+  return downloadResource(r).catch(fail);
+}
+// The tab is opened synchronously, inside the click, so popup blockers allow it; the content follows.
+async function openResourceInTab(r){
+  const w=window.open('','_blank');
+  try{
+    const p=await resourceData(r.id);if(!p||p.error||!p.data_url)throw new Error((p&&p.error)||t('Ressource konnte nicht gelesen werden.'));
+    if(!w){await downloadResource(r);return;}
+    const objectUrl=dataUrlToBlobUrl(p.data_url,p.mime||r.mime||'application/octet-stream');
+    try{w.opener=null;}catch(e){}
+    w.location.href=objectUrl;
+    setTimeout(()=>URL.revokeObjectURL(objectUrl),300000);
+  }catch(e){if(w)try{w.close();}catch(ignore){}throw e;}
+}
+async function previewResource(r){
+  const kind=resourcePreviewKind(r)||'image';
+  let objectUrl='',closed=false;
+  const choice=await jpDialog({title:r.title||r.id,className:'jp-modal-preview',cancelValue:null,buttons:[{label:'Download',value:'download'},{label:t('Schließen'),value:null,primary:true}],mount:modal=>{
+    const box=document.createElement('div');box.className='jp-preview-media';box.textContent=t('Wird geladen …');modal.appendChild(box);
+    resourceData(r.id).then(p=>{
+      if(closed)return;
+      if(!p||p.error||!p.data_url)throw new Error((p&&p.error)||t('Ressource konnte nicht gelesen werden.'));
+      let el;
+      if(kind==='image'){el=document.createElement('img');el.src=p.data_url;el.alt=r.title||'';}
+      else{objectUrl=dataUrlToBlobUrl(p.data_url,p.mime||r.mime);el=document.createElement(kind);el.controls=true;el.src=objectUrl;}
+      box.textContent='';box.appendChild(el);
+    }).catch(e=>{if(closed)return;box.textContent=e.message;box.classList.add('jp-preview-error');});
+  }});
+  closed=true;
+  if(objectUrl)URL.revokeObjectURL(objectUrl);
+  if(choice==='download')await downloadResource(r);
+}
 function stopOfficePolling(resourceId){if(state.officePollers[resourceId]){clearInterval(state.officePollers[resourceId]);delete state.officePollers[resourceId];}}
 function officeStatusText(el,text,kind){if(!el)return;el.textContent=text;el.className='jp-resource-edit-status '+(kind||'');}
 function officeSyncState(resourceId){
@@ -998,18 +1040,18 @@ function renderResources(rs){
     row.appendChild(jpIconEl(kind==='image'?'image':'file'));
     const main=document.createElement('div');main.className='jp-resource-main';
     const title=document.createElement('strong');title.textContent=r.title||r.id;
+    if(r.exists&&kind!=='office'&&resourcePrimaryLabel(kind)){title.className='jp-resource-open';title.tabIndex=0;title.setAttribute('role','button');title.onclick=()=>openResource(r);title.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();openResource(r);}};}
     const meta=document.createElement('span');meta.textContent=[r.file_extension?String(r.file_extension).toUpperCase():(r.mime||''),formatBytes(r.size),r.exists?'':t('Datei fehlt')].filter(Boolean).join(' · ');
     main.appendChild(title);main.appendChild(meta);row.appendChild(main);box.appendChild(row);
     if(!r.exists)return;
     const actions=document.createElement('div');actions.className='jp-resource-actions';row.appendChild(actions);
-    const open=async()=>{try{await openResourceExternal(r);}catch(e){jpAlert(e.message);}};
     const primary=resourcePrimaryLabel(kind);
     if(primary){
       const b=document.createElement('button');b.type='button';b.className='jp-resource-action jp-resource-action-primary';b.textContent=primary;actions.appendChild(b);
       if(kind==='office'){const status=document.createElement('div');status.className='jp-resource-edit-status';row.appendChild(status);b.onclick=async()=>{b.disabled=true;try{await startOfficeEdit(r,status);}catch(e){jpAlert(e.message);}finally{b.disabled=false;}};}
-      else b.onclick=open;
+      else b.onclick=()=>openResource(r);
     }
-    const dl=document.createElement('button');dl.type='button';dl.className='jp-resource-action jp-icon-btn';dl.title='Download';dl.setAttribute('aria-label','Download');dl.appendChild(jpIconEl('download'));dl.onclick=open;actions.appendChild(dl);
+    const dl=document.createElement('button');dl.type='button';dl.className='jp-resource-action jp-icon-btn';dl.title='Download';dl.setAttribute('aria-label','Download');dl.appendChild(jpIconEl('download'));dl.onclick=()=>downloadResource(r).catch(e=>jpAlert(e.message));actions.appendChild(dl);
   });
 }
 function openPdfViewer(p){return;}
@@ -1698,6 +1740,7 @@ async function installUpdateAsset(asset,rel){if(!asset?.id||!rel?.id)return;cons
 // trailing ': ' or leading space. Messages returned by the PHP backend are not translated here.
 // ---------------------------------------------------------------------------
 const JP_EN={
+'Schließen':'Close','Vorschau':'Preview',
 'Einstellungen':'Settings','Allgemein':'General','Aussehen':'Appearance','Sprache':'Language','Datenschutz':'Privacy','Über':'About',
 'Joplix-Ordner':'Joplix folder','Nextcloud-Ordner mit den Joplix-Daten auswählen oder manuell eingeben':'Select the Nextcloud folder containing your Joplix data or enter it manually',
 'Sortierung':'Sorting','Legt fest, wie Notizen angezeigt werden':'Controls how notes are displayed','Neueste zuerst':'Newest first','Älteste zuerst':'Oldest first','Titel A-Z':'Title A-Z',

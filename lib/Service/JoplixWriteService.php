@@ -103,7 +103,7 @@ class JoplixWriteService {
   if($rf->nodeExists($id))$rf->get($id)->delete();
   $rf->newFile($id,$content);
   if(!$this->folder->nodeExists($id.'.md')||!$rf->nodeExists($id))throw new \RuntimeException('Ressource konnte nicht vollstaendig angelegt werden');
-  return ['id'=>$id,'title'=>$safeName,'mime'=>$mime,'file_extension'=>$ext,'size'=>$size,'markdown'=>'['.$safeName.'](:/'.$id.')'];
+  return ['id'=>$id,'title'=>$safeName,'mime'=>$mime,'file_extension'=>$ext,'size'=>$size,'markdown'=>(str_starts_with(strtolower($mime),'image/')?'!':'').'['.$safeName.'](:/'.$id.')'];
  }
  public function updateResourceBinary(string $id,string $binary,string $knownHash=''): array{
   if($binary==='')throw new \RuntimeException('Leere Ressource kann nicht gespeichert werden');

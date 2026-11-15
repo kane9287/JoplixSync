@@ -1,3 +1,10 @@
+# Joplix 2026.11.78
+
+- Photos attached in Joplix now appear in the note: an image is inserted as an embedded image (`![photo.jpg](:/id)`, as the Joplin apps do) instead of a plain link. Images already attached as a link stay links; put a `!` in front of the link in the editor to show them as a picture.
+- Images that Joplin desktop resized (stored as `<img src=":/id" width="…">`) are shown as pictures at that width instead of as text.
+- Clicking an image in a note, an image's name in the attachment list, or its "Open" button shows the image in a preview window, with a separate Download button. Audio and video attachments play in the same window.
+- "Open" no longer downloads the file: PDFs open in a new browser tab. Saving a file is now only done by the download button (or the Download button in the preview). Other file types, which the browser cannot show, still download when their link in the note is clicked.
+
 # Joplix 2026.11.77
 
 - Attach files directly from Nextcloud: the "⋯" menu has a new item "Attach from Nextcloud", and the paperclip in the editor toolbar now asks whether to attach from this device or from Nextcloud. A picker shows your Nextcloud files (folders first, filter field, keyboard navigation) and opens in the folder you used last. The chosen file is copied on the server into the note as a normal Joplin attachment, so it syncs to the Joplin apps like an uploaded one, and large files do not have to pass through the browser.

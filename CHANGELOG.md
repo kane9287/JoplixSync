@@ -11,6 +11,9 @@
 - Saving a note no longer alters text that was not edited: notes without a title, titles with leading spaces or HTML, very long titles and trailing spaces or blank lines at the end of a note are written back exactly as they were. Before, such a note could get its first line duplicated as a title, and trailing whitespace was dropped.
 - The search index is no longer stored in your files (`.joplix/index_….json`) but in Nextcloud's internal app data, so the text of all notes is not versioned on every save or downloaded by desktop sync clients. The old file is removed automatically.
 - When a Nextcloud account is deleted, its Joplix index and synchronisation state are removed.
+- Joplix now uses Nextcloud's own translation system. English is the base language and German is a translation (`l10n/de.json`); the language follows your Nextcloud account, so the separate language setting in Joplix is gone. The page no longer appears in German for a moment before switching to English.
+- Error messages from the server for notes, notebooks, tags and attachments are now translated as well. Messages of the updater are still German, and messages of the Joplin Server synchronisation are still English, in both languages.
+- App description, links to the issue tracker and repository, licence identifier and minimum PHP version (8.1) were added to the app information.
 
 # Joplix 2026.11.78
 

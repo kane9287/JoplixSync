@@ -9,8 +9,7 @@ class PageController extends Controller {
   * @NoCSRFRequired
   */
  public function index(): TemplateResponse {
-  // The template is written in German and translated in the browser (js/app.js, JP_EN). Without this,
-  // Chrome and Edge detect German in the delivered HTML and offer to translate the page.
+  // Keeps Chrome and Edge from offering to translate the page, which would also rewrite the rendered note.
   \OCP\Util::addHeader('meta',['name'=>'google','content'=>'notranslate']);
   $u=$this->userSession->getUser(); $isAdmin=$u!==null && $this->groupManager->isAdmin($u->getUID()); $response=new TemplateResponse('joplix','main',['isAdmin'=>$isAdmin]);
   // Attachment previews play audio and video from blob: URLs built in the browser (js/app.js previewResource);

@@ -1,12 +1,14 @@
 <?php
 namespace OCA\Joplix\Service;
 use OCP\Files\Folder;
+use OCP\IL10N;
+use OCP\L10N\IFactory;
 
 class JoplixWriteService {
- private JoplixModelService $model; private Folder $folder;
- public function __construct(JoplixModelService $model){$this->model=$model;$this->folder=$model->folder();}
- public function createNotebook(string $title,string $parentId=''): array{if($parentId!=='')$this->notebookId($parentId);$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>trim($title)?:'Neues Notizbuch','id'=>$id,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','parent_id'=>$parentId,'is_shared'=>'0','share_id'=>'','master_key_id'=>'','icon'=>'','type_'=>'2'];$this->writeNew($id,$item);return ['id'=>$id];}
- public function updateNotebook(string $id,string $title,string $known=''): array{$item=$this->must($id,'2');$this->conflict($item,$known,'Notizbuch');$this->backup($id);$item['_body']=trim($title)?:($item['_title']??'Notizbuch');$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time']);return ['id'=>$id,'updated_time'=>$item['updated_time']];}
+ private JoplixModelService $model; private Folder $folder; private IL10N $l;
+ public function __construct(JoplixModelService $model,?IL10N $l=null){$this->model=$model;$this->folder=$model->folder();$this->l=$l??\OCP\Server::get(IFactory::class)->get('joplix');}
+ public function createNotebook(string $title,string $parentId=''): array{if($parentId!=='')$this->notebookId($parentId);$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>trim($title)?:$this->l->t('New notebook'),'id'=>$id,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','parent_id'=>$parentId,'is_shared'=>'0','share_id'=>'','master_key_id'=>'','icon'=>'','type_'=>'2'];$this->writeNew($id,$item);return ['id'=>$id];}
+ public function updateNotebook(string $id,string $title,string $known=''): array{$item=$this->must($id,'2');$this->conflict($item,$known,$this->l->t('Conflict: the notebook was changed in the meantime'));$this->backup($id);$item['_body']=trim($title)?:($item['_title']??$this->l->t('Notebook'));$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time']);return ['id'=>$id,'updated_time'=>$item['updated_time']];}
  public function deleteNotebook(string $id): array{$deleted=$this->deleteNotebookRecursive($id);return ['id'=>$id,'deleted'=>true,'deleted_items'=>$deleted];}
 
  // ---- Trash. Same representation as Joplin 3.x: the item file stays and carries
@@ -30,8 +32,8 @@ class JoplixWriteService {
  /** Back to its notebook, or to $targetNotebookId when that notebook is itself trashed or gone. */
  public function restoreNote(string $id,string $targetNotebookId=''): array{
   $item=$this->trashedItem($id,'1'); $books=$this->model->notebooksRaw(); $parent=(string)($item['parent_id']??'');
-  if($targetNotebookId!==''){ if(!isset($books[$targetNotebookId]))throw new \RuntimeException('Zielnotizbuch nicht gefunden'); $parent=$targetNotebookId; }
-  elseif(!isset($books[$parent]))throw new \RuntimeException('Das Notizbuch dieser Notiz ist nicht mehr vorhanden. Bitte ein Zielnotizbuch waehlen.');
+  if($targetNotebookId!==''){ if(!isset($books[$targetNotebookId]))throw new \RuntimeException($this->l->t('Target notebook not found')); $parent=$targetNotebookId; }
+  elseif(!isset($books[$parent]))throw new \RuntimeException($this->l->t('The notebook of this note no longer exists. Please choose a target notebook.'));
   $this->mark($id,$item,'0',$parent===(string)($item['parent_id']??'')?null:$parent);
   return ['id'=>$id,'restored'=>true,'notebook_id'=>$parent];
  }
@@ -51,7 +53,7 @@ class JoplixWriteService {
   return ['ok'=>true,'deleted_items'=>$count];
  }
  private function nowMs(): string{return (string)(int)round(microtime(true)*1000);}
- private function trashedItem(string $id,string $type): array{$t=$this->model->trashedRaw()[$id]??null;if(!$t||($t['type_']??'')!==$type)throw new \RuntimeException('Objekt nicht im Papierkorb gefunden');return $t;}
+ private function trashedItem(string $id,string $type): array{$t=$this->model->trashedRaw()[$id]??null;if(!$t||($t['type_']??'')!==$type)throw new \RuntimeException($this->l->t('Item not found in the trash'));return $t;}
  /** @return array<string,true> $id plus all notebooks of $books below it */
  private function withDescendants(string $id,array $books): array{ $ids=[$id=>true]; do{ $grew=false; foreach($books as $bookId=>$nb){ if(!isset($ids[$bookId])&&isset($ids[(string)($nb['parent_id']??'')])){$ids[$bookId]=true;$grew=true;} } }while($grew); return $ids; }
  private function mark(string $id,array $item,string $deletedTime,?string $parentId=null): void{
@@ -60,11 +62,11 @@ class JoplixWriteService {
   $this->writeExisting($id,$item,$fields);
  }
  public function createNote(string $title,string $body,string $parentId): array{$this->notebookId($parentId);$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>$this->compose($title,$body),'id'=>$id,'parent_id'=>$parentId,'created_time'=>$now,'updated_time'=>$now,'is_conflict'=>'0','latitude'=>'0.00000000','longitude'=>'0.00000000','altitude'=>'0.0000','author'=>'','source_url'=>'','is_todo'=>'0','todo_due'=>'0','todo_completed'=>'0','source'=>'joplix','source_application'=>'joplix','application_data'=>'','order'=>(string)time(),'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','markup_language'=>'1','is_shared'=>'0','share_id'=>'','conflict_original_id'=>'','master_key_id'=>'','user_data'=>'','type_'=>'1'];$this->writeNew($id,$item);return ['id'=>$id];}
- public function updateNote(string $id,string $title,string $body,string $known=''): array{$item=$this->must($id,'1');$this->conflict($item,$known,'Notiz');$this->backup($id);$item['_body']=$this->compose($title,$body);$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time']);return ['id'=>$id,'updated_time'=>$item['updated_time']];}
+ public function updateNote(string $id,string $title,string $body,string $known=''): array{$item=$this->must($id,'1');$this->conflict($item,$known,$this->l->t('Conflict: the note was changed in the meantime'));$this->backup($id);$item['_body']=$this->compose($title,$body);$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time']);return ['id'=>$id,'updated_time'=>$item['updated_time']];}
  public function moveNote(string $id,string $targetNotebookId): array{$item=$this->must($id,'1');$this->notebookId($targetNotebookId);$this->backup($id);$item['parent_id']=$targetNotebookId;$item['updated_time']=$this->model->now();$item['user_updated_time']=$item['updated_time'];$this->writeExisting($id,$item,['updated_time','user_updated_time','parent_id']);return ['id'=>$id];}
  public function deleteNote(string $id): array{$this->must($id,'1');$relations=$this->deleteNoteRelations($id);$this->deleteSyncItem($id);return ['id'=>$id,'deleted'=>true,'deleted_relations'=>$relations];}
- public function createTag(string $title): array{$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>trim($title)?:'Neuer Tag','id'=>$id,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','is_shared'=>'0','parent_id'=>'','type_'=>'5'];$this->writeNew($id,$item);return ['id'=>$id];}
- public function saveNoteTags(string $noteId,array $tagIds): array{ $this->must($noteId,'1'); foreach($tagIds as $tagId){ if(!is_string($tagId)||!self::isId($tagId)||!isset($this->model->tagsRaw()[$tagId]))throw new \RuntimeException('Tag nicht gefunden');$exists=false;foreach($this->model->noteTagsRaw() as $rel){if(($rel['note_id']??'')===$noteId&&($rel['tag_id']??'')===$tagId)$exists=true;} if(!$exists){$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>'','id'=>$id,'note_id'=>$noteId,'tag_id'=>$tagId,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','is_shared'=>'0','type_'=>'6'];$this->writeNew($id,$item);}} return ['ok'=>true];}
+ public function createTag(string $title): array{$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>trim($title)?:$this->l->t('New tag'),'id'=>$id,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','is_shared'=>'0','parent_id'=>'','type_'=>'5'];$this->writeNew($id,$item);return ['id'=>$id];}
+ public function saveNoteTags(string $noteId,array $tagIds): array{ $this->must($noteId,'1'); foreach($tagIds as $tagId){ if(!is_string($tagId)||!self::isId($tagId)||!isset($this->model->tagsRaw()[$tagId]))throw new \RuntimeException($this->l->t('Tag not found'));$exists=false;foreach($this->model->noteTagsRaw() as $rel){if(($rel['note_id']??'')===$noteId&&($rel['tag_id']??'')===$tagId)$exists=true;} if(!$exists){$id=$this->model->newId();$now=$this->model->now();$item=['_body'=>'','id'=>$id,'note_id'=>$noteId,'tag_id'=>$tagId,'created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'encryption_cipher_text'=>'','encryption_applied'=>'0','is_shared'=>'0','type_'=>'6'];$this->writeNew($id,$item);}} return ['ok'=>true];}
  public function removeNoteTag(string $noteId,string $tagId): array{
   $removed=0;
   foreach($this->model->noteTagsRaw() as $relationId=>$rel){
@@ -76,19 +78,19 @@ class JoplixWriteService {
  }
  public function uploadResource(string $filename,string $mime,string $dataBase64): array{
   $bin=base64_decode($dataBase64,true);
-  if($bin===false)throw new \RuntimeException('Ungueltige Base64-Daten');
+  if($bin===false)throw new \RuntimeException($this->l->t('Invalid Base64 data'));
   return $this->createResource($filename,$mime,$bin,strlen($bin));
  }
  // Attach a file from the user's Nextcloud: the content is streamed straight into .resource/<id>,
  // so large files never pass through the browser or PHP's upload limits.
  /** @param resource $stream */
  public function createResourceFromStream(string $filename,string $mime,$stream,int $size): array{
-  if(!is_resource($stream))throw new \RuntimeException('Datei konnte nicht gelesen werden');
+  if(!is_resource($stream))throw new \RuntimeException($this->l->t('The file could not be read'));
   try{return $this->createResource($filename,$mime,$stream,$size);}finally{if(is_resource($stream))fclose($stream);}
  }
  /** @param string|resource $content */
  private function createResource(string $filename,string $mime,$content,int $size): array{
-  if($size<=0)throw new \RuntimeException('Leere Ressource kann nicht angehaengt werden');
+  if($size<=0)throw new \RuntimeException($this->l->t('An empty file cannot be attached'));
   $safeName=$this->cleanResourceFileName($filename);
   $mime=$this->cleanMime($mime,$safeName);
   $id=$this->model->newId();
@@ -98,21 +100,21 @@ class JoplixWriteService {
   $item=['_body'=>$safeName,'id'=>$id,'mime'=>$mime,'filename'=>'','created_time'=>$now,'updated_time'=>$now,'user_created_time'=>$now,'user_updated_time'=>$now,'file_extension'=>$ext,'encryption_cipher_text'=>'','encryption_applied'=>'0','encryption_blob_encrypted'=>'0','size'=>(string)$size,'is_shared'=>'0','share_id'=>'','master_key_id'=>'','user_data'=>'','blob_updated_time'=>$blobMs,'ocr_text'=>'','ocr_details'=>'','ocr_status'=>'0','ocr_error'=>'','ocr_driver_id'=>'1','is_locked'=>'0','type_'=>'4'];
   if(!$this->folder->nodeExists('.resource'))$this->folder->newFolder('.resource');
   $rf=$this->folder->get('.resource');
-  if(!$rf instanceof Folder)throw new \RuntimeException('.resource ist kein Ordner');
+  if(!$rf instanceof Folder)throw new \RuntimeException($this->l->t('.resource is not a folder'));
   $this->writeNew($id,$item);
   if($rf->nodeExists($id))$rf->get($id)->delete();
   $rf->newFile($id,$content);
-  if(!$this->folder->nodeExists($id.'.md')||!$rf->nodeExists($id))throw new \RuntimeException('Ressource konnte nicht vollstaendig angelegt werden');
+  if(!$this->folder->nodeExists($id.'.md')||!$rf->nodeExists($id))throw new \RuntimeException($this->l->t('The attachment could not be created completely'));
   return ['id'=>$id,'title'=>$safeName,'mime'=>$mime,'file_extension'=>$ext,'size'=>$size,'markdown'=>(str_starts_with(strtolower($mime),'image/')?'!':'').'['.$safeName.'](:/'.$id.')'];
  }
  public function updateResourceBinary(string $id,string $binary,string $knownHash=''): array{
-  if($binary==='')throw new \RuntimeException('Leere Ressource kann nicht gespeichert werden');
+  if($binary==='')throw new \RuntimeException($this->l->t('An empty attachment cannot be saved'));
   $item=$this->must($id,'4');
-  if(!$this->folder->nodeExists('.resource'))throw new \RuntimeException('Ressourcenordner fehlt');
+  if(!$this->folder->nodeExists('.resource'))throw new \RuntimeException($this->l->t('The attachment folder is missing'));
   $rf=$this->folder->get('.resource');
-  if(!$rf instanceof Folder||!$rf->nodeExists($id))throw new \RuntimeException('Ressourcendatei fehlt');
+  if(!$rf instanceof Folder||!$rf->nodeExists($id))throw new \RuntimeException($this->l->t('The attachment file is missing'));
   $node=$rf->get($id);
-  if(!$node instanceof \OCP\Files\File)throw new \RuntimeException('Ressource ist keine Datei');
+  if(!$node instanceof \OCP\Files\File)throw new \RuntimeException($this->l->t('The attachment is not a file'));
   $current=$node->getContent();
   $currentHash=hash('sha256',$current);
   $uploadedHash=hash('sha256',$binary);
@@ -120,7 +122,7 @@ class JoplixWriteService {
     if(hash_equals($uploadedHash,$currentHash)){
       return ['id'=>$id,'updated_time'=>(string)($item['updated_time']??''),'size'=>strlen($binary),'sha256'=>$currentHash,'already_applied'=>true];
     }
-    throw new \RuntimeException('Konflikt: Die Ressource wurde zwischenzeitlich auf einem anderen Gerät geändert.');
+    throw new \RuntimeException($this->l->t('Conflict: the attachment was changed on another device in the meantime.'));
   }
   if(hash_equals($uploadedHash,$currentHash)){
     return ['id'=>$id,'updated_time'=>(string)($item['updated_time']??''),'size'=>strlen($binary),'sha256'=>$currentHash,'already_applied'=>true];
@@ -186,7 +188,7 @@ class JoplixWriteService {
  }
  private function deleteSyncItem(string $id): void{
   $file=$this->model->fileFor($id);
-  if(!$file)throw new \RuntimeException('Datei nicht gefunden: '.$id);
+  if(!$file)throw new \RuntimeException($this->l->t('File not found: %1$s',[$id]));
   // Permanent deletion: the sync-target item is removed and so is every backup copy of it, otherwise
   // "delete permanently" would leave the text readable in .joplix_backups. (Joplin's own "move to
   // trash" instead keeps the item with deleted_time set; the model hides those.)
@@ -198,11 +200,12 @@ class JoplixWriteService {
  // an existing item is ever written, so a request cannot add lines to the metadata block or leave an item
  // pointing at something that does not exist.
  private static function isId(string $id): bool{return preg_match('/^[a-f0-9]{32}$/D',$id)===1;}
- private function notebookId(string $id): string{if(!self::isId($id)||!isset($this->model->notebooksRaw()[$id]))throw new \RuntimeException('Notizbuch nicht gefunden');return $id;}
- private function must(string $id,string $type): array{$item=$this->model->item($id);if(!$item||($item['type_']??'')!==$type)throw new \RuntimeException('Objekt nicht gefunden');return $item;}
- private function conflict(array $item,string $known,string $name): void{if($known!==''&&($item['updated_time']??'')!==$known)throw new \RuntimeException('Konflikt: '.$name.' wurde zwischenzeitlich geaendert');}
+ private function notebookId(string $id): string{if(!self::isId($id)||!isset($this->model->notebooksRaw()[$id]))throw new \RuntimeException($this->l->t('Notebook not found'));return $id;}
+ private function must(string $id,string $type): array{$item=$this->model->item($id);if(!$item||($item['type_']??'')!==$type)throw new \RuntimeException($this->l->t('Item not found'));return $item;}
+ /** $message is the translated text for the user; the controller answers a ConflictException with HTTP 409. */
+ private function conflict(array $item,string $known,string $message): void{if($known!==''&&($item['updated_time']??'')!==$known)throw new ConflictException($message);}
  private function writeNew(string $id,array $item): void{$this->folder->newFile($id.'.md',$this->model->format($item));}
- private function writeExisting(string $id,array $item,array $allowedFields=['updated_time','user_updated_time']): void{if(($item['type_']??'')==='13')throw new \RuntimeException('Revisionen duerfen nicht durch Joplix geschrieben werden');$f=$this->model->fileFor($id);if(!$f)throw new \RuntimeException('Datei nicht gefunden');$content=$this->model->formatPreserving($item,$allowedFields);if(($item['type_']??'')==='1'&&!preg_match('/\n\nid:\s*'.preg_quote($id,'/').'/',$content))throw new \RuntimeException('Speichern abgebrochen: Joplin-Trenner vor Metadaten fehlt');$f->putContent($content);}
+ private function writeExisting(string $id,array $item,array $allowedFields=['updated_time','user_updated_time']): void{if(($item['type_']??'')==='13')throw new \RuntimeException($this->l->t('Revisions must not be written by Joplix'));$f=$this->model->fileFor($id);if(!$f)throw new \RuntimeException($this->l->t('File not found'));$content=$this->model->formatPreserving($item,$allowedFields);if(($item['type_']??'')==='1'&&!preg_match('/\n\nid:\s*'.preg_quote($id,'/').'/',$content))throw new \RuntimeException($this->l->t('Saving aborted: the Joplin separator before the metadata is missing'));$f->putContent($content);}
  private function backup(string $id): void{$f=$this->model->fileFor($id);if(!$f)return;if(!$this->folder->nodeExists('.joplix_backups'))$this->folder->newFolder('.joplix_backups');$b=$this->folder->get('.joplix_backups');if($b instanceof Folder)$b->newFile(gmdate('Ymd_His').'_'.$id.'.md',$f->getContent());}
  // ---- Backup retention. backup() copies an item into <Joplin folder>/.joplix_backups before it is
  // changed ("<Ymd_His>_<id>.md"; replaced attachments go to resources/"<Ymd_His>_<id>"). Copies are kept

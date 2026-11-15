@@ -18,8 +18,9 @@ if (is_readable($infoXml)) {
  *   created by js/app.js are appended to it.
  * - <span class="jp-icon" data-icon="name"> is filled with an inline SVG by hydrateIcons() in js/app.js.
  * - translate="no" (plus the notranslate meta tag set in PageController) stops browsers from offering to
- *   translate the page: the markup is German until translateStaticUi() swaps in the user's language.
- * - Element ids are the contract with js/app.js. Text is German; English comes from JP_EN in js/app.js.
+ *   translate the page, which would also rewrite the rendered note.
+ * - Element ids are the contract with js/app.js. Text is English, wrapped in $l->t(); translations are in
+ *   l10n/<lang>.json. The language follows the Nextcloud account.
  */
 ?>
 <link rel="icon" type="image/svg+xml" href="<?php p($faviconUrl); ?>">
@@ -30,50 +31,50 @@ if (is_readable($infoXml)) {
       <img class="jp-logo-img" src="<?php p($iconUrl); ?>" alt="">
       <div class="jp-brand-text"><strong>Joplix</strong><?php if ($isAdmin): ?><a id="jp-brand-update" class="jp-brand-update" href="#" target="_blank" rel="noopener" hidden></a><?php endif; ?></div>
     </div>
-    <button class="jp-action" id="jp-new-root" type="button"><span class="jp-icon" data-icon="plus"></span><span>Neues Notizbuch</span></button>
-    <div class="jp-nav-title">Notizbücher</div>
+    <button class="jp-action" id="jp-new-root" type="button"><span class="jp-icon" data-icon="plus"></span><span><?php p($l->t('New notebook')); ?></span></button>
+    <div class="jp-nav-title"><?php p($l->t('Notebooks')); ?></div>
     <div id="jp-tree" class="jp-tree"></div>
-    <button class="jp-settings-button" id="jp-open-settings" type="button"><span class="jp-icon" data-icon="cog"></span><span>Einstellungen</span></button>
+    <button class="jp-settings-button" id="jp-open-settings" type="button"><span class="jp-icon" data-icon="cog"></span><span><?php p($l->t('Settings')); ?></span></button>
   </aside>
   <!-- Below 1025px the sidebar is a drawer over the list (class jp-nav-open on #joplix-app); this dims the rest. -->
   <div class="jp-nav-backdrop" id="jp-nav-backdrop"></div>
 
-  <div class="jp-resizer" id="jp-resize-left" data-resize="nav" title="Spaltenbreite ändern"></div>
+  <div class="jp-resizer" id="jp-resize-left" data-resize="nav" title="<?php p($l->t('Resize column')); ?>"></div>
 
   <section class="jp-list" data-jp-col="list">
     <div class="jp-list-head">
-      <button id="jp-nav-toggle" class="jp-icon-btn jp-nav-toggle" type="button" title="Notizbücher" aria-label="Notizbücher" aria-controls="jp-sidebar" aria-expanded="false"><span class="jp-icon" data-icon="menu"></span></button>
-      <div class="jp-search-wrap"><span class="jp-icon" data-icon="magnify"></span><input id="jp-search" type="search" placeholder="Notizen durchsuchen …" aria-label="Notizen durchsuchen …"></div>
-      <button id="jp-sort-button" class="jp-icon-btn" type="button" title="Sortierung umkehren" aria-label="Sortierung umkehren"><span class="jp-icon" data-icon="sort"></span></button>
-      <button id="jp-empty-trash" class="jp-icon-btn jp-trash-only" type="button" title="Papierkorb leeren" aria-label="Papierkorb leeren"><span class="jp-icon" data-icon="delete"></span></button>
-      <button id="jp-new-note-main" class="jp-icon-btn primary" type="button" title="Neue Notiz" aria-label="Neue Notiz"><span class="jp-icon" data-icon="plus"></span></button>
+      <button id="jp-nav-toggle" class="jp-icon-btn jp-nav-toggle" type="button" title="<?php p($l->t('Notebooks')); ?>" aria-label="<?php p($l->t('Notebooks')); ?>" aria-controls="jp-sidebar" aria-expanded="false"><span class="jp-icon" data-icon="menu"></span></button>
+      <div class="jp-search-wrap"><span class="jp-icon" data-icon="magnify"></span><input id="jp-search" type="search" placeholder="<?php p($l->t('Search notes …')); ?>" aria-label="<?php p($l->t('Search notes …')); ?>"></div>
+      <button id="jp-sort-button" class="jp-icon-btn" type="button" title="<?php p($l->t('Reverse sort order')); ?>" aria-label="<?php p($l->t('Reverse sort order')); ?>"><span class="jp-icon" data-icon="sort"></span></button>
+      <button id="jp-empty-trash" class="jp-icon-btn jp-trash-only" type="button" title="<?php p($l->t('Empty trash')); ?>" aria-label="<?php p($l->t('Empty trash')); ?>"><span class="jp-icon" data-icon="delete"></span></button>
+      <button id="jp-new-note-main" class="jp-icon-btn primary" type="button" title="<?php p($l->t('New note')); ?>" aria-label="<?php p($l->t('New note')); ?>"><span class="jp-icon" data-icon="plus"></span></button>
     </div>
-    <div id="jp-breadcrumb" class="jp-breadcrumb">Bitte Notizbuch auswählen</div>
-    <div id="jp-notes" class="jp-notes"><p>Bitte links ein Notizbuch auswählen.</p></div>
-    <div id="jp-index-status" class="jp-index-status">Index wird geladen...</div>
+    <div id="jp-breadcrumb" class="jp-breadcrumb"><?php p($l->t('Please select a notebook')); ?></div>
+    <div id="jp-notes" class="jp-notes"><p><?php p($l->t('Please select a notebook on the left.')); ?></p></div>
+    <div id="jp-index-status" class="jp-index-status"><?php p($l->t('Loading index...')); ?></div>
   </section>
 
-  <div class="jp-resizer" id="jp-resize-right" data-resize="list" title="Spaltenbreite ändern"></div>
+  <div class="jp-resizer" id="jp-resize-right" data-resize="list" title="<?php p($l->t('Resize column')); ?>"></div>
 
   <main class="jp-content" data-jp-col="note">
     <section id="jp-editor-view" class="jp-editor-view">
       <div class="jp-toolbar">
-        <button id="jp-back-to-list" class="jp-icon-btn jp-back" type="button" title="Zurück" aria-label="Zurück"><span class="jp-icon" data-icon="arrowLeft"></span></button>
-        <div id="jp-note-path" class="jp-note-path">Keine Notiz geöffnet</div>
+        <button id="jp-back-to-list" class="jp-icon-btn jp-back" type="button" title="<?php p($l->t('Back')); ?>" aria-label="<?php p($l->t('Back')); ?>"><span class="jp-icon" data-icon="arrowLeft"></span></button>
+        <div id="jp-note-path" class="jp-note-path"><?php p($l->t('No note open')); ?></div>
         <div class="jp-toolbar-actions">
-          <button id="jp-sync-now" class="jp-btn-tertiary" type="button" hidden><span class="jp-icon" data-icon="sync"></span><span>Synchronisieren</span></button>
+          <button id="jp-sync-now" class="jp-btn-tertiary" type="button" hidden><span class="jp-icon" data-icon="sync"></span><span><?php p($l->t('Sync')); ?></span></button>
           <div class="jp-segment jp-note-only" role="group">
-            <button id="jp-cancel-edit" type="button"><span class="jp-icon" data-icon="eye"></span><span>Vorschau</span></button>
-            <button id="jp-edit-note" type="button"><span class="jp-icon" data-icon="pencil"></span><span>Bearbeiten</span></button>
+            <button id="jp-cancel-edit" type="button"><span class="jp-icon" data-icon="eye"></span><span><?php p($l->t('Preview')); ?></span></button>
+            <button id="jp-edit-note" type="button"><span class="jp-icon" data-icon="pencil"></span><span><?php p($l->t('Edit')); ?></span></button>
           </div>
-          <button id="jp-save-note" class="primary jp-note-only" type="button" disabled><span class="jp-icon" data-icon="save"></span><span>Speichern</span></button>
+          <button id="jp-save-note" class="primary jp-note-only" type="button" disabled><span class="jp-icon" data-icon="save"></span><span><?php p($l->t('Save')); ?></span></button>
           <div class="jp-more">
-            <button id="jp-more-button" class="jp-icon-btn" type="button" title="Weitere Aktionen" aria-label="Weitere Aktionen" aria-haspopup="menu" aria-expanded="false"><span class="jp-icon" data-icon="dots"></span></button>
+            <button id="jp-more-button" class="jp-icon-btn" type="button" title="<?php p($l->t('More actions')); ?>" aria-label="<?php p($l->t('More actions')); ?>" aria-haspopup="menu" aria-expanded="false"><span class="jp-icon" data-icon="dots"></span></button>
             <div id="jp-more-menu" class="jp-menu" role="menu" hidden>
-              <label class="jp-menu-item jp-upload jp-note-only"><span class="jp-icon" data-icon="paperclip"></span><span>Vom Gerät anhängen</span><input id="jp-resource-file" type="file"></label>
-              <button id="jp-attach-nextcloud" class="jp-menu-item jp-note-only" type="button" role="menuitem"><span class="jp-icon" data-icon="cloud"></span><span>Aus Nextcloud anhängen</span></button>
-              <button id="jp-rebuild-index" class="jp-menu-item" type="button" role="menuitem"><span class="jp-icon" data-icon="refresh"></span><span>Index neu aufbauen</span></button>
-              <button id="jp-delete-note" class="jp-menu-item danger jp-note-only" type="button" role="menuitem"><span class="jp-icon" data-icon="delete"></span><span>Notiz löschen</span></button>
+              <label class="jp-menu-item jp-upload jp-note-only"><span class="jp-icon" data-icon="paperclip"></span><span><?php p($l->t('Attach from device')); ?></span><input id="jp-resource-file" type="file"></label>
+              <button id="jp-attach-nextcloud" class="jp-menu-item jp-note-only" type="button" role="menuitem"><span class="jp-icon" data-icon="cloud"></span><span><?php p($l->t('Attach from Nextcloud')); ?></span></button>
+              <button id="jp-rebuild-index" class="jp-menu-item" type="button" role="menuitem"><span class="jp-icon" data-icon="refresh"></span><span><?php p($l->t('Rebuild index')); ?></span></button>
+              <button id="jp-delete-note" class="jp-menu-item danger jp-note-only" type="button" role="menuitem"><span class="jp-icon" data-icon="delete"></span><span><?php p($l->t('Delete note')); ?></span></button>
             </div>
           </div>
         </div>
@@ -81,37 +82,37 @@ if (is_readable($infoXml)) {
 
       <div class="jp-empty">
         <span class="jp-icon" data-icon="note"></span>
-        <strong>Keine Notiz geöffnet</strong>
-        <span>Wähle eine Notiz aus der Liste oder lege eine neue an.</span>
+        <strong><?php p($l->t('No note open')); ?></strong>
+        <span><?php p($l->t('Select a note from the list or create a new one.')); ?></span>
       </div>
 
       <div class="jp-note-area">
         <div class="jp-note-inner">
-          <div id="jp-trash-bar" class="jp-trash-bar"><span class="jp-icon" data-icon="delete"></span><span class="jp-trash-bar-text">Diese Notiz liegt im Papierkorb.</span><button id="jp-trash-restore" type="button"><span class="jp-icon" data-icon="restore"></span><span>Wiederherstellen</span></button><button id="jp-trash-purge" class="danger" type="button">Endgültig löschen</button></div>
-          <input id="jp-title" class="jp-title" placeholder="Titel" aria-label="Titel">
+          <div id="jp-trash-bar" class="jp-trash-bar"><span class="jp-icon" data-icon="delete"></span><span class="jp-trash-bar-text"><?php p($l->t('This note is in the trash.')); ?></span><button id="jp-trash-restore" type="button"><span class="jp-icon" data-icon="restore"></span><span><?php p($l->t('Restore')); ?></span></button><button id="jp-trash-purge" class="danger" type="button"><?php p($l->t('Delete permanently')); ?></button></div>
+          <input id="jp-title" class="jp-title" placeholder="<?php p($l->t('Title')); ?>" aria-label="<?php p($l->t('Title')); ?>">
           <div id="jp-meta" class="jp-meta"></div>
           <div id="jp-tags" class="jp-tags"></div>
-          <div id="jp-editor-formatbar" class="jp-editor-formatbar" role="toolbar" aria-label="Editor-Werkzeuge">
-            <button type="button" data-jp-editor="undo" title="Rückgängig" aria-label="Rückgängig"><span class="jp-icon" data-icon="undo"></span></button>
+          <div id="jp-editor-formatbar" class="jp-editor-formatbar" role="toolbar" aria-label="<?php p($l->t('Editor tools')); ?>">
+            <button type="button" data-jp-editor="undo" title="<?php p($l->t('Undo')); ?>" aria-label="<?php p($l->t('Undo')); ?>"><span class="jp-icon" data-icon="undo"></span></button>
             <span class="jp-editor-separator"></span>
-            <button type="button" data-jp-editor="bold" title="Fett" aria-label="Fett"><span class="jp-icon" data-icon="bold"></span></button>
-            <button type="button" data-jp-editor="italic" title="Kursiv" aria-label="Kursiv"><span class="jp-icon" data-icon="italic"></span></button>
-            <button type="button" data-jp-editor="marker" title="Markierung einfügen" aria-label="Markierung einfügen"><span class="jp-icon" data-icon="marker"></span></button>
-            <button type="button" data-jp-editor="code" title="Code einfügen" aria-label="Code einfügen"><span class="jp-icon" data-icon="code"></span></button>
+            <button type="button" data-jp-editor="bold" title="<?php p($l->t('Bold')); ?>" aria-label="<?php p($l->t('Bold')); ?>"><span class="jp-icon" data-icon="bold"></span></button>
+            <button type="button" data-jp-editor="italic" title="<?php p($l->t('Italic')); ?>" aria-label="<?php p($l->t('Italic')); ?>"><span class="jp-icon" data-icon="italic"></span></button>
+            <button type="button" data-jp-editor="marker" title="<?php p($l->t('Insert highlight')); ?>" aria-label="<?php p($l->t('Insert highlight')); ?>"><span class="jp-icon" data-icon="marker"></span></button>
+            <button type="button" data-jp-editor="code" title="<?php p($l->t('Insert code')); ?>" aria-label="<?php p($l->t('Insert code')); ?>"><span class="jp-icon" data-icon="code"></span></button>
             <span class="jp-editor-separator"></span>
-            <button type="button" data-jp-editor="h2" title="Überschrift" aria-label="Überschrift"><span class="jp-icon" data-icon="heading"></span></button>
-            <button type="button" data-jp-editor="ul" title="Aufzählung" aria-label="Aufzählung"><span class="jp-icon" data-icon="listBulleted"></span></button>
-            <button type="button" data-jp-editor="ol" title="Nummerierte Liste" aria-label="Nummerierte Liste"><span class="jp-icon" data-icon="listNumbered"></span></button>
-            <button type="button" data-jp-editor="todo" title="Checkliste" aria-label="Checkliste"><span class="jp-icon" data-icon="checkbox"></span></button>
-            <button type="button" data-jp-editor="hr" title="Trennlinie" aria-label="Trennlinie"><span class="jp-icon" data-icon="minus"></span></button>
+            <button type="button" data-jp-editor="h2" title="<?php p($l->t('Heading')); ?>" aria-label="<?php p($l->t('Heading')); ?>"><span class="jp-icon" data-icon="heading"></span></button>
+            <button type="button" data-jp-editor="ul" title="<?php p($l->t('Bulleted list')); ?>" aria-label="<?php p($l->t('Bulleted list')); ?>"><span class="jp-icon" data-icon="listBulleted"></span></button>
+            <button type="button" data-jp-editor="ol" title="<?php p($l->t('Numbered list')); ?>" aria-label="<?php p($l->t('Numbered list')); ?>"><span class="jp-icon" data-icon="listNumbered"></span></button>
+            <button type="button" data-jp-editor="todo" title="<?php p($l->t('Checklist')); ?>" aria-label="<?php p($l->t('Checklist')); ?>"><span class="jp-icon" data-icon="checkbox"></span></button>
+            <button type="button" data-jp-editor="hr" title="<?php p($l->t('Horizontal rule')); ?>" aria-label="<?php p($l->t('Horizontal rule')); ?>"><span class="jp-icon" data-icon="minus"></span></button>
             <span class="jp-editor-separator"></span>
-            <button type="button" data-jp-editor="link" title="Link einfügen" aria-label="Link einfügen"><span class="jp-icon" data-icon="link"></span></button>
-            <button type="button" data-jp-editor="notelink" title="Notiz verlinken" aria-label="Notiz verlinken"><span class="jp-icon" data-icon="note"></span></button>
-            <button type="button" data-jp-editor="resource" title="Ressource anhängen" aria-label="Ressource anhängen"><span class="jp-icon" data-icon="paperclip"></span></button>
-            <button type="button" data-jp-editor="datetime" title="Aktuelles Datum und Uhrzeit einfügen" aria-label="Aktuelles Datum und Uhrzeit einfügen"><span class="jp-icon" data-icon="clock"></span></button>
+            <button type="button" data-jp-editor="link" title="<?php p($l->t('Insert link')); ?>" aria-label="<?php p($l->t('Insert link')); ?>"><span class="jp-icon" data-icon="link"></span></button>
+            <button type="button" data-jp-editor="notelink" title="<?php p($l->t('Link to note')); ?>" aria-label="<?php p($l->t('Link to note')); ?>"><span class="jp-icon" data-icon="note"></span></button>
+            <button type="button" data-jp-editor="resource" title="<?php p($l->t('Attach file')); ?>" aria-label="<?php p($l->t('Attach file')); ?>"><span class="jp-icon" data-icon="paperclip"></span></button>
+            <button type="button" data-jp-editor="datetime" title="<?php p($l->t('Insert current date and time')); ?>" aria-label="<?php p($l->t('Insert current date and time')); ?>"><span class="jp-icon" data-icon="clock"></span></button>
           </div>
           <div id="jp-note-display" class="jp-note-display" aria-live="polite"></div>
-          <textarea id="jp-body" class="jp-body" placeholder="Notizinhalt" aria-label="Notizinhalt" spellcheck="true"></textarea>
+          <textarea id="jp-body" class="jp-body" placeholder="<?php p($l->t('Note content')); ?>" aria-label="<?php p($l->t('Note content')); ?>" spellcheck="true"></textarea>
           <div id="jp-resources" class="jp-resources"></div>
         </div>
       </div>
@@ -123,149 +124,137 @@ if (is_readable($infoXml)) {
   <div class="jp-settings-backdrop jp-backdrop" id="jp-settings-backdrop"></div>
   <section class="jp-settings-modal" role="dialog" aria-modal="true" aria-labelledby="jp-settings-title">
     <aside class="jp-settings-menu">
-      <h2 id="jp-settings-title">Joplix-Einstellungen</h2>
-      <button class="active" type="button" data-settings-tab="general">Allgemein</button>
-      <button type="button" data-settings-tab="view">Aussehen</button>
+      <h2 id="jp-settings-title"><?php p($l->t('Joplix settings')); ?></h2>
+      <button class="active" type="button" data-settings-tab="general"><?php p($l->t('General')); ?></button>
+      <button type="button" data-settings-tab="view"><?php p($l->t('Appearance')); ?></button>
       <button type="button" data-settings-tab="index">Index</button>
-      <button type="button" data-settings-tab="sync">Synchronisation</button>
+      <button type="button" data-settings-tab="sync"><?php p($l->t('Synchronisation')); ?></button>
       <?php if ($isAdmin): ?><button type="button" data-settings-tab="update">Update</button><?php endif; ?>
-      <button type="button" data-settings-tab="language">Sprache</button>
-      <button type="button" data-settings-tab="privacy">Datenschutz</button>
-      <button type="button" data-settings-tab="about">Über</button>
+      <button type="button" data-settings-tab="privacy"><?php p($l->t('Privacy')); ?></button>
+      <button type="button" data-settings-tab="about"><?php p($l->t('About')); ?></button>
     </aside>
     <div class="jp-settings-panel-area">
-      <button id="jp-close-settings" class="jp-settings-close jp-icon-btn" type="button" title="Einstellungen schließen" aria-label="Einstellungen schließen"><span class="jp-icon" data-icon="close"></span></button>
+      <button id="jp-close-settings" class="jp-settings-close jp-icon-btn" type="button" title="<?php p($l->t('Close settings')); ?>" aria-label="<?php p($l->t('Close settings')); ?>"><span class="jp-icon" data-icon="close"></span></button>
       <section class="jp-settings-pane active" data-settings-section="general">
-        <h3>Allgemein</h3>
+        <h3><?php p($l->t('General')); ?></h3>
         <div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-setting-joplin-path"><strong>Joplix-Ordner</strong><span>Nextcloud-Ordner mit den Joplix-Daten auswählen oder manuell eingeben</span></label>
+          <label for="jp-setting-joplin-path"><strong><?php p($l->t('Joplix folder')); ?></strong><span><?php p($l->t('Select the Nextcloud folder containing your Joplix data or enter it manually')); ?></span></label>
           <div class="jp-path-control">
             <input id="jp-setting-joplin-path" list="jp-folder-list" value="/JoplinV2" placeholder="/JoplinV2" autocomplete="off">
             <datalist id="jp-folder-list"></datalist>
           </div>
         </div>
         <div class="jp-setting-card">
-          <label for="jp-setting-sort"><strong>Sortierung</strong><span>Legt fest, wie Notizen angezeigt werden</span></label>
+          <label for="jp-setting-sort"><strong><?php p($l->t('Sorting')); ?></strong><span><?php p($l->t('Controls how notes are displayed')); ?></span></label>
           <select id="jp-setting-sort">
-            <option value="updated_desc">Neueste zuerst</option>
-            <option value="updated_asc">Älteste zuerst</option>
-            <option value="title_asc">Titel A-Z</option>
+            <option value="updated_desc"><?php p($l->t('Newest first')); ?></option>
+            <option value="updated_asc"><?php p($l->t('Oldest first')); ?></option>
+            <option value="title_asc"><?php p($l->t('Title A-Z')); ?></option>
           </select>
         </div>
         <div class="jp-setting-card">
-          <label for="jp-setting-office-open-mode"><strong>Office-Dateien öffnen</strong><span>Legt fest, ob die Bearbeitung in einem eigenen Fenster oder in einem neuen Browser-Tab startet.</span></label>
+          <label for="jp-setting-office-open-mode"><strong><?php p($l->t('Open Office files')); ?></strong><span><?php p($l->t('Choose whether editing opens in a separate window or a new browser tab.')); ?></span></label>
           <select id="jp-setting-office-open-mode">
-            <option value="window">Eigenes Fenster</option>
-            <option value="tab">Neuer Tab</option>
+            <option value="window"><?php p($l->t('Separate window')); ?></option>
+            <option value="tab"><?php p($l->t('New tab')); ?></option>
           </select>
         </div>
         <?php if ($isAdmin): ?><div class="jp-setting-card">
-          <label for="jp-setting-update-backup"><strong>Automatische App-Backups</strong><span>Standardmäßig werden keine App-Backups erstellt. Vollständige Nextcloud-Backups bleiben Aufgabe des Administrators.</span></label>
+          <label for="jp-setting-update-backup"><strong><?php p($l->t('Automatic app backups')); ?></strong><span><?php p($l->t('By default no app backups are created. Complete Nextcloud backups remain the administrator’s responsibility.')); ?></span></label>
           <select id="jp-setting-update-backup">
-            <option value="no">Keine Backups (empfohlen)</option>
-            <option value="yes">Backup vor Update erstellen</option>
+            <option value="no"><?php p($l->t('No backups (recommended)')); ?></option>
+            <option value="yes"><?php p($l->t('Create backup before update')); ?></option>
           </select>
         </div><?php endif; ?>
       </section>
       <section class="jp-settings-pane" data-settings-section="view">
-        <h3>Aussehen</h3>
+        <h3><?php p($l->t('Appearance')); ?></h3>
         <div class="jp-setting-card">
-          <label><strong>Letzte Position merken</strong><span>Beim Öffnen wieder zum zuletzt verwendeten Notizbuch springen</span></label>
+          <label><strong><?php p($l->t('Remember last position')); ?></strong><span><?php p($l->t('Return to the last used notebook when opening Joplix')); ?></span></label>
           <button id="jp-setting-remember-toggle" class="jp-switch" type="button" role="switch" aria-checked="true"><span></span></button>
         </div>
         <div class="jp-setting-card jp-setting-card-action">
-          <div><strong>Spaltenbreiten</strong><span>Setzt die Breite der Spalten auf den Standard zurück.</span></div>
-          <button id="jp-layout-reset" type="button">Zurücksetzen</button>
+          <div><strong><?php p($l->t('Column widths')); ?></strong><span><?php p($l->t('Resets the column widths to their defaults.')); ?></span></div>
+          <button id="jp-layout-reset" type="button"><?php p($l->t('Reset')); ?></button>
         </div>
       </section>
       <section class="jp-settings-pane" data-settings-section="index">
         <h3>Index</h3>
         <div class="jp-setting-card jp-setting-card-action">
-          <div><strong>Index neu aufbauen</strong><span>Wenn Notizbücher oder Notizen fehlen, kann der lokale Index neu aufgebaut werden.</span></div>
-          <button id="jp-settings-rebuild" type="button">Starten</button>
+          <div><strong><?php p($l->t('Rebuild index')); ?></strong><span><?php p($l->t('Rebuild the local index if notebooks or notes are missing.')); ?></span></div>
+          <button id="jp-settings-rebuild" type="button"><?php p($l->t('Start')); ?></button>
         </div>
       </section>
 
       <section class="jp-settings-pane" data-settings-section="sync">
-        <h3>Synchronisation</h3>
+        <h3><?php p($l->t('Synchronisation')); ?></h3>
         <div class="jp-setting-card jp-setting-card-static">
-          <div><strong>Joplin Server</strong><span>Joplix gleicht den Joplix-Ordner mit einem Joplin Server ab. Der Ordner in Nextcloud ist zugleich eine versionierte Sicherung aller Notizen.</span></div>
+          <div><strong>Joplin Server</strong><span><?php p($l->t('Joplix synchronises the Joplix folder with a Joplin Server. The folder in Nextcloud doubles as a versioned backup of all notes.')); ?></span></div>
         </div>
         <div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-sync-url"><strong>Server-Adresse</strong><span>Adresse des Joplin Servers, zum Beispiel https://joplin.example.com</span></label>
+          <label for="jp-sync-url"><strong><?php p($l->t('Server address')); ?></strong><span><?php p($l->t('Address of the Joplin Server, for example https://joplin.example.com')); ?></span></label>
           <div class="jp-path-control"><input id="jp-sync-url" type="url" placeholder="https://joplin.example.com" autocomplete="off" spellcheck="false"></div>
         </div>
         <div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-sync-email"><strong>E-Mail</strong><span>Anmeldung des Joplin-Server-Kontos</span></label>
+          <label for="jp-sync-email"><strong><?php p($l->t('E-mail')); ?></strong><span><?php p($l->t('Login of the Joplin Server account')); ?></span></label>
           <div class="jp-path-control"><input id="jp-sync-email" type="email" autocomplete="off" spellcheck="false"></div>
         </div>
         <div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-sync-password"><strong>Passwort</strong><span>Wird verschlüsselt in Nextcloud gespeichert und nie wieder angezeigt. Leer lassen, um das gespeicherte Passwort zu behalten.</span></label>
+          <label for="jp-sync-password"><strong><?php p($l->t('Password')); ?></strong><span><?php p($l->t('Stored encrypted in Nextcloud and never shown again. Leave empty to keep the stored password.')); ?></span></label>
           <div class="jp-path-control"><input id="jp-sync-password" type="password" autocomplete="new-password"></div>
         </div>
         <div class="jp-setting-card">
-          <label><strong>Synchronisation aktivieren</strong><span>Gleicht beim Öffnen, nach dem Speichern und regelmäßig im Hintergrund ab.</span></label>
+          <label><strong><?php p($l->t('Enable synchronisation')); ?></strong><span><?php p($l->t('Synchronises on opening, after saving and regularly in the background.')); ?></span></label>
           <button id="jp-sync-enabled" class="jp-switch" type="button" role="switch" aria-checked="false"><span></span></button>
         </div>
         <?php if ($isAdmin): ?><div class="jp-setting-card">
-          <label><strong>Lokale Server-Adressen erlauben</strong><span>Nötig, wenn der Joplin Server im eigenen Netzwerk oder auf demselben Rechner läuft. Gilt für alle Benutzer.</span></label>
+          <label><strong><?php p($l->t('Allow local server addresses')); ?></strong><span><?php p($l->t('Needed when the Joplin Server runs in your own network or on the same machine. Applies to all users.')); ?></span></label>
           <button id="jp-sync-allow-local" class="jp-switch" type="button" role="switch" aria-checked="false"><span></span></button>
         </div><?php endif; ?>
         <div class="jp-sync-actions">
-          <button id="jp-sync-save" class="primary" type="button">Speichern</button>
-          <button id="jp-sync-test" type="button">Verbindung testen</button>
-          <button id="jp-sync-run" type="button">Jetzt synchronisieren</button>
+          <button id="jp-sync-save" class="primary" type="button"><?php p($l->t('Save')); ?></button>
+          <button id="jp-sync-test" type="button"><?php p($l->t('Test connection')); ?></button>
+          <button id="jp-sync-run" type="button"><?php p($l->t('Synchronise now')); ?></button>
         </div>
-        <div id="jp-sync-status" class="jp-update-status">Noch nicht synchronisiert.</div>
+        <div id="jp-sync-status" class="jp-update-status"><?php p($l->t('Not synchronised yet.')); ?></div>
       </section>
 
 <?php if ($isAdmin): ?>
       <section class="jp-settings-pane" data-settings-section="update">
         <h3>Update</h3>
         <div class="jp-setting-card jp-setting-card-static jp-update-current-version">
-          <div><strong>Aktuell installierte Version</strong><span id="jp-update-installed-version">Joplix <?php p($joplixVersion); ?></span></div>
+          <div><strong><?php p($l->t('Currently installed version')); ?></strong><span id="jp-update-installed-version">Joplix <?php p($joplixVersion); ?></span></div>
         </div>
         <div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-update-repo-url"><strong>GitHub-Adresse</strong><span>Standard: https://github.com/kane9287/joplix-xsync/releases</span></label>
+          <label for="jp-update-repo-url"><strong><?php p($l->t('GitHub address')); ?></strong><span><?php p($l->t('Default: https://github.com/kane9287/joplix-xsync/releases')); ?></span></label>
           <div class="jp-path-control"><input id="jp-update-repo-url" value="https://github.com/kane9287/joplix-xsync/releases" autocomplete="off" spellcheck="false"></div>
         </div>
         <div class="jp-setting-card">
-          <label for="jp-update-channel"><strong>Release Channel</strong><span>Main zeigt reguläre GitHub-Releases, Beta zeigt Vorabversionen (Pre-releases).</span></label>
+          <label for="jp-update-channel"><strong><?php p($l->t('Release channel')); ?></strong><span><?php p($l->t('Main shows regular GitHub releases; Beta shows pre-releases.')); ?></span></label>
           <select id="jp-update-channel">
             <option value="main">Main</option>
             <option value="beta">Beta</option>
           </select>
         </div>
         <div class="jp-setting-card jp-setting-card-action">
-          <div><strong>Verfügbare Versionen</strong><span>Release-Liste von GitHub abrufen und ausgewählte Version installieren.</span></div>
-          <button id="jp-update-check" type="button">Updates suchen</button>
+          <div><strong><?php p($l->t('Available versions')); ?></strong><span><?php p($l->t('Fetch the release list from GitHub and install the selected version.')); ?></span></div>
+          <button id="jp-update-check" type="button"><?php p($l->t('Check for updates')); ?></button>
         </div>
-        <div id="jp-update-status" class="jp-update-status">Noch nicht geprüft.</div>
+        <div id="jp-update-status" class="jp-update-status"><?php p($l->t('Not checked yet.')); ?></div>
         <div id="jp-update-list" class="jp-update-list"></div>
       </section>
       <?php endif; ?>
-      <section class="jp-settings-pane" data-settings-section="language">
-        <h3>Sprache</h3>
-        <div class="jp-setting-card">
-          <label for="jp-setting-language"><strong>Sprache</strong><span>Systemsprache verwendet Deutsch bei einer deutschen Systemsprache, andernfalls Englisch.</span></label>
-          <select id="jp-setting-language">
-            <option value="system">Systemsprache</option>
-            <option value="de">Deutsch</option>
-            <option value="en">English</option>
-          </select>
-        </div>
-      </section>
       <section class="jp-settings-pane" data-settings-section="privacy">
-        <h3>Datenschutz</h3>
+        <h3><?php p($l->t('Privacy')); ?></h3>
         <div class="jp-setting-card jp-setting-card-static">
-          <div><strong>Lokale Speicherung</strong><span>Spaltenbreiten, Sortierung und letzte Position werden nur lokal im Browser gespeichert.</span></div>
+          <div><strong><?php p($l->t('Local storage')); ?></strong><span><?php p($l->t('Column widths, sorting and the last position are stored locally in the browser.')); ?></span></div>
         </div>
       </section>
       <section class="jp-settings-pane" data-settings-section="about">
-        <h3>Über</h3>
+        <h3><?php p($l->t('About')); ?></h3>
         <div class="jp-setting-card jp-setting-card-static jp-about-card">
           <img class="jp-logo-img" src="<?php p($iconUrl); ?>" alt="">
-          <div><strong>Joplix <?php p($joplixVersion); ?></strong><span>Nextcloud-App für deine Joplix-Daten.</span>
+          <div><strong>Joplix <?php p($joplixVersion); ?></strong><span><?php p($l->t('Nextcloud app for your Joplix data.')); ?></span>
           <p class="jp-about-created">Created with <span class="jp-heart" aria-label="love">♥</span> by STONEUBI from Tirol / Austria.</p></div>
         </div>
       </section>
@@ -277,18 +266,18 @@ if (is_readable($infoXml)) {
 <div id="jp-welcome-overlay" class="jp-welcome-overlay jp-overlay" aria-hidden="true">
   <div class="jp-welcome-backdrop jp-backdrop"></div>
   <section class="jp-welcome-modal jp-modal" role="dialog" aria-modal="true" aria-labelledby="jp-welcome-title">
-    <button id="jp-welcome-close" class="jp-welcome-close jp-icon-btn" type="button" title="Willkommen schließen" aria-label="Willkommen schließen"><span class="jp-icon" data-icon="close"></span></button>
+    <button id="jp-welcome-close" class="jp-welcome-close jp-icon-btn" type="button" title="<?php p($l->t('Close welcome')); ?>" aria-label="<?php p($l->t('Close welcome')); ?>"><span class="jp-icon" data-icon="close"></span></button>
     <img class="jp-welcome-icon" src="<?php p($iconUrl); ?>" alt="">
-    <h2 id="jp-welcome-title">Willkommen bei Joplix</h2>
-    <p>Joplix zeigt deine synchronisierten Notizen direkt in Nextcloud an. Für die erste Nutzung muss der Joplix-Ordner korrekt gesetzt und der Index aufgebaut sein. Unter Einstellungen › Synchronisation kann Joplix den Ordner selbst mit einem Joplin Server abgleichen.</p>
+    <h2 id="jp-welcome-title"><?php p($l->t('Welcome to Joplix')); ?></h2>
+    <p><?php p($l->t('Joplix shows your synchronised notes directly in Nextcloud. For first use, the Joplix folder must be set correctly and the index built. Under Settings › Synchronisation, Joplix can synchronise the folder with a Joplin Server itself.')); ?></p>
     <ol class="jp-welcome-steps">
-      <li><strong>Joplix-Ordner prüfen</strong><span>Standard ist <code>/JoplinV2</code>. Der Pfad kann in den Einstellungen geändert werden.</span></li>
-      <li><strong>Index aufbauen</strong><span>Wenn Notizen fehlen, in den Einstellungen unter Index den Neuaufbau starten.</span></li>
-      <li><strong>Notizen bearbeiten</strong><span>Der Speichern-Button wird nur aktiv, wenn es Änderungen gibt.</span></li>
+      <li><strong><?php p($l->t('Check the Joplix folder')); ?></strong><span><?php p($l->t('Default is')); ?> <code>/JoplinV2</code>. <?php p($l->t('The path can be changed in the settings.')); ?></span></li>
+      <li><strong><?php p($l->t('Build the index')); ?></strong><span><?php p($l->t('If notes are missing, start the rebuild under Index in the settings.')); ?></span></li>
+      <li><strong><?php p($l->t('Edit notes')); ?></strong><span><?php p($l->t('The Save button only becomes active when there are changes.')); ?></span></li>
     </ol>
     <div class="jp-modal-actions">
-      <button id="jp-welcome-settings" type="button">Einstellungen öffnen</button>
-      <button id="jp-welcome-done" class="primary" type="button">Loslegen</button>
+      <button id="jp-welcome-settings" type="button"><?php p($l->t('Open settings')); ?></button>
+      <button id="jp-welcome-done" class="primary" type="button"><?php p($l->t('Get started')); ?></button>
     </div>
   </section>
 </div>
@@ -300,15 +289,15 @@ if (is_readable($infoXml)) {
   <section class="jp-pdf-viewer-modal" role="dialog" aria-modal="true" aria-labelledby="jp-pdf-viewer-title">
     <header class="jp-pdf-viewer-head">
       <div>
-        <strong id="jp-pdf-viewer-title">PDF anzeigen</strong>
+        <strong id="jp-pdf-viewer-title"><?php p($l->t('View PDF')); ?></strong>
         <span id="jp-pdf-viewer-meta"></span>
       </div>
       <div class="jp-pdf-viewer-actions">
-        <a id="jp-pdf-viewer-open" href="#" target="_blank" rel="noopener">Extern öffnen</a>
-        <button id="jp-pdf-viewer-close" class="jp-icon-btn" type="button" title="PDF schließen" aria-label="PDF schließen"><span class="jp-icon" data-icon="close"></span></button>
+        <a id="jp-pdf-viewer-open" href="#" target="_blank" rel="noopener"><?php p($l->t('Open externally')); ?></a>
+        <button id="jp-pdf-viewer-close" class="jp-icon-btn" type="button" title="<?php p($l->t('Close PDF')); ?>" aria-label="<?php p($l->t('Close PDF')); ?>"><span class="jp-icon" data-icon="close"></span></button>
       </div>
     </header>
-    <iframe id="jp-pdf-viewer-frame" title="PDF-Anzeige"></iframe>
+    <iframe id="jp-pdf-viewer-frame" title="<?php p($l->t('PDF view')); ?>"></iframe>
   </section>
 </div>
 </div>

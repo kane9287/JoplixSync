@@ -1,3 +1,7 @@
+# Joplix 2026.11.80
+
+- New app icon in the monochrome style of current Nextcloud apps. It follows the theme: white in the top bar, dark on light pages and light on dark pages (app list, Joplix sidebar, welcome and about dialogs). The browser tab icon is blue and adapts to a dark browser theme.
+
 # Joplix 2026.11.79
 
 - Unsaved changes are no longer lost silently: closing or reloading the tab, or leaving Joplix, asks first while a note has unsaved text.

@@ -1,7 +1,7 @@
 <?php
 script('joplix','app');
 style('joplix','style');
-$iconUrl = image_path('joplix','app.svg');
+$iconUrl = image_path('joplix','app-dark.svg');
 $faviconUrl = image_path('joplix','favicon.svg');
 $joplixVersion = 'unknown';
 $isAdmin = (bool)($_['isAdmin'] ?? false);

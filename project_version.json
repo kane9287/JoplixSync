@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.79",
+  "version": "2026.11.80",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-14",
   "channel": "beta",
-  "base_version": "2026.11.78",
+  "base_version": "2026.11.79",
   "build_date": "2026-11-14",
   "release_date": "2026-11-14",
-  "summary": "Review fixes: unsaved-change guard, conflict resolution, per-account browser cache.",
+  "summary": "New app icon in the Nextcloud monochrome style, matching light and dark themes.",
   "updated": "2026-11-14",
   "notes": "See CHANGELOG.md."
 }

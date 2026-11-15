@@ -101,7 +101,7 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
   -webkit-backdrop-filter: var(--filter-background-blur, none); backdrop-filter: var(--filter-background-blur, none);
 }
 #joplix .jp-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 8px; }
-#joplix .jp-logo-img { width: 28px; height: 28px; border-radius: 7px; flex: 0 0 auto; }
+#joplix .jp-logo-img { width: 28px; height: 28px; flex: 0 0 auto; filter: var(--background-invert-if-dark); }
 #joplix .jp-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 #joplix .jp-brand-text strong { font-size: 16px; }
 #joplix .jp-brand-update { color: var(--color-primary-element); font-size: 12px; font-weight: bold; text-decoration: none; }
@@ -411,7 +411,7 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 
 #joplix .jp-welcome-modal { width: min(560px, 100%); }
 #joplix .jp-welcome-close { position: absolute; top: 12px; right: 12px; }
-#joplix .jp-welcome-icon { width: 48px; height: 48px; border-radius: 12px; }
+#joplix .jp-welcome-icon { width: 48px; height: 48px; filter: var(--background-invert-if-dark); }
 #joplix .jp-welcome-modal p { color: var(--jp-muted); }
 #joplix .jp-welcome-steps { display: grid; gap: 10px; margin: 4px 0; padding-left: 22px; list-style: decimal outside; }
 #joplix .jp-welcome-steps strong { display: block; }
@@ -457,7 +457,7 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 #joplix button.jp-switch.active { background: var(--color-primary-element); }
 #joplix button.jp-switch.active span { transform: translateX(18px); background: var(--color-primary-element-text); }
 #joplix .jp-about-card { justify-content: flex-start; align-items: flex-start; }
-#joplix .jp-about-card .jp-logo-img { width: 48px; height: 48px; border-radius: 12px; }
+#joplix .jp-about-card .jp-logo-img { width: 48px; height: 48px; }
 #joplix .jp-about-created { margin: 10px 0 0; color: var(--jp-muted); font-size: 13px; }
 #joplix .jp-heart { display: inline !important; color: var(--color-error); }
 #joplix .jp-sync-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }

@@ -1,3 +1,9 @@
+# Joplix 2026.11.79
+
+- Unsaved changes are no longer lost silently: closing or reloading the tab, or leaving Joplix, asks first while a note has unsaved text.
+- When a note was changed elsewhere (synchronisation or another window) while it was open, saving now offers a choice instead of failing over and over: save your version as a separate copy, overwrite the other version, load the other version, or keep editing.
+- The browser cache of notes and of the note index is now tied to the Nextcloud account. If a different account uses the same browser without a regular logout in between (expired session, closed browser), the previous account's cached notebooks and notes are removed before anything is shown.
+
 # Joplix 2026.11.78
 
 - Photos attached in Joplix now appear in the note: an image is inserted as an embedded image (`![photo.jpg](:/id)`, as the Joplin apps do) instead of a plain link. Images already attached as a link stay links; put a `!` in front of the link in the editor to show them as a picture.

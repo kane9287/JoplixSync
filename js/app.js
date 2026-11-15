@@ -1,7 +1,16 @@
 (function(){
 const state={index:null,settings:null,notebookId:'',noteId:'',note:null,sort:'updated_desc',loadingNoteId:'',backgroundBusy:false,noteLoading:false,noteMemCache:{},noteFetches:{},editorHistory:{undo:[],last:'',max:80},dirty:false,saving:false,saveAgain:false,savePromise:null,pendingNoteId:'',noteGenerations:{},officePollers:{},officeSyncs:{}};
 const $=id=>document.getElementById(id); const route=p=>OC.generateUrl('/apps/joplix'+p);
-
+// The browser cache (index with full note text, recent note bodies, last location, local settings) belongs to
+// one Nextcloud user. localStorage is shared by everyone who uses this browser profile, so the cache records
+// its owner in joplix.cacheOwner and is emptied before anything reads it when another user (or an unknown
+// one) loads the app. A regular Nextcloud logout already wipes localStorage (login page with ?clear=1);
+// this covers the cases without one: expired session, closed browser, a second account logging in.
+// Layout keys (column widths, collapsed notebooks) hold no note content and stay.
+const JP_USER_CACHE_KEYS=/^joplix\.(lastGoodIndex|lastLocation|recentNoteCacheIds|noteCache_|settings$|attachFolder$)/;
+function jpPurgeUserCache(){try{Object.keys(localStorage).filter(k=>JP_USER_CACHE_KEYS.test(k)).forEach(k=>localStorage.removeItem(k));}catch(e){}}
+function jpCurrentUser(){return String((document.head&&document.head.getAttribute('data-user'))||(window.OC&&OC.currentUser)||'');}
+(function(){const uid=jpCurrentUser();let owner=null;try{owner=localStorage.getItem('joplix.cacheOwner');}catch(e){}if(!uid||owner!==uid){jpPurgeUserCache();try{localStorage.setItem('joplix.cacheOwner',uid);}catch(e){}}})();
 // ---------------------------------------------------------------------------
 // UI helpers: icons, panes, dialogs, toasts.
 // - Icons are inline SVG (Material Design Icons paths, the set Nextcloud uses) so they follow the text
@@ -595,7 +604,7 @@ function renderNoteToEditor(n,fromCache=false){
   resetEditorHistory($('jp-body')?$('jp-body').value:'');renderDisplayMode();
 }
 function ensureNoteSelected(id){document.querySelectorAll('.jp-note-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));}
-async function api(p,o={}){o.headers=Object.assign({'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);const d=await r.json();if(!r.ok||d.error)throw new Error(d.error||'HTTP '+r.status);noteLocalChangeForSync(p,o,d);return d;}
+async function api(p,o={}){o.headers=Object.assign({'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);const d=await r.json();if(!r.ok||d.error){const err=new Error(d.error||'HTTP '+r.status);err.status=r.status;throw err;}noteLocalChangeForSync(p,o,d);return d;}
 function status(t,cls=''){const el=$('jp-index-status');el.textContent=t;el.className='jp-index-status '+cls;}
 function restoreLocationWithoutClearing(idx){
   const loc=localLocation();
@@ -1134,6 +1143,28 @@ async function deleteNotebookNode(node){
     jpAlert(msg);
   }
 }
+// A save answered with 409: the stored note is newer than the one in the editor. The user decides; until
+// then nothing is written and the editor keeps the text. Returns the PUT result when the editor version
+// was saved over the server version, otherwise null (saveNote then stops without clearing the dirty state,
+// except where the editor was reloaded with the server version).
+//  - overwrite: PUT again without known_updated_time, which skips the server's check.
+//  - copy: the editor text becomes a new note in the same notebook, then the server version is loaded.
+//  - reload: the editor text is dropped and the server version is loaded.
+//  - cancel: keep editing.
+async function resolveSaveConflict(note,title,body){
+  const choice=await jpDialog({title:L('Notiz wurde zwischenzeitlich geändert','Note was changed in the meantime'),message:L('Diese Notiz wurde seit dem Öffnen an anderer Stelle geändert (Synchronisation oder ein anderes Fenster). Deine Änderungen sind noch nicht gespeichert.','This note was changed somewhere else since you opened it (synchronisation or another window). Your changes are not saved yet.'),cancelValue:'cancel',buttons:[{label:t('Abbrechen'),value:'cancel'},{label:L('Andere Version laden','Load other version'),value:'reload'},{label:L('Meine überschreibt','Overwrite with mine'),value:'overwrite',danger:true},{label:L('Meine als Kopie speichern','Save mine as a copy'),value:'copy',primary:true}]});
+  if(choice==='overwrite')return api('/api/notes/'+note.id,{method:'PUT',body:{title,body}});
+  if(choice!=='copy'&&choice!=='reload')return null;
+  if(choice==='copy'){
+    await api('/api/notes',{method:'POST',body:{title:(title||t('Ohne Titel'))+L(' (Konfliktkopie)',' (conflict copy)'),body,parent_id:note.notebook_id||state.notebookId}});
+    jpToast(L('Deine Version wurde als Kopie gespeichert','Your version was saved as a copy'));
+  }
+  state.dirty=false;forgetNote(note.id);
+  const fresh=await apiNote(note.id);
+  if(state.noteId===note.id)renderNoteToEditor(fresh,false);
+  scheduleBackgroundRefresh(300);
+  return null;
+}
 async function saveNote(options={}){
   if(state.savePromise){
     state.saveAgain=true;
@@ -1157,7 +1188,15 @@ async function saveNote(options={}){
         const body={title:titleSnapshot,body:bodySnapshot};
         if(state.note){
           body.known_updated_time=state.note.updated_time;
-          const r=await api('/api/notes/'+state.note.id,{method:'PUT',body});
+          let r;
+          try{r=await api('/api/notes/'+state.note.id,{method:'PUT',body});}
+          catch(e){
+            if(e.status!==409)throw e;
+            // The note changed on the server since it was opened (sync or another tab). Nothing is saved yet.
+            const resolved=await resolveSaveConflict(state.note,titleSnapshot,bodySnapshot);
+            if(!resolved)return false;
+            r=resolved;
+          }
           state.note.title=titleSnapshot;
           state.note.body=bodySnapshot;
           if(r&&r.updated_time)state.note.updated_time=r.updated_time;
@@ -2157,6 +2196,9 @@ function setupChrome(){
     if(state.dirty)saveNote({keepMode:true,skipReload:true}).then(ok=>{if(ok)jpToast(t('Notiz gespeichert'));}).catch(e=>jpAlert(e.message));
   });
 }
+// Closing the tab, reloading or following a link out of Joplix would drop unsaved text without a word.
+// The browser shows its own generic question; the text of the message cannot be set.
+window.addEventListener('beforeunload',ev=>{if(state.dirty||state.savePromise){ev.preventDefault();ev.returnValue='';}});
 document.addEventListener('DOMContentLoaded',()=>{
   // First pass with the language known locally (stored setting or browser language), so English users do
   // not see the German template while the settings request is running; load() repeats it with server settings.

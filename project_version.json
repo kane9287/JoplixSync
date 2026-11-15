@@ -1,14 +1,14 @@
 {
   "name": "Joplix",
-  "version": "2026.11.78",
+  "version": "2026.11.79",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-14",
   "channel": "beta",
-  "base_version": "2026.11.77",
+  "base_version": "2026.11.78",
   "build_date": "2026-11-14",
   "release_date": "2026-11-14",
-  "summary": "Photos show in notes; attachment preview instead of download.",
+  "summary": "Review fixes: unsaved-change guard, conflict resolution, per-account browser cache.",
   "updated": "2026-11-14",
-  "notes": "Attached images are inserted as embedded images and render in the note; clicking an image or an image attachment opens a preview. Open no longer downloads: PDFs open in a new tab, audio and video play in the preview, and only the download button saves a file."
+  "notes": "See CHANGELOG.md."
 }

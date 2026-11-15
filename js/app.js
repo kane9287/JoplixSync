@@ -537,14 +537,14 @@ function setSavingUi(active){
 function noteCacheKey(id){return 'noteCache_'+id;}
 function cachedNote(id){
   const note=storage.get(noteCacheKey(id),null);
-  return note?.bodyFormat===2?note:null;
+  return note?.bodyFormat===3?note:null;
 }
 function rememberNote(n){
   if(!n||!n.id)return;
   noteMemorySet(n);
   const item={id:n.id,title:n.title||'',body:String(n.body||''),updated_time:n.updated_time||'',notebook_title:n.notebook_title||'',is_deleted:!!n.is_deleted,tags:n.tags||[],resources:n.resources||[],cached_at:Date.now()};
-  // Older cache entries may contain a body stripped by Beta 63.
-  item.bodyFormat=2;
+  // Format 3 (2026.11.79): title/body split as Joplin does it. Entries of older formats are ignored.
+  item.bodyFormat=3;
   if(item.body.length>700000){
     storage.del(noteCacheKey(n.id));
     return;

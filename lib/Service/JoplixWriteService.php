@@ -162,7 +162,9 @@ class JoplixWriteService {
   return $clean!==''?$clean:'upload.bin';
  }
  private function cleanMime(string $mime,string $filename): string{$mime=trim(strtolower($mime));if($mime===''||$mime==='application/octet-stream'){$ext=strtolower(pathinfo($filename,PATHINFO_EXTENSION));$map=['pdf'=>'application/pdf','txt'=>'text/plain','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','gif'=>'image/gif','webp'=>'image/webp','doc'=>'application/msword','docx'=>'application/vnd.openxmlformats-officedocument.wordprocessingml.document','xls'=>'application/vnd.ms-excel','xlsx'=>'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','ppt'=>'application/vnd.ms-powerpoint','pptx'=>'application/vnd.openxmlformats-officedocument.presentationml.presentation','odt'=>'application/vnd.oasis.opendocument.text','ods'=>'application/vnd.oasis.opendocument.spreadsheet','odp'=>'application/vnd.oasis.opendocument.presentation'];return $map[$ext]??'application/octet-stream';}return preg_match('/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i',$mime)?$mime:'application/octet-stream';}
- private function compose(string $title,string $body): string{$title=trim($title)?:'Neue Notiz';$body=rtrim($body);return $body===''?$title:$title."\n\n".$body;}
+ // Inverse of JoplixModelService::titleAndBody(): nothing is trimmed and no default title is invented, so
+ // an unedited note is written back unchanged. The title is one line by definition.
+ private function compose(string $title,string $body): string{$title=str_replace(["\r\n","\r","\n"],' ',$title);$body=str_replace("\r\n","\n",$body);return $body===''?$title:$title."\n\n".$body;}
  private function deleteNotebookRecursive(string $id): array{
   $deleted=['notebooks'=>0,'notes'=>0];
   $children=[];
@@ -185,10 +187,11 @@ class JoplixWriteService {
  private function deleteSyncItem(string $id): void{
   $file=$this->model->fileFor($id);
   if(!$file)throw new \RuntimeException('Datei nicht gefunden: '.$id);
-  $this->backup($id);
-  // Permanent deletion: the sync-target item is removed. Joplin's own "move to
-  // trash" instead keeps the item with deleted_time set; the model hides those.
+  // Permanent deletion: the sync-target item is removed and so is every backup copy of it, otherwise
+  // "delete permanently" would leave the text readable in .joplix_backups. (Joplin's own "move to
+  // trash" instead keeps the item with deleted_time set; the model hides those.)
   $file->delete();
+  $this->dropBackups($id);
  }
 
  // Ids taken from a request end up as "key: value" lines in item files. Only a 32-digit hex id that names
@@ -201,4 +204,36 @@ class JoplixWriteService {
  private function writeNew(string $id,array $item): void{$this->folder->newFile($id.'.md',$this->model->format($item));}
  private function writeExisting(string $id,array $item,array $allowedFields=['updated_time','user_updated_time']): void{if(($item['type_']??'')==='13')throw new \RuntimeException('Revisionen duerfen nicht durch Joplix geschrieben werden');$f=$this->model->fileFor($id);if(!$f)throw new \RuntimeException('Datei nicht gefunden');$content=$this->model->formatPreserving($item,$allowedFields);if(($item['type_']??'')==='1'&&!preg_match('/\n\nid:\s*'.preg_quote($id,'/').'/',$content))throw new \RuntimeException('Speichern abgebrochen: Joplin-Trenner vor Metadaten fehlt');$f->putContent($content);}
  private function backup(string $id): void{$f=$this->model->fileFor($id);if(!$f)return;if(!$this->folder->nodeExists('.joplix_backups'))$this->folder->newFolder('.joplix_backups');$b=$this->folder->get('.joplix_backups');if($b instanceof Folder)$b->newFile(gmdate('Ymd_His').'_'.$id.'.md',$f->getContent());}
+ // ---- Backup retention. backup() copies an item into <Joplin folder>/.joplix_backups before it is
+ // changed ("<Ymd_His>_<id>.md"; replaced attachments go to resources/"<Ymd_His>_<id>"). Copies are kept
+ // for BACKUP_DAYS and then removed by pruneBackupFolder(), which ApiController runs at most once a day.
+ // Copies of an item that is deleted permanently go at once (dropBackups).
+ public const BACKUP_DAYS=30;
+ /** @var array<string,\OCP\Files\Node[]>|null backup files by item id, listed once per request */
+ private ?array $backupsById=null;
+ private function dropBackups(string $id): void{
+  if($this->backupsById===null){
+   $this->backupsById=[];
+   foreach(self::backupNodes($this->folder) as $node){ if(preg_match('/^\d{8}_\d{6}_([a-f0-9]{32})(?:\.md)?$/D',$node->getName(),$m))$this->backupsById[$m[1]][]=$node; }
+  }
+  foreach($this->backupsById[$id]??[] as $node){ try{$node->delete();}catch(\Throwable $e){} }
+  unset($this->backupsById[$id]);
+ }
+ /** @return \OCP\Files\Node[] the backup files of items and of attachments */
+ private static function backupNodes(Folder $joplinFolder): array{
+  if(!$joplinFolder->nodeExists('.joplix_backups'))return [];
+  $root=$joplinFolder->get('.joplix_backups'); if(!$root instanceof Folder)return [];
+  $out=[];
+  foreach($root->getDirectoryListing() as $node){
+   if($node instanceof Folder){ if($node->getName()==='resources')foreach($node->getDirectoryListing() as $r){ if(!$r instanceof Folder)$out[]=$r; } }
+   else $out[]=$node;
+  }
+  return $out;
+ }
+ /** Removes backup copies older than $days. Returns how many were removed. */
+ public static function pruneBackupFolder(Folder $joplinFolder,int $days=self::BACKUP_DAYS): int{
+  $cutoff=time()-$days*86400; $removed=0;
+  foreach(self::backupNodes($joplinFolder) as $node){ if($node->getMTime()<$cutoff){ try{$node->delete();$removed++;}catch(\Throwable $e){} } }
+  return $removed;
+ }
 }

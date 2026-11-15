@@ -78,6 +78,10 @@ class JoplixWorkspaceService {
                 $old = json_decode($node->getContent(), true) ?: [];
             }
         }
+        if (($old['version'] ?? '') === self::APP_VERSION) {
+            // Unchanged: writing it again on every page load only produced file versions and sync traffic.
+            return;
+        }
         $payload = [
             'app' => 'Joplix',
             'version' => self::APP_VERSION,

@@ -6,6 +6,11 @@
 - Synchronisation no longer overwrites a note that is saved while a synchronisation is running. The file is checked again at the moment it is replaced; if it changed, your version is kept as a conflict note, as before for changes made between two runs. Saving and synchronising now take turns per note instead of running into each other.
 - A change saved at the very moment a note is received from the server is no longer skipped by the next upload.
 - Notes can only be created in or moved to an existing notebook, and tags can only be assigned to an existing note and tag.
+- Deleting a note or notebook permanently, and emptying the trash, now also removes the backup copies Joplix kept of those items in `.joplix_backups`. Before, the text stayed readable there indefinitely.
+- Backup copies in `.joplix_backups` are kept for 30 days and then removed (checked at most once a day, after a change). Before, they were never removed. Nextcloud's own *Versions* and *Deleted files* are not affected.
+- Saving a note no longer alters text that was not edited: notes without a title, titles with leading spaces or HTML, very long titles and trailing spaces or blank lines at the end of a note are written back exactly as they were. Before, such a note could get its first line duplicated as a title, and trailing whitespace was dropped.
+- The search index is no longer stored in your files (`.joplix/index_….json`) but in Nextcloud's internal app data, so the text of all notes is not versioned on every save or downloaded by desktop sync clients. The old file is removed automatically.
+- When a Nextcloud account is deleted, its Joplix index and synchronisation state are removed.
 
 # Joplix 2026.11.78
 

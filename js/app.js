@@ -366,22 +366,31 @@ function jpRenderBlocks(lines,interactive){
   closeAll();
   return html;
 }
-// Resource payloads ({data_url,mime,title,...}) by id, shared by the preview and the attachment list.
+// Attachments by id: metadata from /data ({title,mime,size,...}) plus the bytes from /file as a Blob typed with
+// that mime, and an object URL for it ({blob,url}). Shared by the preview and the attachment list; the newest
+// 24 stay cached and their object URLs are revoked when they drop out.
 const resourceDataCache=new Map();
 function resourceData(id){
   if(resourceDataCache.has(id))return resourceDataCache.get(id);
-  const p=api('/api/resources/'+id+'/data');
+  const p=(async()=>{
+    const meta=await api('/api/resources/'+id+'/data');
+    const r=await fetch(route('/api/resources/'+id+'/file'),{headers:{'requesttoken':OC.requestToken||''}});
+    if(!r.ok){let msg='HTTP '+r.status;try{msg=(await r.json()).error||msg;}catch(e){}throw new Error(msg);}
+    const blob=new Blob([await r.blob()],{type:meta.mime||'application/octet-stream'});
+    return Object.assign({},meta,{blob,url:URL.createObjectURL(blob)});
+  })();
   resourceDataCache.set(id,p);
   p.catch(()=>resourceDataCache.delete(id));
-  while(resourceDataCache.size>24)resourceDataCache.delete(resourceDataCache.keys().next().value);
+  while(resourceDataCache.size>24)forgetResourceData(resourceDataCache.keys().next().value);
   return p;
 }
+function forgetResourceData(id){const p=resourceDataCache.get(id);if(!p)return;resourceDataCache.delete(id);p.then(o=>{if(o&&o.url)URL.revokeObjectURL(o.url);}).catch(()=>{});}
 function findResource(id){return ((state.note&&state.note.resources)||[]).find(r=>String(r.id).toLowerCase()===String(id).toLowerCase())||{id};}
 function hydratePreviewResources(root){
   root.querySelectorAll('img[data-jp-res]').forEach(img=>{
     const known=findResource(img.dataset.jpRes);
     if(known.mime&&!String(known.mime).toLowerCase().startsWith('image/')){img.classList.add('jp-md-missing');return;}
-    resourceData(img.dataset.jpRes).then(p=>{if(p&&/^data:image\//i.test(String(p.data_url||''))){img.src=p.data_url;img.classList.add('jp-md-res-ready');img.title=t('joplix','Preview');img.addEventListener('click',()=>previewResource(findResource(img.dataset.jpRes)).catch(e=>jpAlert(e.message)));}else img.classList.add('jp-md-missing');}).catch(()=>img.classList.add('jp-md-missing'));
+    resourceData(img.dataset.jpRes).then(p=>{if(p&&p.url&&/^image\//i.test(String(p.mime||''))){img.src=p.url;img.classList.add('jp-md-res-ready');img.title=t('joplix','Preview');img.addEventListener('click',()=>previewResource(findResource(img.dataset.jpRes)).catch(e=>jpAlert(e.message)));}else img.classList.add('jp-md-missing');}).catch(()=>img.classList.add('jp-md-missing'));
   });
   root.querySelectorAll('a[data-jp-res-link]').forEach(a=>{
     const id=a.dataset.jpResLink;
@@ -511,7 +520,7 @@ function renderNoteToEditor(n,fromCache=false){
   resetEditorHistory($('jp-body')?$('jp-body').value:'');renderDisplayMode();
 }
 function ensureNoteSelected(id){document.querySelectorAll('.jp-note-item').forEach(b=>b.classList.toggle('active',b.dataset.id===id));}
-async function api(p,o={}){o.headers=Object.assign({'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);const d=await r.json();if(!r.ok||d.error){const err=new Error(d.error||'HTTP '+r.status);err.status=r.status;throw err;}noteLocalChangeForSync(p,o,d);return d;}
+async function api(p,o={}){const form=typeof FormData!=='undefined'&&o.body instanceof FormData;o.headers=Object.assign(form?{'requesttoken':OC.requestToken||''}:{'Content-Type':'application/json','requesttoken':OC.requestToken||''},o.headers||{});if(o.body&&!form&&typeof o.body!=='string')o.body=JSON.stringify(o.body);const r=await fetch(route(p),o);const d=await r.json();if(!r.ok||d.error){const err=new Error(d.error||'HTTP '+r.status);err.status=r.status;throw err;}noteLocalChangeForSync(p,o,d);return d;}
 function status(t,cls=''){const el=$('jp-index-status');el.textContent=t;el.className='jp-index-status '+cls;}
 function restoreLocationWithoutClearing(idx){
   const loc=localLocation();
@@ -740,11 +749,10 @@ function resourceIsPdf(r){return !!(r&&((r.is_pdf===true)||String(r.mime||'').to
 const JP_OFFICE_EXTENSIONS=['doc','docx','xls','xlsx','ppt','pptx','odt','ods','odp'];
 function resourceIsOffice(r){const ext=String(r&&r.file_extension||'').toLowerCase();const title=String(r&&r.title||'').toLowerCase();return !!(r&&((r.is_office===true)||JP_OFFICE_EXTENSIONS.includes(ext)||JP_OFFICE_EXTENSIONS.some(e=>title.endsWith('.'+e))));}
 function resourceFileName(r,p){let name=String((p&&p.title)||r.title||r.id||'resource').trim()||'resource';const ext=String((p&&p.file_extension)||r.file_extension||'').trim().replace(/^\./,'');if(ext&&!name.toLowerCase().endsWith('.'+ext.toLowerCase()))name+='.'+ext;return name.replace(/[\\/:*?"<>|]+/g,'_');}
-function dataUrlToBlobUrl(dataUrl,mime){const parts=String(dataUrl||'').split(',');if(parts.length<2)throw new Error(t('joplix','Attachment could not be read.'));const bin=atob(parts[1]);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return URL.createObjectURL(new Blob([bytes],{type:mime||'application/octet-stream'}));}
 function formatBytes(n){n=Number(n||0);if(!n)return '';const u=['B','KB','MB','GB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):Math.round(n))+' '+u[i];}
 // Download is the only path that saves a file. "Open" previews images, audio and video in a dialog and
 // shows PDFs in a new browser tab; other files have nothing to show, so opening them downloads.
-async function downloadResource(r){const p=await resourceData(r.id);if(!p||p.error||!p.data_url)throw new Error((p&&p.error)||t('joplix','Attachment could not be read.'));const mime=p.mime||r.mime||'application/octet-stream';const objectUrl=dataUrlToBlobUrl(p.data_url,mime);const a=document.createElement('a');a.href=objectUrl;a.download=resourceFileName(r,p);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);}
+async function downloadResource(r){const p=await resourceData(r.id);if(!p||!p.blob)throw new Error(t('joplix','Attachment could not be read.'));const objectUrl=URL.createObjectURL(p.blob);const a=document.createElement('a');a.href=objectUrl;a.download=resourceFileName(r,p);document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);}
 function resourcePreviewKind(r){const k=resourceKind(r);return ['image','audio','video'].includes(k)?k:'';}
 function openResource(r){
   const fail=e=>jpAlert(e.message);
@@ -756,9 +764,9 @@ function openResource(r){
 async function openResourceInTab(r){
   const w=window.open('','_blank');
   try{
-    const p=await resourceData(r.id);if(!p||p.error||!p.data_url)throw new Error((p&&p.error)||t('joplix','Attachment could not be read.'));
+    const p=await resourceData(r.id);if(!p||!p.blob)throw new Error(t('joplix','Attachment could not be read.'));
     if(!w){await downloadResource(r);return;}
-    const objectUrl=dataUrlToBlobUrl(p.data_url,p.mime||r.mime||'application/octet-stream');
+    const objectUrl=URL.createObjectURL(p.blob);
     try{w.opener=null;}catch(e){}
     w.location.href=objectUrl;
     setTimeout(()=>URL.revokeObjectURL(objectUrl),300000);
@@ -771,10 +779,10 @@ async function previewResource(r){
     const box=document.createElement('div');box.className='jp-preview-media';box.textContent=t('joplix','Loading …');modal.appendChild(box);
     resourceData(r.id).then(p=>{
       if(closed)return;
-      if(!p||p.error||!p.data_url)throw new Error((p&&p.error)||t('joplix','Attachment could not be read.'));
+      if(!p||!p.blob)throw new Error(t('joplix','Attachment could not be read.'));
       let el;
-      if(kind==='image'){el=document.createElement('img');el.src=p.data_url;el.alt=r.title||'';}
-      else{objectUrl=dataUrlToBlobUrl(p.data_url,p.mime||r.mime);el=document.createElement(kind);el.controls=true;el.src=objectUrl;}
+      if(kind==='image'){el=document.createElement('img');el.src=p.url;el.alt=r.title||'';}
+      else{objectUrl=URL.createObjectURL(p.blob);el=document.createElement(kind);el.controls=true;el.src=objectUrl;}
       box.textContent='';box.appendChild(el);
     }).catch(e=>{if(closed)return;box.textContent=e.message;box.classList.add('jp-preview-error');});
   }});
@@ -800,7 +808,7 @@ async function pollOfficeEdit(resourceId,statusEl,options={}){
         return result;
       }
       if(result.updated||result.already_applied){
-        resourceDataCache.delete(resourceId);
+        forgetResourceData(resourceId);
         sync.lastHash=String(result.sha256||sync.lastHash||'');
         officeStatusText(statusEl,t('joplix','Changes were applied to the Joplix attachment and can be synchronised.'),'ok');
         scheduleBackgroundRefresh(350);
@@ -1092,14 +1100,11 @@ function mimeFromFilename(name){const ext=String(name||'').toLowerCase().split('
 async function uploadResource(file){
   if(!state.note){jpAlert(t('joplix','Please open a note first.'));return;}
   const noteId=state.note.id;
-  const data=await new Promise((resolve,reject)=>{
-    const reader=new FileReader();
-    reader.onload=()=>resolve(String(reader.result).split(',')[1]);
-    reader.onerror=reject;
-    reader.readAsDataURL(file);
-  });
+  if(file.size>JP_ATTACH_WARN_BYTES&&!(await jpConfirm(t('joplix','“{name}” is {size}. Large attachments make synchronisation to the Joplin apps slow. Attach it anyway?',{name:file.name,size:formatBytes(file.size)}),{title:t('joplix','Large file'),confirmLabel:t('joplix','Attach')})))return;
   if(state.note?.id!==noteId||state.noteLoading)throw new Error(t('joplix','The original note is no longer open.'));
-  const resource=await api('/api/resources',{method:'POST',body:{filename:file.name,mime:file.type||mimeFromFilename(file.name),data_base64:data}});
+  // Sent as a file (multipart), not as base64 inside JSON.
+  const form=new FormData();form.append('file',file,file.name);form.append('filename',file.name);form.append('mime',file.type||mimeFromFilename(file.name));
+  const resource=await api('/api/resources',{method:'POST',body:form});
   await appendResourceLink(noteId,resource);
 }
 // Shared tail of both attach sources: append the resource link to the note it was started from, then save.

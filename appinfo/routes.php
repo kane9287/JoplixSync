@@ -28,6 +28,7 @@ return ['routes'=>[
  ['name'=>'api#attach_nextcloud_file','url'=>'/api/resources/from-files','verb'=>'POST'],
  ['name'=>'api#browse_files','url'=>'/api/files','verb'=>'GET'],
  ['name'=>'api#resource_data','url'=>'/api/resources/{id}/data','verb'=>'GET'],
+ ['name'=>'api#resource_file','url'=>'/api/resources/{id}/file','verb'=>'GET'],
  ['name'=>'api#start_office_edit','url'=>'/api/resources/{id}/office/start','verb'=>'POST'],
  ['name'=>'api#office_edit_status','url'=>'/api/resources/{id}/office/status','verb'=>'POST'],
  ['name'=>'api#dev_packages','url'=>'/api/dev/packages','verb'=>'GET'],

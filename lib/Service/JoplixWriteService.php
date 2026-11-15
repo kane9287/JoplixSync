@@ -76,13 +76,8 @@ class JoplixWriteService {
   }
   return ['ok'=>true,'note_id'=>$noteId,'tag_id'=>$tagId,'removed'=>$removed];
  }
- public function uploadResource(string $filename,string $mime,string $dataBase64): array{
-  $bin=base64_decode($dataBase64,true);
-  if($bin===false)throw new \RuntimeException($this->l->t('Invalid Base64 data'));
-  return $this->createResource($filename,$mime,$bin,strlen($bin));
- }
- // Attach a file from the user's Nextcloud: the content is streamed straight into .resource/<id>,
- // so large files never pass through the browser or PHP's upload limits.
+ // Both attach sources end here: a file from the user's Nextcloud (File::fopen) and a device upload
+ // (PHP's temporary upload file). The content is streamed into .resource/<id>, never held in memory.
  /** @param resource $stream */
  public function createResourceFromStream(string $filename,string $mime,$stream,int $size): array{
   if(!is_resource($stream))throw new \RuntimeException($this->l->t('The file could not be read'));
@@ -101,9 +96,11 @@ class JoplixWriteService {
   if(!$this->folder->nodeExists('.resource'))$this->folder->newFolder('.resource');
   $rf=$this->folder->get('.resource');
   if(!$rf instanceof Folder)throw new \RuntimeException($this->l->t('.resource is not a folder'));
-  $this->writeNew($id,$item);
+  // File first, item second: a resource item without its file would sync to every Joplin client as a
+  // broken attachment. If writing the item fails, the file is removed again.
   if($rf->nodeExists($id))$rf->get($id)->delete();
-  $rf->newFile($id,$content);
+  $blob=$rf->newFile($id,$content);
+  try{$this->writeNew($id,$item);}catch(\Throwable $e){try{$blob->delete();}catch(\Throwable $ignore){}throw $e;}
   if(!$this->folder->nodeExists($id.'.md')||!$rf->nodeExists($id))throw new \RuntimeException($this->l->t('The attachment could not be created completely'));
   return ['id'=>$id,'title'=>$safeName,'mime'=>$mime,'file_extension'=>$ext,'size'=>$size,'markdown'=>(str_starts_with(strtolower($mime),'image/')?'!':'').'['.$safeName.'](:/'.$id.')'];
  }

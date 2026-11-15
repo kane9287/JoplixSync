@@ -8,6 +8,12 @@
 - The background synchronisation no longer creates the Joplix folder when it is missing (for example after a typo in the path); it reports an error instead. A synchronisation started in the browser still creates it.
 - Item files with Windows (CRLF) line endings, written by other tools, are now read correctly. Before, such notes did not appear.
 - Saved notes carry modification times with milliseconds, so two saves within one second are told apart by the conflict check.
+- Attachments are loaded as files instead of base64 text inside the server's answer. Opening, previewing and downloading need far less memory on the server, and attachments larger than 25 MB can now be opened and downloaded in Joplix.
+- Attaching a file from your device sends it as a normal file upload. A file larger than the server's upload limit gets a clear message pointing to *Attach from Nextcloud*; files over 25 MB ask for confirmation first, as with Nextcloud files.
+- An attachment's file is written before its entry, so a failed upload can no longer leave an attachment without content that then synchronises to the Joplin apps.
+- Files from a share whose owner disabled downloading are no longer offered under *Attach from Nextcloud* and cannot be attached.
+- Error messages no longer show server paths; unexpected internal errors show a short notice and are written to the Nextcloud log.
+- The folder suggestions in the settings look three levels deep and skip hidden folders, so the settings open quickly with large file trees.
 - Internal: one parser for Joplin's item format shared by the note view and the synchronisation; one definition of the Joplix folder; one list of Office formats and of file types; a note list that is read once per request instead of up to three times.
 
 # Joplix 2026.11.81

@@ -46,7 +46,20 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  private function officeEditors(): array{$u=$this->userSession->getUser();if($u===null)return [];$out=[];foreach(array_keys(self::OFFICE_EDITORS) as $app){try{if($this->appManager->isEnabledForUser($app,$u))$out[]=$app;}catch(\Throwable $e){}}return $out;}
  /** The editor to use: the user's choice while it is still installed, else the first available one. */
  private function officeEditor(): ?string{$all=$this->officeEditors();$pick=$this->setting('office_editor','auto');if(in_array($pick,$all,true))return $pick;return $all[0]??null;}
- private function err(\Throwable $e,?int $s=null): JSONResponse{return new JSONResponse(['error'=>$e->getMessage()],$s??($e instanceof ConflictException?409:400));}
+ /**
+  * Error answer for the browser. Programming errors (\Error: type errors, undefined calls) are logged and
+  * answered with a generic text; other messages are passed on with server paths (data directory, server
+  * root) removed, since updater and file-system errors contain them.
+  */
+ private function err(\Throwable $e,?int $s=null): JSONResponse{
+  if($e instanceof \Error){
+   \OCP\Server::get(\Psr\Log\LoggerInterface::class)->error('Joplix: '.$e->getMessage(),['app'=>Application::APP_ID,'exception'=>$e]);
+   return new JSONResponse(['error'=>$this->l->t('An internal error occurred. Details are in the Nextcloud log.')],500);
+  }
+  $message=$e->getMessage();
+  foreach([$this->config->getSystemValueString('datadirectory',''),dirname(__DIR__,4)] as $root){if(strlen($root)>1)$message=str_replace(rtrim($root,'/'),'…',$message);}
+  return new JSONResponse(['error'=>$message],$s??($e instanceof ConflictException?409:400));
+ }
  /**
   * @NoAdminRequired
   * @NoCSRFRequired
@@ -56,7 +69,10 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   * @NoAdminRequired
   * @NoCSRFRequired
   */
- public function folders(): JSONResponse{try{$out=[];$walk=function($folder,$path,$depth) use (&$walk,&$out){if($depth>4)return;foreach($folder->getDirectoryListing() as $node){if($node instanceof Folder){$p=$path.'/'.$node->getName();$out[]=$p;$walk($node,$p,$depth+1);}}};$walk($this->userFolder(),'',0);sort($out,SORT_NATURAL|SORT_FLAG_CASE);return new JSONResponse(['folders'=>$out,'current'=>$this->joplinPath()]);}catch(\Throwable $e){return $this->err($e);}}
+ public function folders(): JSONResponse{try{$out=[];
+  // Suggestions for the folder field: three levels, hidden folders skipped, at most 1000 entries, so a large
+  // file tree does not make the settings slow (it used to walk five levels of everything).
+  $walk=function($folder,$path,$depth) use (&$walk,&$out){if($depth>2||count($out)>=1000)return;foreach($folder->getDirectoryListing() as $node){if(count($out)>=1000)return;if($node instanceof Folder&&$node->getName()!==''&&$node->getName()[0]!=='.'){$p=$path.'/'.$node->getName();$out[]=$p;$walk($node,$p,$depth+1);}}};$walk($this->userFolder(),'',0);sort($out,SORT_NATURAL|SORT_FLAG_CASE);return new JSONResponse(['folders'=>$out,'current'=>$this->joplinPath()]);}catch(\Throwable $e){return $this->err($e);}}
  /**
   * @NoAdminRequired
   */
@@ -188,7 +204,19 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  }
  /**
  * @NoAdminRequired
- */ public function uploadResource(): JSONResponse{try{return $this->write(fn(JoplixWriteService $w)=>$w->uploadResource((string)$this->request->getParam('filename','upload.bin'),(string)$this->request->getParam('mime','application/octet-stream'),(string)$this->request->getParam('data_base64','')));}catch(\Throwable $e){return $this->err($e);}}
+ */ public function uploadResource(): JSONResponse{
+  try{
+   // Multipart upload (field "file"), streamed from PHP's temporary file. Until 2026.11.81 the browser sent
+   // base64 inside JSON, which needed several times the file size in memory and had no limit.
+   $f=$this->request->getUploadedFile('file');
+   $code=is_array($f)?(int)($f['error']??UPLOAD_ERR_NO_FILE):UPLOAD_ERR_NO_FILE;
+   if($code===UPLOAD_ERR_INI_SIZE||$code===UPLOAD_ERR_FORM_SIZE)throw new \RuntimeException($this->l->t('The file is larger than this server accepts for uploads (%1$s). Upload it to Nextcloud and use "Attach from Nextcloud" instead.',[(string)ini_get('upload_max_filesize')]));
+   if($code!==UPLOAD_ERR_OK||!is_uploaded_file((string)($f['tmp_name']??'')))throw new \RuntimeException($this->l->t('The file could not be uploaded.'));
+   $name=(string)$this->request->getParam('filename',(string)($f['name']??'upload.bin'));
+   $mime=(string)$this->request->getParam('mime',(string)($f['type']??'application/octet-stream'));
+   return $this->write(fn(JoplixWriteService $w)=>$w->createResourceFromStream($name,$mime,fopen((string)$f['tmp_name'],'rb'),(int)($f['size']??0)));
+  }catch(\Throwable $e){return $this->err($e);}
+ }
 
  // ---- Attach from Nextcloud. Paths are relative to the user's files root ("/Documents/a.pdf").
  // The Joplin sync folder and the .joplix workspace are not offered and cannot be attached from.
@@ -199,6 +227,15 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  private function isHiddenFilesPath(string $path): bool{
   foreach([$this->joplinPath(),'/.joplix'] as $root){if($path===$root||str_starts_with($path,rtrim($root,'/').'/'))return true;}
   return false;
+ }
+ /** True for files of a share whose owner switched off downloading: copying one into a note would bypass that. */
+ private function downloadForbidden(\OCP\Files\Node $node): bool{
+  try{
+   $storage=$node->getStorage();
+   if(!$storage->instanceOfStorage(\OCP\Files\Storage\ISharedStorage::class)||!method_exists($storage,'getShare'))return false;
+   $attributes=$storage->getShare()->getAttributes();
+   return $attributes!==null&&$attributes->getAttribute('permissions','download')===false;
+  }catch(\Throwable $e){return false;}
  }
  private function filesNode(string $path){$uf=$this->userFolder();if($path==='/')return $uf;try{return $uf->get(ltrim($path,'/'));}catch(\OCP\Files\NotFoundException $e){throw new \RuntimeException($this->l->t('Not found: %1$s',[$path]));}}
  /**
@@ -215,6 +252,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
     $name=$child->getName();if($name===''||$name[0]==='.')continue;
     $p=rtrim($path,'/').'/'.$name;if($this->isHiddenFilesPath($p))continue;
     $isDir=$child instanceof Folder;
+    if(!$isDir&&$this->downloadForbidden($child))continue;
     $entries[]=['name'=>$name,'path'=>$p,'type'=>$isDir?'dir':'file','mime'=>$isDir?'':(string)$child->getMimeType(),'size'=>$isDir?0:(int)$child->getSize(),'mtime'=>(int)$child->getMTime()];
    }
    usort($entries,fn($a,$b)=>(($a['type']==='dir'?0:1)<=>($b['type']==='dir'?0:1))?:strnatcasecmp($a['name'],$b['name']));
@@ -230,6 +268,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
    if($path==='/'||$this->isHiddenFilesPath($path))throw new \RuntimeException($this->l->t('This file cannot be attached'));
    $node=$this->filesNode($path);
    if(!$node instanceof \OCP\Files\File)throw new \RuntimeException($this->l->t('Not a file: %1$s',[$path]));
+   if($this->downloadForbidden($node))throw new \RuntimeException($this->l->t('The owner of this share does not allow downloading it, so it cannot be attached.'));
    return $this->write(fn(JoplixWriteService $w)=>$w->createResourceFromStream($node->getName(),(string)$node->getMimeType(),$node->fopen('r'),(int)$node->getSize()));
   }catch(\Throwable $e){return $this->err($e);}
  }
@@ -323,6 +362,28 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  * @NoCSRFRequired
  */ public function resourceData(string $id): JSONResponse{try{$p=$this->model()->resourcePayload($id);return $p?new JSONResponse($p):new JSONResponse(['error'=>$this->l->t('Attachment not found')],404);}catch(\Throwable $e){return $this->err($e);}}
  /**
+  * The attachment's bytes, streamed. Always a download of type application/octet-stream with nosniff: the
+  * browser builds a typed blob itself (js/app.js resourceData), and an attachment opened by URL directly
+  * must never be rendered as HTML or SVG in Nextcloud's origin.
+  * @NoAdminRequired
+  * @NoCSRFRequired
+  */
+ public function resourceFile(string $id): \OCP\AppFramework\Http\Response{
+  try{
+   $node=$this->model()->resourceFile($id);
+   if($node===null)return new JSONResponse(['error'=>$this->l->t('Attachment not found')],404);
+   $stream=$node->fopen('rb');
+   if(!is_resource($stream))throw new \RuntimeException($this->l->t('The attachment could not be read.'));
+   $r=new \OCP\AppFramework\Http\StreamResponse($stream);
+   $r->addHeader('Content-Type','application/octet-stream');
+   $r->addHeader('Content-Disposition','attachment; filename="'.$id.'"');
+   $r->addHeader('Content-Length',(string)$node->getSize());
+   $r->addHeader('X-Content-Type-Options','nosniff');
+   $r->cacheFor(0);
+   return $r;
+  }catch(\Throwable $e){return $this->err($e);}
+ }
+ /**
  * @NoAdminRequired
  */ public function startOfficeEdit(string $id): JSONResponse{try{
   $payload=$this->model()->resourcePayload($id);
@@ -332,10 +393,9 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   $editor=$this->officeEditor();
   if($editor===null)throw new \RuntimeException($this->l->t('No office editor is installed. Ask your administrator to enable Nextcloud Office, ONLYOFFICE or Euro Office.'));
   if($editor==='onlyoffice'&&in_array($ext,self::ONLYOFFICE_CONVERTS,true))throw new \RuntimeException($this->l->t('ONLYOFFICE can only edit .%1$s files by converting them to a new file, so the changes would not reach the attachment. Download the file instead, or choose another editor in the settings.',[$ext]));
-  $dataUrl=(string)($payload['data_url']??'');
-  $comma=strpos($dataUrl,',');
-  $binary=$comma===false?false:base64_decode(substr($dataUrl,$comma+1),true);
-  if($binary===false)throw new \RuntimeException($this->l->t('The attachment could not be read.'));
+  $node=$this->model()->resourceFile($id);
+  $binary=$node!==null?$node->getContent():false;
+  if(!is_string($binary))throw new \RuntimeException($this->l->t('The attachment could not be read.'));
   $editing=$this->workspace()->editingFolder();$this->cleanupEditingSessions($editing);
   $sessionId=bin2hex(random_bytes(16));$sessionFolder=$editing->newFolder($sessionId);
   $title=preg_replace('/[\\\/:*?"<>|]+/','_',trim((string)($payload['title']??$id)))?:$id;

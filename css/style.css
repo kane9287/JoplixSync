@@ -419,6 +419,10 @@ body.jp-resizing, body.jp-resizing * { cursor: col-resize !important; user-selec
 #joplix .jp-welcome-steps code { padding: 1px 5px; border-radius: 4px; background: var(--color-background-dark); }
 
 
+#joplix .jp-sync-rejected { margin-top: 8px; color: var(--jp-muted); font-size: 13px; }
+#joplix .jp-sync-rejected ul { margin: 4px 0 0; padding-left: 18px; list-style: disc outside; }
+#joplix .jp-sync-rejected li { margin: 2px 0; overflow-wrap: anywhere; }
+
 /* 10 — settings --------------------------------------------------------------------------------------- */
 #joplix .jp-settings-modal {
   position: relative; display: grid; grid-template-columns: 220px minmax(0, 1fr);

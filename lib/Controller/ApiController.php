@@ -20,7 +20,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  /** Every change to the Joplin folder runs inside this: the model is read, checked and written under the per-user write lock that the sync engine takes per item (JoplixWriteLock). */
  private function locked(callable $fn){return $this->writeLock->run($this->uid(),function() use ($fn){$this->model=null;try{$r=$fn();}finally{$this->model=null;}$this->maintenanceIfDue();return $r;});}
  /** A change through JoplixWriteService, then the cached index rebuilt from the files as they are now. */
- private function write(callable $change): JSONResponse{return $this->locked(function() use ($change){$r=$change($this->writer());$this->model=null;$this->storeIndex();return new JSONResponse($r);});}
+ private function write(callable $change): JSONResponse{return $this->locked(function() use ($change){$w=$this->writer();try{$r=$change($w);}finally{$this->syncService->noteLocalDeletions($this->uid(),$w->deletedItemNames());}$this->model=null;$this->storeIndex();return new JSONResponse($r);});}
  private function storeIndex(): array{$idx=$this->model()->fullIndex();$this->indexSvc()->write($idx);return $idx;}
  /** After a write, at most once a day per user: old backup copies (JoplixWriteService, "Backup retention") and leftovers of older versions (JoplixWorkspaceService::removeLegacy). */
  private function maintenanceIfDue(): void{
@@ -413,7 +413,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   */
  public function syncStatus(): JSONResponse {
      try {
-         $status = $this->syncService->status($this->uid());
+         $status = $this->syncService->status($this->uid(), $this->isAdmin());
          $status['is_admin'] = $this->isAdmin();
          return new JSONResponse($status);
      } catch (\Throwable $e) {
@@ -427,11 +427,11 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
  public function saveSyncSettings(): JSONResponse {
      try {
          $values = [];
-         foreach (['enabled', 'server_url', 'email', 'password', 'allow_local'] as $key) {
+         foreach (['enabled', 'server_url', 'email', 'password', 'local_hosts'] as $key) {
              $values[$key] = $this->request->getParam($key);
          }
          $this->syncService->saveSettings($this->uid(), $values, $this->isAdmin());
-         $status = $this->syncService->status($this->uid());
+         $status = $this->syncService->status($this->uid(), $this->isAdmin());
          $status['is_admin'] = $this->isAdmin();
          return new JSONResponse($status);
      } catch (\Throwable $e) {
@@ -455,9 +455,13 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   */
  public function runSync(): JSONResponse {
      try {
-         $confirm = in_array($this->request->getParam('confirm_delete'), [true, 1, '1', 'yes', 'true'], true);
+         // What to do with synchronised files that disappeared without Joplix deleting them: '' report, 'delete', 'restore'.
+         $action = (string)$this->request->getParam('missing_action', '');
+         if (!in_array($action, ['', 'delete', 'restore'], true)) {
+             $action = '';
+         }
          // Short budget per request; the browser repeats while the result is "partial".
-         return new JSONResponse($this->syncService->run($this->uid(), 20, $confirm));
+         return new JSONResponse($this->syncService->run($this->uid(), 20, $action));
      } catch (\Throwable $e) {
          return $this->err($e);
      }

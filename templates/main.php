@@ -211,9 +211,9 @@ if (is_readable($infoXml)) {
           <label><strong><?php p($l->t('Enable synchronisation')); ?></strong><span><?php p($l->t('Synchronises on opening, after saving and regularly in the background.')); ?></span></label>
           <button id="jp-sync-enabled" class="jp-switch" type="button" role="switch" aria-checked="false"><span></span></button>
         </div>
-        <?php if ($isAdmin): ?><div class="jp-setting-card">
-          <label><strong><?php p($l->t('Allow local server addresses')); ?></strong><span><?php p($l->t('Needed when the Joplin Server runs in your own network or on the same machine. Applies to all users.')); ?></span></label>
-          <button id="jp-sync-allow-local" class="jp-switch" type="button" role="switch" aria-checked="false"><span></span></button>
+        <?php if ($isAdmin): ?><div class="jp-setting-card jp-setting-card-path">
+          <label for="jp-sync-local-hosts"><strong><?php p($l->t('Local Joplin servers')); ?></strong><span><?php p($l->t('Administrators only. Joplin Servers in your own network that Joplix may connect to, for example joplin.lan or 192.168.1.20:22300, separated by commas. Only these may use http://. Applies to all users.')); ?></span></label>
+          <div class="jp-path-control"><input id="jp-sync-local-hosts" autocomplete="off" spellcheck="false"></div>
         </div><?php endif; ?>
         <div class="jp-sync-actions">
           <button id="jp-sync-save" class="primary" type="button"><?php p($l->t('Save')); ?></button>
@@ -221,6 +221,7 @@ if (is_readable($infoXml)) {
           <button id="jp-sync-run" type="button"><?php p($l->t('Synchronise now')); ?></button>
         </div>
         <div id="jp-sync-status" class="jp-update-status"><?php p($l->t('Not synchronised yet.')); ?></div>
+        <div id="jp-sync-rejected" class="jp-sync-rejected" hidden></div>
       </section>
 
 <?php if ($isAdmin): ?>

@@ -5,6 +5,7 @@ use OCA\Joplix\AppInfo\Application;
 use OCA\Joplix\Service\JoplixSyncService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
+use OCP\IUserManager;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -19,9 +20,11 @@ class SyncJob extends TimedJob {
 
     private JoplixSyncService $sync;
     private LoggerInterface $logger;
+    private IUserManager $userManager;
 
-    public function __construct(ITimeFactory $time, JoplixSyncService $sync, LoggerInterface $logger) {
+    public function __construct(ITimeFactory $time, JoplixSyncService $sync, LoggerInterface $logger, IUserManager $userManager) {
         parent::__construct($time);
+        $this->userManager = $userManager;
         $this->sync = $sync;
         $this->logger = $logger;
         $this->setInterval(self::INTERVAL_SECONDS);
@@ -40,8 +43,13 @@ class SyncJob extends TimedJob {
             if ($remaining < 10) {
                 break;
             }
+            // Disabled accounts and leftovers of deleted ones are skipped.
+            $user = $this->userManager->get((string)$uid);
+            if ($user === null || !$user->isEnabled()) {
+                continue;
+            }
             try {
-                $this->sync->run((string)$uid, min(self::PER_USER_BUDGET_SECONDS, $remaining), false, false);
+                $this->sync->run((string)$uid, min(self::PER_USER_BUDGET_SECONDS, $remaining), '', false);
             } catch (\Throwable $e) {
                 $this->logger->warning('Joplix background sync failed for {uid}: {message}', ['app' => Application::APP_ID, 'uid' => $uid, 'message' => $e->getMessage()]);
             }

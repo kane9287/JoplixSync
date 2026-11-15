@@ -12,6 +12,8 @@ use OCP\Files\NotFoundException;
 use OCP\Files\SimpleFS\ISimpleFolder;
 use OCP\Http\Client\IClientService;
 use OCP\IConfig;
+use OCP\IDBConnection;
+use OCP\IL10N;
 use OCP\IUserManager;
 use OCP\L10N\IFactory;
 use OCP\Lock\ILockingProvider;
@@ -22,9 +24,20 @@ use Psr\Log\LoggerInterface;
 /**
  * Per-user Joplin Server synchronisation: settings, credentials, state and
  * running the sync engine. Used by the API controller and the background job.
+ *
+ * Local servers: Nextcloud refuses connections to private addresses. An administrator lists the Joplin
+ * servers in the own network that may be reached anyway (app setting sync_local_hosts, "host" or
+ * "host:port"); only those get Nextcloud's allow_local_address, and only those may use plain http://.
+ * Until 2026.11.81 this was one switch (sync_allow_local) that opened the whole internal network to every
+ * user; localHosts() turns it into the list of hosts configured at that time, once.
+ *
+ * Deletions: JoplixWriteService reports the item files Joplix deleted; they are kept in the user setting
+ * sync_deleted until the engine has deleted them on the server (see SyncEngine, "Deletions").
  */
 class JoplixSyncService {
     private const APP_ID = Application::APP_ID;
+    /** Confirmed deletions older than this are forgotten (the server copy then counts as "missing"). */
+    private const DELETED_KEEP_DAYS = 90;
 
     private IRootFolder $rootFolder;
     private IConfig $config;
@@ -37,11 +50,9 @@ class JoplixSyncService {
     private JoplixFolders $folders;
     private IFactory $l10nFactory;
     private IUserManager $userManager;
+    private IDBConnection $db;
 
-    public function __construct(IRootFolder $rootFolder, IConfig $config, ICrypto $crypto, IClientService $clientService, IAppDataFactory $appDataFactory, ILockingProvider $locking, JoplixWriteLock $writeLock, LoggerInterface $logger, JoplixFolders $folders, IFactory $l10nFactory, IUserManager $userManager) {
-        $this->folders = $folders;
-        $this->l10nFactory = $l10nFactory;
-        $this->userManager = $userManager;
+    public function __construct(IRootFolder $rootFolder, IConfig $config, ICrypto $crypto, IClientService $clientService, IAppDataFactory $appDataFactory, ILockingProvider $locking, JoplixWriteLock $writeLock, LoggerInterface $logger, JoplixFolders $folders, IFactory $l10nFactory, IUserManager $userManager, IDBConnection $db) {
         $this->rootFolder = $rootFolder;
         $this->config = $config;
         $this->crypto = $crypto;
@@ -50,39 +61,66 @@ class JoplixSyncService {
         $this->locking = $locking;
         $this->writeLock = $writeLock;
         $this->logger = $logger;
+        $this->folders = $folders;
+        $this->l10nFactory = $l10nFactory;
+        $this->userManager = $userManager;
+        $this->db = $db;
     }
 
     // ------------------------------------------------------------- settings
 
     /** Settings and last status for the UI. Never contains the password. */
-    public function status(string $uid): array {
+    public function status(string $uid, bool $isAdmin = false): array {
         $last = json_decode($this->get($uid, 'sync_status', '{}'), true);
         if (!is_array($last)) {
             $last = [];
         }
-        return [
+        $url = $this->get($uid, 'sync_server_url');
+        $out = [
             'enabled' => $this->get($uid, 'sync_enabled', 'no') === 'yes',
-            'server_url' => $this->get($uid, 'sync_server_url'),
+            'server_url' => $url,
             'email' => $this->get($uid, 'sync_email'),
             'password_set' => $this->get($uid, 'sync_password') !== '',
             'configured' => $this->isConfigured($uid),
-            'allow_local' => $this->allowLocal(),
+            'allow_local' => $url !== '' && $this->isLocalHost(JoplinServerClient::hostKey($url)),
             'last_run' => (int)($last['last_run'] ?? 0),
             'last_ok' => (int)($last['last_ok'] ?? 0),
             'last_status' => (string)($last['status'] ?? ''),
             'last_message' => (string)($last['message'] ?? ''),
+            'last_code' => (string)($last['code'] ?? ''),
             'last_result' => is_array($last['result'] ?? null) ? $last['result'] : null,
+            'rejected_items' => $this->rejectedItems($uid),
         ];
+        if ($isAdmin) {
+            $out['local_hosts'] = implode(', ', $this->localHosts());
+        }
+        return $out;
     }
 
     /**
-     * @param array{enabled?: mixed, server_url?: mixed, email?: mixed, password?: mixed, allow_local?: mixed} $values
+     * @param array{enabled?: mixed, server_url?: mixed, email?: mixed, password?: mixed, local_hosts?: mixed} $values
      */
     public function saveSettings(string $uid, array $values, bool $isAdmin): void {
+        $l = $this->l($uid);
+        // The administrator's list first, so an admin can allow a local http:// server and use it in one step.
+        if ($isAdmin && array_key_exists('local_hosts', $values) && $values['local_hosts'] !== null) {
+            $hosts = [];
+            foreach (preg_split('/[\s,;]+/', strtolower(trim((string)$values['local_hosts']))) ?: [] as $host) {
+                if ($host === '') {
+                    continue;
+                }
+                if (!preg_match('/^[a-z0-9.\-]+(?::\d{1,5})?$|^\[[0-9a-f:.]+\](?::\d{1,5})?$/D', $host)) {
+                    throw new \InvalidArgumentException($l->t('Not a host name: %1$s. Enter host names or addresses, optionally with :port, separated by commas.', [$host]));
+                }
+                $hosts[$host] = true;
+            }
+            $this->config->setAppValue(self::APP_ID, 'sync_local_hosts', implode(',', array_keys($hosts)));
+            $this->config->deleteAppValue(self::APP_ID, 'sync_allow_local');
+        }
         $credentialsChanged = false;
         if (array_key_exists('server_url', $values) && $values['server_url'] !== null) {
             $url = trim((string)$values['server_url']);
-            $url = $url === '' ? '' : JoplinServerClient::normalizeBaseUrl($url);
+            $url = $url === '' ? '' : JoplinServerClient::normalizeBaseUrl($url, $l, fn(string $key) => $this->isLocalHost($key));
             if ($url !== $this->get($uid, 'sync_server_url')) {
                 $this->set($uid, 'sync_server_url', $url);
                 $credentialsChanged = true;
@@ -91,7 +129,7 @@ class JoplixSyncService {
         if (array_key_exists('email', $values) && $values['email'] !== null) {
             $email = trim((string)$values['email']);
             if (strlen($email) > 320 || preg_match('/[\x00-\x1f]/', $email)) {
-                throw new \InvalidArgumentException('The e-mail address is not valid.');
+                throw new \InvalidArgumentException($l->t('The e-mail address is not valid.'));
             }
             if ($email !== $this->get($uid, 'sync_email')) {
                 $this->set($uid, 'sync_email', $email);
@@ -109,13 +147,9 @@ class JoplixSyncService {
         if (array_key_exists('enabled', $values) && $values['enabled'] !== null) {
             $on = in_array($values['enabled'], [true, 1, '1', 'yes', 'true'], true);
             if ($on && !$this->isConfigured($uid)) {
-                throw new \InvalidArgumentException('Enter the server address, e-mail and password before enabling synchronisation.');
+                throw new \InvalidArgumentException($l->t('Enter the server address, e-mail and password before enabling synchronisation.'));
             }
             $this->set($uid, 'sync_enabled', $on ? 'yes' : 'no');
-        }
-        if ($isAdmin && array_key_exists('allow_local', $values) && $values['allow_local'] !== null) {
-            $on = in_array($values['allow_local'], [true, 1, '1', 'yes', 'true'], true);
-            $this->config->setAppValue(self::APP_ID, 'sync_allow_local', $on ? 'yes' : 'no');
         }
     }
 
@@ -124,12 +158,29 @@ class JoplixSyncService {
         return $this->config->getUsersForUserValue(self::APP_ID, 'sync_enabled', 'yes');
     }
 
+    /**
+     * Remembers item files Joplix deleted, so the next run deletes them on the server (and only them).
+     * @param string[] $names "<id>.md"
+     */
+    public function noteLocalDeletions(string $uid, array $names): void {
+        if ($names === []) {
+            return;
+        }
+        $log = $this->deletionLog($uid);
+        foreach ($names as $name) {
+            if (preg_match('/^[a-f0-9]{32}\.md$/D', $name)) {
+                $log[$name] = time();
+            }
+        }
+        $this->saveDeletionLog($uid, $log);
+    }
+
     // ------------------------------------------------------------ operations
 
     /** Logs in and reads the sync information without changing anything. */
     public function test(string $uid): array {
         if (!$this->isConfigured($uid)) {
-            throw new \InvalidArgumentException('Enter the server address, e-mail and password first.');
+            throw new \InvalidArgumentException($this->l($uid)->t('Enter the server address, e-mail and password first.'));
         }
         $client = $this->client($uid, false);
         $client->login();
@@ -148,18 +199,30 @@ class JoplixSyncService {
 
     /**
      * Runs one time-boxed synchronisation.
+     * @param string $missingAction '', 'delete' or 'restore' for synchronised files that disappeared (SyncEngine::run)
+     * @param bool $interactive started by the user in the browser (may create the folder); false for the background job
      * @return array status is one of done, partial, busy, error, disabled
      */
-    public function run(string $uid, int $budgetSeconds, bool $allowMassDelete = false, bool $interactive = true): array {
+    public function run(string $uid, int $budgetSeconds, string $missingAction = '', bool $interactive = true): array {
         if ($this->get($uid, 'sync_enabled', 'no') !== 'yes' || !$this->isConfigured($uid)) {
             return ['status' => 'disabled'];
         }
+        $l = $this->l($uid);
         $lockKey = 'joplix/sync/' . md5($uid);
         try {
             $this->locking->acquireLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE);
         } catch (LockedException $e) {
-            return ['status' => 'busy', 'message' => 'A synchronisation is already running.'];
+            return ['status' => 'busy', 'message' => $l->t('A synchronisation is already running.')];
         }
+        // Second guard for installations with Nextcloud's file locking switched off (no-op locking provider):
+        // a lease in the user's settings. Not atomic, but it keeps a browser run and a cron run from routinely
+        // running at the same time under the same client id.
+        $lease = (int)$this->get($uid, 'sync_running_until', '0');
+        if ($lease > time()) {
+            $this->releaseLock($lockKey);
+            return ['status' => 'busy', 'message' => $l->t('A synchronisation is already running.')];
+        }
+        $this->set($uid, 'sync_running_until', (string)(time() + $budgetSeconds + 60));
         $client = null;
         try {
             $path = $this->folders->joplinPath($uid);
@@ -168,15 +231,19 @@ class JoplixSyncService {
             $folder = $this->folders->joplinFolder($uid, $interactive);
             $stateFile = $this->stateFileName($uid, $path);
             $client = $this->client($uid, true);
+            $deletionLog = $this->deletionLog($uid);
             $engine = new SyncEngine($folder, $client, $this->loadState($stateFile), function (array $state) use ($stateFile): void {
                 $this->saveState($stateFile, $state);
             }, function (callable $critical) use ($uid) {
                 // Per item, not per run: users keep saving while a long synchronisation is in progress.
                 return $this->writeLock->run($uid, $critical, 20.0);
-            });
-            $result = $engine->run($budgetSeconds, $allowMassDelete);
-            if (($result['pulled'] ?? 0) > 0 || ($result['deleted_local'] ?? 0) > 0 || ($result['conflicts'] ?? 0) > 0) {
-                $this->refreshIndex($uid, $path, $folder);
+            }, array_keys($deletionLog), $l);
+            $result = $engine->run($budgetSeconds, $missingAction);
+            if ($engine->handledDeletes() !== []) {
+                $this->forgetDeletions($uid, $engine->handledDeletes());
+            }
+            if (($result['pulled'] ?? 0) > 0 || ($result['deleted_local'] ?? 0) > 0 || ($result['conflicts'] ?? 0) > 0 || ($result['restored'] ?? 0) > 0) {
+                $this->refreshIndex($uid, $path, $folder, $l);
             }
         } catch (\Throwable $e) {
             $code = $e instanceof JoplinServerException ? $e->serverCode() : '';
@@ -186,11 +253,8 @@ class JoplixSyncService {
             if ($client !== null) {
                 $this->storeSession($uid, $client->sessionId());
             }
-            try {
-                $this->locking->releaseLock($lockKey, ILockingProvider::LOCK_EXCLUSIVE);
-            } catch (\Throwable $e) {
-                // Released at the end of the request in any case.
-            }
+            $this->config->deleteUserValue($uid, self::APP_ID, 'sync_running_until');
+            $this->releaseLock($lockKey);
         }
         $this->recordStatus($uid, $result);
         return $result;
@@ -198,19 +262,70 @@ class JoplixSyncService {
 
     // -------------------------------------------------------------- internals
 
+    /** Texts in the user's language (also in the background job, where there is no request language). */
+    private function l(string $uid): IL10N {
+        return $this->l10nFactory->get(self::APP_ID, $this->l10nFactory->getUserLanguage($this->userManager->get($uid)));
+    }
+
+    private function releaseLock(string $key): void {
+        try {
+            $this->locking->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+        } catch (\Throwable $e) {
+            // Released at the end of the request in any case.
+        }
+    }
+
     private function isConfigured(string $uid): bool {
         return $this->get($uid, 'sync_server_url') !== '' && $this->get($uid, 'sync_email') !== '' && $this->get($uid, 'sync_password') !== '';
     }
 
-    private function allowLocal(): bool {
-        return $this->config->getAppValue(self::APP_ID, 'sync_allow_local', 'no') === 'yes';
+    /** @return string[] hosts ("host" or "host:port") an administrator allowed although they are local */
+    private function localHosts(): array {
+        $value = $this->config->getAppValue(self::APP_ID, 'sync_local_hosts', "\0");
+        if ($value === "\0") {
+            $value = $this->migrateAllowLocal();
+        }
+        return array_values(array_filter(explode(',', $value), fn($h) => $h !== ''));
+    }
+
+    private function isLocalHost(string $key): bool {
+        $hosts = $this->localHosts();
+        // "host" in the list covers every port of it.
+        return in_array($key, $hosts, true) || in_array(preg_replace('/:\d+$/', '', $key), $hosts, true);
+    }
+
+    /** One-time: the old global switch becomes the list of the server hosts users had set up at that time. */
+    private function migrateAllowLocal(): string {
+        $hosts = [];
+        if ($this->config->getAppValue(self::APP_ID, 'sync_allow_local', 'no') === 'yes') {
+            try {
+                $qb = $this->db->getQueryBuilder();
+                $qb->select('configvalue')->from('preferences')
+                    ->where($qb->expr()->eq('appid', $qb->createNamedParameter(self::APP_ID)))
+                    ->andWhere($qb->expr()->eq('configkey', $qb->createNamedParameter('sync_server_url')));
+                $rows = $qb->executeQuery();
+                while (($url = $rows->fetchOne()) !== false) {
+                    if ((string)$url !== '') {
+                        $hosts[JoplinServerClient::hostKey((string)$url)] = true;
+                    }
+                }
+                $rows->closeCursor();
+            } catch (\Throwable $e) {
+                $this->logger->warning('Joplix could not convert sync_allow_local: {message}', ['app' => self::APP_ID, 'message' => $e->getMessage()]);
+            }
+        }
+        $value = implode(',', array_keys($hosts));
+        $this->config->setAppValue(self::APP_ID, 'sync_local_hosts', $value);
+        $this->config->deleteAppValue(self::APP_ID, 'sync_allow_local');
+        return $value;
     }
 
     private function client(string $uid, bool $reuseSession): JoplinServerClient {
+        $l = $this->l($uid);
         try {
             $password = $this->crypto->decrypt($this->get($uid, 'sync_password'));
         } catch (\Throwable $e) {
-            throw new \RuntimeException('The stored Joplin Server password can no longer be decrypted. Please enter it again.');
+            throw new \RuntimeException($l->t('The stored Joplin Server password can no longer be decrypted. Please enter it again.'));
         }
         $session = '';
         if ($reuseSession) {
@@ -223,7 +338,13 @@ class JoplixSyncService {
                 }
             }
         }
-        return new JoplinServerClient($this->clientService, $this->get($uid, 'sync_server_url'), $this->get($uid, 'sync_email'), $password, $this->allowLocal(), $session);
+        $url = $this->get($uid, 'sync_server_url');
+        $local = $this->isLocalHost(JoplinServerClient::hostKey($url));
+        if (str_starts_with($url, 'http://') && !$local) {
+            // Stored before 2026.11.82 or allowed then; never send the password over plain HTTP to a non-local host.
+            throw new \RuntimeException($l->t('Use an https:// address. Plain http:// would send your Joplin password unencrypted; it is only accepted for servers an administrator allowed as local servers.'));
+        }
+        return new JoplinServerClient($this->clientService, $url, $this->get($uid, 'sync_email'), $password, $local, $session, $l);
     }
 
     private function storeSession(string $uid, string $sessionId): void {
@@ -256,18 +377,80 @@ class JoplixSyncService {
             'last_ok' => in_array($status, ['done', 'partial'], true) ? $now : (int)(is_array($previous) ? ($previous['last_ok'] ?? 0) : 0),
             'status' => $status,
             'message' => substr((string)($result['message'] ?? ''), 0, 500),
-            'result' => array_intersect_key($result, array_flip(['pulled', 'pushed', 'deleted_local', 'deleted_remote', 'conflicts', 'rejected'])),
+            'code' => (string)($result['code'] ?? ''),
+            'result' => array_intersect_key($result, array_flip(['pulled', 'pushed', 'deleted_local', 'deleted_remote', 'conflicts', 'rejected', 'missing', 'overwritten', 'encrypted', 'restored'])),
         ];
         $this->set($uid, 'sync_status', json_encode($record, JSON_UNESCAPED_SLASHES));
+    }
+
+    /** Items the server refused, with its reason and the item's title, for the settings pane (finding Y7). */
+    private function rejectedItems(string $uid): array {
+        try {
+            if (!$this->isConfigured($uid)) {
+                return [];
+            }
+            $state = $this->loadState($this->stateFileName($uid, $this->folders->joplinPath($uid)));
+            $rejected = is_array($state['rejected'] ?? null) ? $state['rejected'] : [];
+            if ($rejected === []) {
+                return [];
+            }
+            $folder = null;
+            try {
+                $folder = $this->folders->joplinFolder($uid);
+            } catch (\Throwable $e) {
+            }
+            $out = [];
+            foreach (array_slice($rejected, 0, 20, true) as $name => $entry) {
+                $title = '';
+                try {
+                    $node = $folder !== null ? $folder->get((string)$name) : null;
+                    if ($node instanceof \OCP\Files\File) {
+                        $title = mb_substr(trim(strtok(JoplinItem::parse($node->getContent())['body'], "\n") ?: ''), 0, 120);
+                    }
+                } catch (\Throwable $e) {
+                }
+                $out[] = ['name' => (string)$name, 'title' => $title, 'message' => (string)($entry['m'] ?? '')];
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /** @return array<string,int> name => time of deletion */
+    private function deletionLog(string $uid): array {
+        $log = json_decode($this->get($uid, 'sync_deleted', '{}'), true);
+        if (!is_array($log)) {
+            return [];
+        }
+        $cutoff = time() - self::DELETED_KEEP_DAYS * 86400;
+        return array_filter($log, fn($t) => (int)$t >= $cutoff);
+    }
+
+    private function saveDeletionLog(string $uid, array $log): void {
+        if ($log === []) {
+            $this->config->deleteUserValue($uid, self::APP_ID, 'sync_deleted');
+            return;
+        }
+        arsort($log);
+        $this->set($uid, 'sync_deleted', json_encode(array_slice($log, 0, 20000, true), JSON_UNESCAPED_SLASHES));
+    }
+
+    /** @param string[] $names */
+    private function forgetDeletions(string $uid, array $names): void {
+        $log = $this->deletionLog($uid);
+        foreach ($names as $name) {
+            unset($log[$name]);
+        }
+        $this->saveDeletionLog($uid, $log);
     }
 
     /**
      * Rebuilds the cached index after the engine changed files, so a background run does not leave it
      * stale until somebody opens Joplix. Labels in the index use the user's language.
      */
-    private function refreshIndex(string $uid, string $path, Folder $folder): void {
+    private function refreshIndex(string $uid, string $path, Folder $folder, IL10N $l): void {
         try {
-            $l = $this->l10nFactory->get(self::APP_ID, $this->l10nFactory->getUserLanguage($this->userManager->get($uid)));
             $this->writeLock->run($uid, function () use ($uid, $path, $folder, $l): void {
                 $index = (new JoplixModelService($folder, $l))->fullIndex();
                 (new JoplixIndexService($this->appDataFactory->get(self::APP_ID), $uid, $path))->write($index);

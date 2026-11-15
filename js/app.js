@@ -1659,6 +1659,10 @@ function describeSyncCounts(r){
   if(r.deleted_remote)parts.push(r.deleted_remote+' '+t('joplix','deleted on the server'));
   if(r.conflicts)parts.push(r.conflicts+' '+t('joplix','conflict(s)'));
   if(r.rejected)parts.push(r.rejected+' '+t('joplix','rejected by the server'));
+  if(r.restored)parts.push(t('joplix','{count} restored from the server',{count:r.restored}));
+  if(r.overwritten)parts.push(t('joplix','{count} notebook or tag changes replaced by the server version',{count:r.overwritten}));
+  if(r.encrypted)parts.push(t('joplix','{count} encrypted items skipped',{count:r.encrypted}));
+  if(r.missing)parts.push(t('joplix','{count} missing from the folder',{count:r.missing}));
   return parts.join(', ');
 }
 function describeLastSync(st){
@@ -1679,8 +1683,18 @@ function fillSyncUi(){
   if($('jp-sync-email')&&document.activeElement!==$('jp-sync-email'))$('jp-sync-email').value=st.email||'';
   if($('jp-sync-password')){$('jp-sync-password').value='';$('jp-sync-password').placeholder=st.password_set?t('joplix','(stored)'):'';}
   setSwitch($('jp-sync-enabled'),!!st.enabled);
-  setSwitch($('jp-sync-allow-local'),!!st.allow_local);
+  if($('jp-sync-local-hosts')&&document.activeElement!==$('jp-sync-local-hosts'))$('jp-sync-local-hosts').value=st.local_hosts||'';
+  renderRejectedItems(st.rejected_items||[]);
   syncPaneStatus(describeLastSync(st),st.last_status==='error'&&st.enabled?'error':(st.enabled&&st.last_run?'ok':''));
+}
+// Items the server refused to accept, with its reason (they are retried after the next change).
+function renderRejectedItems(items){
+  const box=$('jp-sync-rejected');if(!box)return;
+  box.replaceChildren();box.hidden=!items.length;if(!items.length)return;
+  const head=document.createElement('div');head.textContent=t('joplix','Not accepted by the Joplin Server:');box.appendChild(head);
+  const ul=document.createElement('ul');
+  items.forEach(it=>{const li=document.createElement('li');li.textContent=(it.title||it.name)+' – '+(it.message||'');ul.appendChild(li);});
+  box.appendChild(ul);
 }
 async function loadSyncStatus(){
   try{syncState.status=await api('/api/sync/status');}catch(e){syncState.status=null;}
@@ -1691,7 +1705,7 @@ function syncFormValues(){
   const v={server_url:$('jp-sync-url')?$('jp-sync-url').value.trim():'',email:$('jp-sync-email')?$('jp-sync-email').value.trim():'',enabled:($('jp-sync-enabled')&&$('jp-sync-enabled').classList.contains('active'))?'yes':'no'};
   const pw=$('jp-sync-password')?$('jp-sync-password').value:'';
   if(pw)v.password=pw;
-  if($('jp-sync-allow-local'))v.allow_local=$('jp-sync-allow-local').classList.contains('active')?'yes':'no';
+  if($('jp-sync-local-hosts'))v.local_hosts=$('jp-sync-local-hosts').value.trim();
   return v;
 }
 async function saveSyncSettings(){
@@ -1718,28 +1732,32 @@ async function runSync(opts={}){
   if(!syncEnabled()){if(opts.manual)syncPaneStatus(t('joplix','Please set up and enable synchronisation first.'),'warning');return null;}
   if(syncState.running){syncState.again=true;return null;}
   syncState.running=true;syncBusy(true);
-  const total={pulled:0,pushed:0,deleted_local:0,deleted_remote:0,conflicts:0,rejected:0};
-  let last=null,confirmDelete=false;
+  const total={pulled:0,pushed:0,deleted_local:0,deleted_remote:0,conflicts:0,rejected:0,restored:0,overwritten:0,encrypted:0,missing:0};
+  let last=null,missingAction='',asked=false;
   try{
     if(opts.manual){status(t('joplix','Synchronising...'),'warning');syncPaneStatus(t('joplix','Synchronising...'),'warning');}
     for(let round=0;round<2000;round++){
-      last=await api('/api/sync/run',{method:'POST',body:{confirm_delete:confirmDelete?'yes':'no'}});
-      Object.keys(total).forEach(k=>{total[k]+=Number(last[k]||0);});
+      last=await api('/api/sync/run',{method:'POST',body:{missing_action:missingAction}});
+      Object.keys(total).forEach(k=>{total[k]+=Number(last[k]||0);});total.missing=Number(last.missing||0);
       if(last.status==='partial'){
         const text=t('joplix','Synchronising... ')+describeSyncCounts(total);
         status(text,'warning');syncPaneStatus(text,'warning');
         continue;
       }
-      if(last.status==='error'&&last.code==='massDelete'&&opts.manual&&!confirmDelete){
-        if(await jpConfirm(last.message,{title:t('joplix','Delete these items on the Joplin Server as well?'),danger:true,confirmLabel:t('joplix','Delete')})){confirmDelete=true;continue;}
+      // Synchronised files disappeared without Joplix deleting them (Files app, desktop client, moved folder).
+      // Only the user decides whether that is a deletion; the automatic runs leave them alone.
+      if((last.code==='massDelete'||last.code==='missing')&&opts.manual&&!asked){
+        asked=true;
+        const choice=await jpDialog({title:t('joplix','Items missing from the Joplix folder'),message:last.message||'',cancelValue:'',buttons:[{label:t('joplix','Later'),value:''},{label:t('joplix','Delete on the server'),value:'delete',danger:true},{label:t('joplix','Restore from the server'),value:'restore',primary:true}]});
+        if(choice){missingAction=choice;continue;}
       }
       break;
     }
     const counts=describeSyncCounts(total);
     if(last&&last.status==='done'){
-      const text=t('joplix','Synchronised')+(counts?': '+counts:'');
-      if(opts.manual||counts)status(text,'ok');
-      syncPaneStatus(text,'ok');
+      const text=t('joplix','Synchronised')+(counts?': '+counts:'')+(last.code==='missing'&&!opts.manual?' '+t('joplix','Choose "Synchronise now" to decide about the missing items.'):'');
+      if(opts.manual||counts)status(text,last.code==='missing'?'warning':'ok');
+      syncPaneStatus(text,last.code==='missing'?'warning':'ok');
     }else if(last&&last.status==='busy'){
       if(opts.manual){status(last.message||t('joplix','A synchronisation is already running.'),'warning');syncPaneStatus(last.message||'','warning');}
     }else if(last&&last.status==='error'){
@@ -1753,6 +1771,7 @@ async function runSync(opts={}){
     }
     if(last&&last.status!=='busy'&&last.status!=='disabled'&&syncState.status){
       syncState.status.last_run=Math.floor(Date.now()/1000);syncState.status.last_status=last.status;syncState.status.last_message=last.message||'';syncState.status.last_result=total;
+      if(total.rejected||(syncState.status.rejected_items||[]).length)loadSyncStatus().catch(()=>{});
     }
     return last;
   }catch(e){
@@ -1779,7 +1798,7 @@ function noteLocalChangeForSync(path,options,data){
 }
 function setupSync(){
   const toggle=id=>{const el=$(id);if(el)el.addEventListener('click',()=>setSwitch(el,!el.classList.contains('active')));};
-  toggle('jp-sync-enabled');toggle('jp-sync-allow-local');
+  toggle('jp-sync-enabled');
   const fail=e=>syncPaneStatus(e.message,'error');
   if($('jp-sync-save'))$('jp-sync-save').addEventListener('click',()=>saveSyncSettings().then(()=>{if(syncEnabled())runSync({manual:true});}).catch(fail));
   if($('jp-sync-test'))$('jp-sync-test').addEventListener('click',()=>testSyncConnection().catch(fail));

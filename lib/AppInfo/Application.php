@@ -1,7 +1,9 @@
 <?php
 namespace OCA\Joplix\AppInfo;
 
+use OCA\Joplix\Listener\OfficeFileWrittenListener;
 use OCA\Joplix\Listener\UserDeletedListener;
+use OCP\Files\Events\Node\NodeWrittenEvent;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -17,6 +19,7 @@ class Application extends App implements IBootstrap {
 
     public function register(IRegistrationContext $context): void {
         $context->registerEventListener(UserDeletedEvent::class, UserDeletedListener::class);
+        $context->registerEventListener(NodeWrittenEvent::class, OfficeFileWrittenListener::class);
     }
 
     public function boot(IBootContext $context): void {

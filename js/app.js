@@ -793,7 +793,7 @@ async function previewResource(r){
 function stopOfficePolling(resourceId){if(state.officePollers[resourceId]){clearInterval(state.officePollers[resourceId]);delete state.officePollers[resourceId];}}
 function officeStatusText(el,text,kind){if(!el)return;el.textContent=text;el.className='jp-resource-edit-status '+(kind||'');}
 function officeSyncState(resourceId){
-  if(!state.officeSyncs[resourceId])state.officeSyncs[resourceId]={inFlight:null,closed:false,lastHash:''};
+  if(!state.officeSyncs[resourceId])state.officeSyncs[resourceId]={inFlight:null,closed:false,lastHash:'',lastImportAt:0};
   return state.officeSyncs[resourceId];
 }
 async function pollOfficeEdit(resourceId,statusEl,options={}){
@@ -807,7 +807,12 @@ async function pollOfficeEdit(resourceId,statusEl,options={}){
         if(!options.silentInactive)officeStatusText(statusEl,result.error||t('joplix','Editing session ended.'),'warning');
         return result;
       }
-      if(result.updated||result.already_applied){
+      // The server usually imports a save itself (OfficeFileWrittenListener) before this poll comes, so a
+      // newer last_import_at counts as an update as well.
+      const importedElsewhere=!!result.last_import_at&&result.last_import_at!==sync.lastImportAt;
+      sync.lastImportAt=result.last_import_at||sync.lastImportAt;
+      if(importedElsewhere&&!result.updated)scheduleSync(2500);
+      if(result.updated||result.already_applied||importedElsewhere){
         forgetResourceData(resourceId);
         sync.lastHash=String(result.sha256||sync.lastHash||'');
         officeStatusText(statusEl,t('joplix','Changes were applied to the Joplix attachment and can be synchronised.'),'ok');
@@ -874,7 +879,7 @@ async function startOfficeEdit(r,statusEl){
     editorWindow.location.replace(officeUrl);
     officeStatusText(statusEl,(openMode==='window'?t('joplix','Editing was requested in a separate window. '):t('joplix','Editing is running in a new tab. '))+t('joplix','{editor} opens directly. Saved changes are transferred back to Joplix automatically.',{editor:editorName}),'busy');
     stopOfficePolling(r.id);
-    state.officeSyncs[r.id]={inFlight:null,closed:false,lastHash:''};
+    state.officeSyncs[r.id]={inFlight:null,closed:false,lastHash:'',lastImportAt:0};
     state.officePollers[r.id]=setInterval(()=>pollOfficeEdit(r.id,statusEl).catch(()=>{}),3000);
     setTimeout(()=>pollOfficeEdit(r.id,statusEl).catch(()=>{}),1200);
     const closeWatcher=setInterval(async()=>{

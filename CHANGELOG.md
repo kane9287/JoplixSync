@@ -16,6 +16,8 @@
 - The folder suggestions in the settings look three levels deep and skip hidden folders, so the settings open quickly with large file trees.
 - Deleting a note or notebook permanently, or emptying the trash, now also removes the attachments that only those notes used (as the Joplin apps do). Attachments still used by another note, a note in the trash or a revision stay.
 - Permanently deleting a notebook checks all its files before removing the first one, and moving a notebook to the trash or restoring it is undone completely if it fails halfway, instead of leaving it half done.
+- Office editing: changes saved in the Office editor are now written into the attachment by the server at the moment the editor saves, also when the Joplix tab was closed in the meantime. Before, they were only taken over while Joplix was open and checking, and a working copy left over was deleted after a day, edits included. Working copies whose changes cannot be taken over (the attachment was changed elsewhere meanwhile) are now kept for 30 days in `.joplix/editing`.
+- The development-package folder `.joplix/updates` is no longer emptied after a day.
 - Internal: one parser for Joplin's item format shared by the note view and the synchronisation; one definition of the Joplix folder; one list of Office formats and of file types; a note list that is read once per request instead of up to three times.
 
 # Joplix 2026.11.81

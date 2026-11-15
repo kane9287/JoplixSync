@@ -1,14 +1,14 @@
 <?php
 namespace OCA\Joplix\Controller;
-use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixFolders; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService; use OCA\Joplix\Service\JoplixWriteLock;
+use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixFolders; use OCA\Joplix\Service\JoplixOfficeService; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService; use OCA\Joplix\Service\JoplixWriteLock;
 use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP\Files\Folder; use OCP\Files\IRootFolder; use OCP\IConfig; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager; use OCP\IL10N; use OCP\Files\AppData\IAppDataFactory; use OCA\Joplix\Service\ConflictException; use OCP\App\IAppManager;
 /**
  * Every endpoint of the browser app. Writes to the Joplin folder go through write(): under the per-user
  * write lock (shared with the sync engine), on a model read inside that lock, followed by an index refresh.
  * GET endpoints read only (the cached index in app data is filled on a miss, nothing in the user's files).
  */
-class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService; private JoplixWriteLock $writeLock; private IAppDataFactory $appDataFactory; private IL10N $l; private IAppManager $appManager; private JoplixFolders $folders;
- public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService,JoplixWriteLock $writeLock,IAppDataFactory $appDataFactory,IL10N $l,IAppManager $appManager,JoplixFolders $folders){parent::__construct($AppName,$request);$this->folders=$folders;$this->appManager=$appManager;$this->l=$l;$this->appDataFactory=$appDataFactory;$this->writeLock=$writeLock;$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
+class ApiController extends Controller{ private IRootFolder $rootFolder; private IConfig $config; private IUserSession $userSession; private IGroupManager $groupManager; private JoplixSyncService $syncService; private JoplixWriteLock $writeLock; private IAppDataFactory $appDataFactory; private IL10N $l; private IAppManager $appManager; private JoplixFolders $folders; private JoplixOfficeService $office;
+ public function __construct(string $AppName,IRequest $request,IRootFolder $rootFolder,IConfig $config,IUserSession $userSession,IGroupManager $groupManager,JoplixSyncService $syncService,JoplixWriteLock $writeLock,IAppDataFactory $appDataFactory,IL10N $l,IAppManager $appManager,JoplixFolders $folders,JoplixOfficeService $office){parent::__construct($AppName,$request);$this->office=$office;$this->folders=$folders;$this->appManager=$appManager;$this->l=$l;$this->appDataFactory=$appDataFactory;$this->writeLock=$writeLock;$this->syncService=$syncService;$this->rootFolder=$rootFolder;$this->config=$config;$this->userSession=$userSession;$this->groupManager=$groupManager;}
  private function uid(): string{$u=$this->userSession->getUser();if($u===null)throw new \RuntimeException($this->l->t('Not logged in'));return $u->getUID();}
  private function isAdmin(): bool{return $this->groupManager->isAdmin($this->uid());} private function setting(string $k,string $d=''): string{return $this->config->getUserValue($this->uid(),Application::APP_ID,$k,$d);} private function setSetting(string $k,string $v): void{$this->config->setUserValue($this->uid(),Application::APP_ID,$k,$v);} private function userFolder(): Folder{return $this->rootFolder->getUserFolder($this->uid());}
  private function joplinPath(): string{return $this->folders->joplinPath($this->uid());} private function joplinFolder(): Folder{return $this->folders->joplinFolder($this->uid());}
@@ -394,38 +394,18 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   if($editor===null)throw new \RuntimeException($this->l->t('No office editor is installed. Ask your administrator to enable Nextcloud Office, ONLYOFFICE or Euro Office.'));
   if($editor==='onlyoffice'&&in_array($ext,self::ONLYOFFICE_CONVERTS,true))throw new \RuntimeException($this->l->t('ONLYOFFICE can only edit .%1$s files by converting them to a new file, so the changes would not reach the attachment. Download the file instead, or choose another editor in the settings.',[$ext]));
   $node=$this->model()->resourceFile($id);
-  $binary=$node!==null?$node->getContent():false;
-  if(!is_string($binary))throw new \RuntimeException($this->l->t('The attachment could not be read.'));
-  $editing=$this->workspace()->editingFolder();$this->cleanupEditingSessions($editing);
-  $sessionId=bin2hex(random_bytes(16));$sessionFolder=$editing->newFolder($sessionId);
+  if($node===null)throw new \RuntimeException($this->l->t('The attachment could not be read.'));
   $title=preg_replace('/[\\\/:*?"<>|]+/','_',trim((string)($payload['title']??$id)))?:$id;
   if($ext!==''&&!str_ends_with(strtolower($title),'.'.$ext))$title.='.'.$ext;
-  $file=$sessionFolder->newFile($title,$binary);$hash=hash('sha256',$binary);
-  $session=['session_id'=>$sessionId,'resource_id'=>$id,'file_name'=>$title,'file_id'=>$file->getId(),'working_hash'=>$hash,'resource_hash'=>$hash,'started_at'=>time(),'last_import_at'=>0];
-  $sessions=json_decode($this->setting('office_sessions','{}'),true);if(!is_array($sessions))$sessions=[];$sessions[$id]=$session;
-  $this->setSetting('office_sessions',json_encode($sessions,JSON_UNESCAPED_SLASHES));
-  return new JSONResponse(['ok'=>true,'resource_id'=>$id,'session_id'=>$sessionId,'file_id'=>$file->getId(),'file_name'=>$title,'edit_dir'=>'/.joplix/editing/'.$sessionId,'editor'=>$editor,'editor_path'=>str_replace('{id}',(string)$file->getId(),self::OFFICE_EDITORS[$editor])]);
+  $s=$this->office->start($this->uid(),$id,$node,$title);
+  return new JSONResponse(['ok'=>true,'resource_id'=>$id,'session_id'=>$s['session_id'],'file_id'=>$s['file_id'],'file_name'=>$s['file_name'],'edit_dir'=>'/.joplix/editing/'.$s['session_id'],'editor'=>$editor,'editor_path'=>str_replace('{id}',(string)$s['file_id'],self::OFFICE_EDITORS[$editor])]);
  }catch(\Throwable $e){return $this->err($e);}}
 
  /**
   * Imports the working copy when it changed. POST since it writes (CSRF-protected); the browser polls it.
+  * Usually the server-side listener (OfficeFileWrittenListener) has imported the save already.
  * @NoAdminRequired
- */ public function officeEditStatus(string $id): JSONResponse{try{
-  $sessions=json_decode($this->setting('office_sessions','{}'),true);if(!is_array($sessions)||!isset($sessions[$id]))return new JSONResponse(['active'=>false]);
-  $session=$sessions[$id];$editing=$this->workspace()->editingFolder();$this->cleanupEditingSessions($editing);
-  $sessionId=(string)($session['session_id']??'');
-  if($sessionId===''||!$editing->nodeExists($sessionId))return new JSONResponse(['active'=>false,'error'=>$this->l->t('The editing session is missing')]);
-  $folder=$editing->get($sessionId);if(!$folder instanceof Folder||!$folder->nodeExists((string)$session['file_name']))return new JSONResponse(['active'=>false,'error'=>$this->l->t('The working file is missing')]);
-  $file=$folder->get((string)$session['file_name']);if(!$file instanceof \OCP\Files\File)return new JSONResponse(['active'=>false,'error'=>$this->l->t('The working file is not valid')]);
-  $binary=$file->getContent();$hash=hash('sha256',$binary);$updated=false;
-  if(!hash_equals((string)$session['working_hash'],$hash)){
-    $result=$this->locked(fn()=>$this->writer()->updateResourceBinary($id,$binary,(string)$session['resource_hash']));
-    $session['working_hash']=$hash;$session['resource_hash']=$result['sha256'];$session['last_import_at']=time();$sessions[$id]=$session;
-    $this->setSetting('office_sessions',json_encode($sessions,JSON_UNESCAPED_SLASHES));$updated=!((bool)($result['already_applied']??false));
-    $alreadyApplied=(bool)($result['already_applied']??false);
-  }
-  return new JSONResponse(['active'=>true,'updated'=>$updated,'already_applied'=>$alreadyApplied??false,'file_name'=>$session['file_name'],'last_import_at'=>$session['last_import_at']??0,'sha256'=>$session['resource_hash'],'working_sha256'=>$hash,'working_mtime'=>$file->getMTime(),'working_size'=>$file->getSize()]);
- }catch(\Throwable $e){return $this->err($e);}}
+ */ public function officeEditStatus(string $id): JSONResponse{try{$this->office->cleanup($this->uid());return new JSONResponse($this->office->import($this->uid(),$id));}catch(\Throwable $e){return $this->err($e);}}
 
  /**
   * @NoAdminRequired
@@ -483,8 +463,5 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
      }
  }
 
- private function cleanupEditingSessions(Folder $editing): void{
-  $cutoff=time()-86400;foreach($editing->getDirectoryListing() as $node){if(!$node instanceof Folder)continue;if($node->getMTime()<$cutoff){try{$node->delete();}catch(\Throwable $e){}}}
- }
 
 }

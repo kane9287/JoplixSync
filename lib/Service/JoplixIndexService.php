@@ -1,5 +1,5 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
 use OCP\Files\Folder;
 use OCP\Files\IAppData;

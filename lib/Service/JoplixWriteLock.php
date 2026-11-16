@@ -1,5 +1,5 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
 use OCP\Lock\ILockingProvider;
 use OCP\Lock\LockedException;
@@ -39,7 +39,7 @@ class JoplixWriteLock {
                 break;
             } catch (LockedException $e) {
                 if (microtime(true) >= $deadline) {
-                    throw new \RuntimeException(\OCP\Server::get(\OCP\L10N\IFactory::class)->get(\OCA\Joplix\AppInfo\Application::APP_ID)->t('Joplix is busy writing this folder (synchronisation or another save). Please try again.'));
+                    throw new \RuntimeException(\OCP\Server::get(\OCP\L10N\IFactory::class)->get(\OCA\JoplixSync\AppInfo\Application::APP_ID)->t('JoplixSync is busy writing this folder (synchronisation or another save). Please try again.'));
                 }
                 usleep(50000);
             }

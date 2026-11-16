@@ -1,8 +1,8 @@
 <?php
-script('joplix','app');
-style('joplix','style');
-$iconUrl = image_path('joplix','app-dark.svg');
-$faviconUrl = image_path('joplix','favicon.svg');
+script('joplixsync','app');
+style('joplixsync','style');
+$iconUrl = image_path('joplixsync','app-dark.svg');
+$faviconUrl = image_path('joplixsync','favicon.svg');
 $joplixVersion = 'unknown';
 $isAdmin = (bool)($_['isAdmin'] ?? false);
 $infoXml = __DIR__ . '/../appinfo/info.xml';
@@ -29,7 +29,7 @@ if (is_readable($infoXml)) {
   <aside class="jp-sidebar" id="jp-sidebar" data-jp-col="nav">
     <div class="jp-brand">
       <img class="jp-logo-img" src="<?php p($iconUrl); ?>" alt="">
-      <div class="jp-brand-text"><strong>Joplix</strong><?php if ($isAdmin): ?><a id="jp-brand-update" class="jp-brand-update" href="#" target="_blank" rel="noopener" hidden></a><?php endif; ?></div>
+      <div class="jp-brand-text"><strong>JoplixSync</strong><?php if ($isAdmin): ?><a id="jp-brand-update" class="jp-brand-update" href="#" target="_blank" rel="noopener" hidden></a><?php endif; ?></div>
     </div>
     <button class="jp-action" id="jp-new-root" type="button"><span class="jp-icon" data-icon="plus"></span><span><?php p($l->t('New notebook')); ?></span></button>
     <div class="jp-nav-title"><?php p($l->t('Notebooks')); ?></div>
@@ -124,7 +124,7 @@ if (is_readable($infoXml)) {
   <div class="jp-settings-backdrop jp-backdrop" id="jp-settings-backdrop"></div>
   <section class="jp-settings-modal" role="dialog" aria-modal="true" aria-labelledby="jp-settings-title">
     <aside class="jp-settings-menu">
-      <h2 id="jp-settings-title"><?php p($l->t('Joplix settings')); ?></h2>
+      <h2 id="jp-settings-title"><?php p($l->t('JoplixSync settings')); ?></h2>
       <button class="active" type="button" data-settings-tab="general"><?php p($l->t('General')); ?></button>
       <button type="button" data-settings-tab="view"><?php p($l->t('Appearance')); ?></button>
       <button type="button" data-settings-tab="index">Index</button>
@@ -138,7 +138,7 @@ if (is_readable($infoXml)) {
       <section class="jp-settings-pane active" data-settings-section="general">
         <h3><?php p($l->t('General')); ?></h3>
         <div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-setting-joplin-path"><strong><?php p($l->t('Joplix folder')); ?></strong><span><?php p($l->t('Select the Nextcloud folder containing your Joplix data or enter it manually')); ?></span></label>
+          <label for="jp-setting-joplin-path"><strong><?php p($l->t('JoplixSync folder')); ?></strong><span><?php p($l->t('Select the Nextcloud folder containing your JoplixSync data or enter it manually')); ?></span></label>
           <div class="jp-path-control">
             <input id="jp-setting-joplin-path" list="jp-folder-list" value="/JoplinV2" placeholder="/JoplinV2" autocomplete="off">
             <datalist id="jp-folder-list"></datalist>
@@ -174,7 +174,7 @@ if (is_readable($infoXml)) {
       <section class="jp-settings-pane" data-settings-section="view">
         <h3><?php p($l->t('Appearance')); ?></h3>
         <div class="jp-setting-card">
-          <label><strong><?php p($l->t('Remember last position')); ?></strong><span><?php p($l->t('Return to the last used notebook when opening Joplix')); ?></span></label>
+          <label><strong><?php p($l->t('Remember last position')); ?></strong><span><?php p($l->t('Return to the last used notebook when opening JoplixSync')); ?></span></label>
           <button id="jp-setting-remember-toggle" class="jp-switch" type="button" role="switch" aria-checked="true"><span></span></button>
         </div>
         <div class="jp-setting-card jp-setting-card-action">
@@ -193,7 +193,7 @@ if (is_readable($infoXml)) {
       <section class="jp-settings-pane" data-settings-section="sync">
         <h3><?php p($l->t('Synchronisation')); ?></h3>
         <div class="jp-setting-card jp-setting-card-static">
-          <div><strong>Joplin Server</strong><span><?php p($l->t('Joplix synchronises the Joplix folder with a Joplin Server. The folder in Nextcloud doubles as a versioned backup of all notes.')); ?></span></div>
+          <div><strong>Joplin Server</strong><span><?php p($l->t('JoplixSync synchronises the JoplixSync folder with a Joplin Server. The folder in Nextcloud doubles as a versioned backup of all notes.')); ?></span></div>
         </div>
         <div class="jp-setting-card jp-setting-card-path">
           <label for="jp-sync-url"><strong><?php p($l->t('Server address')); ?></strong><span><?php p($l->t('Address of the Joplin Server, for example https://joplin.example.com')); ?></span></label>
@@ -212,7 +212,7 @@ if (is_readable($infoXml)) {
           <button id="jp-sync-enabled" class="jp-switch" type="button" role="switch" aria-checked="false"><span></span></button>
         </div>
         <?php if ($isAdmin): ?><div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-sync-local-hosts"><strong><?php p($l->t('Local Joplin servers')); ?></strong><span><?php p($l->t('Administrators only. Joplin Servers in your own network that Joplix may connect to, for example joplin.lan or 192.168.1.20:22300, separated by commas. Only these may use http://. Applies to all users.')); ?></span></label>
+          <label for="jp-sync-local-hosts"><strong><?php p($l->t('Local Joplin servers')); ?></strong><span><?php p($l->t('Administrators only. Joplin Servers in your own network that JoplixSync may connect to, for example joplin.lan or 192.168.1.20:22300, separated by commas. Only these may use http://. Applies to all users.')); ?></span></label>
           <div class="jp-path-control"><input id="jp-sync-local-hosts" autocomplete="off" spellcheck="false"></div>
         </div><?php endif; ?>
         <div class="jp-sync-actions">
@@ -228,10 +228,10 @@ if (is_readable($infoXml)) {
       <section class="jp-settings-pane" data-settings-section="update">
         <h3>Update</h3>
         <div class="jp-setting-card jp-setting-card-static jp-update-current-version">
-          <div><strong><?php p($l->t('Currently installed version')); ?></strong><span id="jp-update-installed-version">Joplix <?php p($joplixVersion); ?></span></div>
+          <div><strong><?php p($l->t('Currently installed version')); ?></strong><span id="jp-update-installed-version">JoplixSync <?php p($joplixVersion); ?></span></div>
         </div>
         <div class="jp-setting-card jp-setting-card-path">
-          <label for="jp-update-repo-url"><strong><?php p($l->t('GitHub address')); ?></strong><span><?php p($l->t('Releases are installed from this repository. It can only be changed on the server: occ config:app:set joplix update_repo_url --value=…')); ?></span></label>
+          <label for="jp-update-repo-url"><strong><?php p($l->t('GitHub address')); ?></strong><span><?php p($l->t('Releases are installed from this repository. It can only be changed on the server: occ config:app:set joplixsync update_repo_url --value=…')); ?></span></label>
           <div class="jp-path-control"><input id="jp-update-repo-url" value="https://github.com/kane9287/joplix-xsync/releases" readonly autocomplete="off" spellcheck="false"></div>
         </div>
         <div class="jp-setting-card">
@@ -259,7 +259,7 @@ if (is_readable($infoXml)) {
         <h3><?php p($l->t('About')); ?></h3>
         <div class="jp-setting-card jp-setting-card-static jp-about-card">
           <img class="jp-logo-img" src="<?php p($iconUrl); ?>" alt="">
-          <div><strong>Joplix <?php p($joplixVersion); ?></strong><span><?php p($l->t('Nextcloud app for your Joplix data.')); ?></span>
+          <div><strong>JoplixSync <?php p($joplixVersion); ?></strong><span><?php p($l->t('Nextcloud app for your JoplixSync data.')); ?></span>
           <p class="jp-about-created">Created with <span class="jp-heart" aria-label="love">♥</span> by STONEUBI from Tirol / Austria.</p></div>
         </div>
       </section>
@@ -273,10 +273,10 @@ if (is_readable($infoXml)) {
   <section class="jp-welcome-modal jp-modal" role="dialog" aria-modal="true" aria-labelledby="jp-welcome-title">
     <button id="jp-welcome-close" class="jp-welcome-close jp-icon-btn" type="button" title="<?php p($l->t('Close welcome')); ?>" aria-label="<?php p($l->t('Close welcome')); ?>"><span class="jp-icon" data-icon="close"></span></button>
     <img class="jp-welcome-icon" src="<?php p($iconUrl); ?>" alt="">
-    <h2 id="jp-welcome-title"><?php p($l->t('Welcome to Joplix')); ?></h2>
-    <p><?php p($l->t('Joplix shows your synchronised notes directly in Nextcloud. For first use, the Joplix folder must be set correctly and the index built. Under Settings › Synchronisation, Joplix can synchronise the folder with a Joplin Server itself.')); ?></p>
+    <h2 id="jp-welcome-title"><?php p($l->t('Welcome to JoplixSync')); ?></h2>
+    <p><?php p($l->t('JoplixSync shows your synchronised notes directly in Nextcloud. For first use, the JoplixSync folder must be set correctly and the index built. Under Settings › Synchronisation, JoplixSync can synchronise the folder with a Joplin Server itself.')); ?></p>
     <ol class="jp-welcome-steps">
-      <li><strong><?php p($l->t('Check the Joplix folder')); ?></strong><span><?php p($l->t('Default is')); ?> <code>/JoplinV2</code>. <?php p($l->t('The path can be changed in the settings.')); ?></span></li>
+      <li><strong><?php p($l->t('Check the JoplixSync folder')); ?></strong><span><?php p($l->t('Default is')); ?> <code>/JoplinV2</code>. <?php p($l->t('The path can be changed in the settings.')); ?></span></li>
       <li><strong><?php p($l->t('Build the index')); ?></strong><span><?php p($l->t('If notes are missing, start the rebuild under Index in the settings.')); ?></span></li>
       <li><strong><?php p($l->t('Edit notes')); ?></strong><span><?php p($l->t('The Save button only becomes active when there are changes.')); ?></span></li>
     </ol>

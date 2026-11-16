@@ -1,7 +1,7 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
-use OCA\Joplix\AppInfo\Application;
+use OCA\JoplixSync\AppInfo\Application;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  * start() copies the attachment to /.joplix/editing/<session>/<name>, a Nextcloud file an Office app can open
  * by id. import() writes the working copy back into the attachment when its content changed. It runs
  *  - on the server whenever the working copy is written (OfficeFileWrittenListener), so changes saved in the
- *    editor reach the note even when the Joplix tab is closed, and
+ *    editor reach the note even when the JoplixSync tab is closed, and
  *  - from the browser's status poll, which mostly reports what the listener already did.
  * Sessions are kept in the user setting office_sessions: resource id => session.
  *
@@ -125,7 +125,7 @@ class JoplixOfficeService {
                         $imported = empty($state['error']) || !$state['active'];
                     } catch (\Throwable $e) {
                         $imported = false;
-                        $this->logger->warning('Joplix could not import the Office working copy {session} of {uid}: {message}', ['app' => Application::APP_ID, 'uid' => $uid, 'session' => $node->getName(), 'message' => $e->getMessage()]);
+                        $this->logger->warning('JoplixSync could not import the Office working copy {session} of {uid}: {message}', ['app' => Application::APP_ID, 'uid' => $uid, 'session' => $node->getName(), 'message' => $e->getMessage()]);
                     }
                 }
                 if (!$imported && $node->getMTime() >= $now - self::KEEP_UNIMPORTED_DAYS * 86400) {

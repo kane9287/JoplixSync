@@ -1,8 +1,8 @@
 <?php
-namespace OCA\Joplix\Listener;
+namespace OCA\JoplixSync\Listener;
 
-use OCA\Joplix\AppInfo\Application;
-use OCA\Joplix\Service\JoplixIndexService;
+use OCA\JoplixSync\AppInfo\Application;
+use OCA\JoplixSync\Service\JoplixIndexService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\Files\AppData\IAppDataFactory;
@@ -10,7 +10,7 @@ use OCP\Files\NotFoundException;
 use OCP\User\Events\UserDeletedEvent;
 
 /**
- * Removes what Joplix keeps outside the user's files when an account is deleted: the cached index
+ * Removes what JoplixSync keeps outside the user's files when an account is deleted: the cached index
  * (contains note text) and the sync state. Nextcloud removes the user's files and settings itself.
  *
  * @template-implements IEventListener<UserDeletedEvent>

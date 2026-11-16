@@ -1,7 +1,7 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
-use OCA\Joplix\AppInfo\Application;
+use OCA\JoplixSync\AppInfo\Application;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\IConfig;
@@ -11,7 +11,7 @@ use OCP\IConfig;
  * Nextcloud file:
  *   editing/<session>/   working copies opened in an Office editor (see JoplixOfficeService)
  *   updates/             default folder for development packages (admins only, JoplixDevUpdateService)
- * Nothing creates the folder until one of these is needed, so opening Joplix writes nothing into the user's
+ * Nothing creates the folder until one of these is needed, so opening JoplixSync writes nothing into the user's
  * files. Index and synchronisation state live in app data (JoplixIndexService, JoplixSyncService).
  *
  * Older versions also wrote version.json and lock.json on every page load and kept the folders backups,

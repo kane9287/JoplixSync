@@ -1,12 +1,12 @@
-# Joplix Installer & Uninstaller
+# JoplixSync Installer & Uninstaller
 
 ## Overview
 
-Joplix can be installed, upgraded, or removed directly from the GitHub releases of [kane9287/joplix-xsync](https://github.com/kane9287/joplix-xsync/releases).
+JoplixSync can be installed, upgraded, or removed directly from the GitHub releases of [kane9287/joplix-xsync](https://github.com/kane9287/joplix-xsync/releases).
 
 The installer selects the newest release of the chosen channel by version. If the release has a `JoplixNC_v<version>.zip` (beta: `JoplixNC_v<version>-beta.zip`) asset, that package is used and its SHA-256 checksum must match the digest GitHub publishes for the asset or a `SHA256SUMS` asset. If no package is attached, the installer uses GitHub’s automatic source archive of the release tag; there is no checksum for it, so the download relies on HTTPS alone.
 
-In both cases the version in the tag (for example `joplix-2026.11.67` or `v2026.11.67`) must equal `<version>` in `appinfo/info.xml` of the tagged commit, otherwise the package is rejected.
+In both cases the version in the tag (for example `joplixsync-2026.11.67` or `v2026.11.67`) must equal `<version>` in `appinfo/info.xml` of the tagged commit, otherwise the package is rejected.
 
 Both scripts use Nextcloud’s configured `apps_paths`, including `custom_apps` when configured. Set `NC_DIR` to the Nextcloud root if it lives outside `/var/www` or more than one instance is found. Set `WEBUSER` if the PHP service account differs from the detected account.
 
@@ -24,7 +24,7 @@ If several Nextcloud instances are found, the installer lists them and stops; pi
 
 ## One-Step Installation
 
-To install the latest stable version of Joplix, run:
+To install the latest stable version of JoplixSync, run:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
@@ -33,19 +33,19 @@ curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/
 The installer will:
 
 1. Detect Nextcloud automatically
-2. Find the newest stable Joplix release
+2. Find the newest stable JoplixSync release
 3. Find the matching `JoplixNC_v<version>.zip` package
 4. Download the package and verify its SHA-256 checksum before extraction
-5. Install or upgrade Joplix
+5. Install or upgrade JoplixSync
 6. Complete the Nextcloud app upgrade lifecycle when required
-7. Activate Joplix
+7. Activate JoplixSync
 8. Verify the installed version
 
 Example result:
 
 ```text
 ==========================================
- Joplix successfully installed
+ JoplixSync successfully installed
  Version: 2026.09.60
 ==========================================
 ```
@@ -54,7 +54,7 @@ Example result:
 
 # Beta Installation
 
-To install the latest Joplix Beta release, explicitly select the Beta channel:
+To install the latest JoplixSync Beta release, explicitly select the Beta channel:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
@@ -64,7 +64,7 @@ The installer will only consider releases that:
 
 - Are marked as pre-releases on GitHub
 - Have a tag that contains the version
-- Contain a matching Joplix Beta ZIP package, or can be installed from the source archive of the tag
+- Contain a matching JoplixSync Beta ZIP package, or can be installed from the source archive of the tag
 
 For example:
 
@@ -79,7 +79,7 @@ The Beta channel is intended for testing upcoming releases and fixes.
 
 # Upgrade
 
-The One-Step Installer can also be used to upgrade an existing Joplix installation.
+The One-Step Installer can also be used to upgrade an existing JoplixSync installation.
 
 ## Upgrade to the Latest Stable Version
 
@@ -97,15 +97,15 @@ Run:
 curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
 ```
 
-When an existing Joplix installation is detected, the installer will:
+When an existing JoplixSync installation is detected, the installer will:
 
 - Detect the currently installed version
 - Download the latest release for the selected channel
-- Create a backup of the existing Joplix application
+- Create a backup of the existing JoplixSync application
 - Install the new application files
 - Run the Nextcloud app-specific upgrade lifecycle
 - Verify the version stored by Nextcloud
-- Ensure that Joplix is enabled
+- Ensure that JoplixSync is enabled
 - Verify the final installation
 
 This avoids leaving Nextcloud with different application-file and `installed_version` states after an upgrade.
@@ -114,21 +114,21 @@ This avoids leaving Nextcloud with different application-file and `installed_ver
 
 # Upgrade Backups
 
-Before replacing an existing Joplix installation, the installer creates a backup.
+Before replacing an existing JoplixSync installation, the installer creates a backup.
 
 Upgrade backups are stored under the configured app directory. For example:
 
 ```text
-/var/www/nextcloud/apps/.joplix-backups
+/var/www/nextcloud/apps/.joplixsync-backups
 ```
 
 Example:
 
 ```text
-/var/www/nextcloud/apps/.joplix-backups/joplix-Ab12Cd34/previous
+/var/www/nextcloud/apps/.joplixsync-backups/joplixsync-Ab12Cd34/previous
 ```
 
-These backups contain the previous Joplix application files.
+These backups contain the previous JoplixSync application files.
 
 ---
 
@@ -152,7 +152,7 @@ curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/
 
 selects the latest **Beta** release.
 
-The installer does not permanently change the release-channel setting of the integrated Joplix updater.
+The installer does not permanently change the release-channel setting of the integrated JoplixSync updater.
 
 ---
 
@@ -169,22 +169,22 @@ curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/
 The uninstaller will:
 
 - Detect Nextcloud
-- Detect the installed Joplix version
+- Detect the installed JoplixSync version
 - Create a backup
-- Disable Joplix
+- Disable JoplixSync
 - Remove the application files
 
 Uninstall backups are stored under the configured app directory. For example:
 
 ```text
-/var/www/nextcloud/apps/.joplix-uninstall
+/var/www/nextcloud/apps/.joplixsync-uninstall
 ```
 
 ---
 
 # Purge Mode
 
-The `--purge` option delegates app removal to Nextcloud’s `occ app:remove joplix`. The script keeps app backups and leaves the Nextcloud data directory alone, including users’ `.joplix` workspaces and Joplin sync files.
+The `--purge` option delegates app removal to Nextcloud’s `occ app:remove joplixsync`. The script keeps app backups and leaves the Nextcloud data directory alone, including users’ `.joplixsync` workspaces and Joplin sync files.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash -s -- --purge
@@ -197,26 +197,26 @@ curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/
 ## Upgrade Backups
 
 ```text
-/var/www/nextcloud/apps/.joplix-backups
+/var/www/nextcloud/apps/.joplixsync-backups
 ```
 
 ## Uninstall Backups
 
 ```text
-/var/www/nextcloud/apps/.joplix-uninstall
+/var/www/nextcloud/apps/.joplixsync-uninstall
 ```
 
 Example upgrade backup:
 
 ```text
-/var/www/nextcloud/apps/.joplix-backups/joplix-Ab12Cd34/previous
+/var/www/nextcloud/apps/.joplixsync-backups/joplixsync-Ab12Cd34/previous
 ```
 
 ---
 
 # Supported Package Formats
 
-The installer automatically supports both Joplix package layouts.
+The installer automatically supports both JoplixSync package layouts.
 
 ## Flat ZIP
 
@@ -232,7 +232,7 @@ img/
 ## Traditional Nextcloud ZIP
 
 ```text
-joplix/
+joplixsync/
 ├── appinfo/
 ├── lib/
 ├── templates/
@@ -247,7 +247,7 @@ No manual package-format selection is required.
 
 # Release Package Naming
 
-Current Joplix releases use versioned package names.
+Current JoplixSync releases use versioned package names.
 
 ## Stable
 
@@ -273,7 +273,7 @@ Example:
 JoplixNC_v2026.09.60-beta.zip
 ```
 
-The GitHub tag only has to contain the same version, for example `joplix-2026.09.60`. Attaching a package is optional: without one, the source archive of the tag is installed.
+The GitHub tag only has to contain the same version, for example `joplixsync-2026.09.60`. Attaching a package is optional: without one, the source archive of the tag is installed.
 
 Example:
 
@@ -285,7 +285,7 @@ Package:
 JoplixNC_v2026.09.60-beta.zip
 ```
 
-Legacy packages named only `joplix.zip` are no longer used by the current installer.
+Legacy packages named only `joplixsync.zip` are no longer used by the current installer.
 
 ---
 
@@ -294,21 +294,21 @@ Legacy packages named only `joplix.zip` are no longer used by the current instal
 ## Verify Installation
 
 ```bash
-sudo -u www-data php /var/www/nextcloud/occ app:list | grep joplix
+sudo -u www-data php /var/www/nextcloud/occ app:list | grep joplixsync
 ```
 
-## Verify the Installed Joplix Version
+## Verify the Installed JoplixSync Version
 
 ```bash
 grep -oPm1 '(?<=<version>)[^<]+' \
-/var/www/nextcloud/apps/joplix/appinfo/info.xml
+/var/www/nextcloud/apps/joplixsync/appinfo/info.xml
 ```
 
-## Verify Nextcloud's Stored Joplix Version
+## Verify Nextcloud's Stored JoplixSync Version
 
 ```bash
 sudo -u www-data php /var/www/nextcloud/occ \
-config:app:get joplix installed_version
+config:app:get joplixsync installed_version
 ```
 
 The version reported by `appinfo/info.xml` and Nextcloud's stored `installed_version` should match after a successful upgrade.
@@ -329,11 +329,11 @@ sudo -u www-data php /var/www/nextcloud/occ maintenance:repair
 
 ---
 
-# Updating Older Joplix Beta Installations
+# Updating Older JoplixSync Beta Installations
 
-Older Joplix Beta versions may use the previous release-package naming scheme.
+Older JoplixSync Beta versions may use the previous release-package naming scheme.
 
-If an older integrated Joplix updater cannot install a current `JoplixNC` release, perform a one-time upgrade using the One-Step Installer:
+If an older integrated JoplixSync updater cannot install a current `JoplixNC` release, perform a one-time upgrade using the One-Step Installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
@@ -341,13 +341,13 @@ curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/
 
 The installer will upgrade the existing installation to the latest Beta release using the current package naming scheme.
 
-After upgrading to a current Joplix version, future updates can again be installed using the integrated Joplix updater.
+After upgrading to a current JoplixSync version, future updates can again be installed using the integrated JoplixSync updater.
 
 ---
 
 # Recovery
 
-The installer stages the verified package next to the live app. If the upgrade command fails, it restores the previous app files. Review Nextcloud’s database state if an upgrade started applying migrations before failing. If the process was forcibly stopped during the swap, the previous app files may still be under `.joplix-backups`.
+The installer stages the verified package next to the live app. If the upgrade command fails, it restores the previous app files. Review Nextcloud’s database state if an upgrade started applying migrations before failing. If the process was forcibly stopped during the swap, the previous app files may still be under `.joplixsync-backups`.
 
 ---
 
@@ -357,7 +357,7 @@ The installer stages the verified package next to the live app. If the upgrade c
 
 https://github.com/kane9287/joplix-xsync
 
-Joplix Xsync is a fork of https://codeberg.org/Stoneubi/joplix
+JoplixSync Xsync is a fork of https://codeberg.org/Stoneubi/joplixsync
 
 ## Releases
 
@@ -367,6 +367,6 @@ https://github.com/kane9287/joplix-xsync/releases
 
 # License
 
-Joplix is free and open-source software licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
+JoplixSync is free and open-source software licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
 
 See the repository `LICENSE` file for the complete license text.

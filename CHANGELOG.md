@@ -1,3 +1,10 @@
+# JoplixSync 2026.11.83
+
+- The app is now called **JoplixSync**, with the app id `joplixsync` (before: Joplix, `joplix`), in preparation for the Nextcloud App Store. Its PHP namespace is `OCA\JoplixSync`, its address `/apps/joplixsync`.
+- Nextcloud treats the new id as a separate app, so the in-app updater and the installer of an existing `joplix` installation cannot switch to it. Install JoplixSync next to it: on activation it copies the user settings, the server-wide settings and the synchronisation state from `joplix` once (values JoplixSync already has are kept), then disables `joplix` so the two never synchronise the same folder. The note index is rebuilt. Nothing of `joplix` is deleted; its folder in the apps directory can be removed afterwards.
+- Unchanged on purpose: the `.joplix` folder in your files, the `.joplix_backups` folder in the Joplin folder, and the browser storage, so open Office sessions, backups and local preferences carry over.
+- Notes and conflict notes created by the app record `joplixsync` as their source application.
+
 # Joplix 2026.11.82
 
 - Settings: one implementation instead of two that ran side by side. Changing the sort order or the Joplix folder saves once and rebuilds the index once (before: up to four requests and rebuilds). Closing the settings no longer re-sends settings nobody changed. The folder list is loaded once per visit.

@@ -1,7 +1,7 @@
 <?php
-namespace OCA\Joplix\Sync;
+namespace OCA\JoplixSync\Sync;
 
-use OCA\Joplix\Service\JoplinItem;
+use OCA\JoplixSync\Service\JoplinItem;
 use OCP\IL10N;
 use OCP\Files\File;
 use OCP\Files\Folder;
@@ -11,7 +11,7 @@ use OCP\Files\NotFoundException;
  * Two-way synchronisation between a Nextcloud folder holding Joplin sync
  * items (<id>.md plus .resource/<id>) and a Joplin Server account.
  *
- * The folder is Joplix's working copy and, because every write goes through
+ * The folder is JoplixSync's working copy and, because every write goes through
  * the Nextcloud files API, also a versioned backup of the server content.
  *
  * A run is time-boxed and resumable: when the budget is used up it returns
@@ -34,7 +34,7 @@ use OCP\Files\NotFoundException;
  *   resync       true while a full resynchronisation still has to be reconciled
  *
  * Deletions (finding Y5): a synchronised file that is gone from the folder is deleted on the server only
- * when Joplix itself deleted it ($deleted, the names JoplixWriteService reported), or when the user chose
+ * when JoplixSync itself deleted it ($deleted, the names JoplixWriteService reported), or when the user chose
  * "delete" for the missing items. Any other disappearance (Files app, desktop client, unmounted storage) is
  * reported as "missing" and left alone until the user chooses to delete it on the server or to restore it.
  */
@@ -63,7 +63,7 @@ class SyncEngine {
     /** True when the folder held no items at the start of the run although some were synchronised before. */
     private bool $folderWasEmptied = false;
 
-    /** @var array<string,true> item names Joplix deleted on purpose */
+    /** @var array<string,true> item names JoplixSync deleted on purpose */
     private array $deleted;
     /** @var string[] names from $deleted that were dealt with in this run */
     private array $handledDeletes = [];
@@ -80,7 +80,7 @@ class SyncEngine {
      *                             API writes to the same folder take (JoplixWriteLock)
      */
     /**
-     * @param string[] $deleted names of item files Joplix deleted (confirmed deletions)
+     * @param string[] $deleted names of item files JoplixSync deleted (confirmed deletions)
      */
     public function __construct(Folder $folder, JoplinServerClient $client, array $state, ?callable $persist = null, ?callable $guard = null, array $deleted = [], ?IL10N $l = null) {
         $this->deleted = array_fill_keys($deleted, true);
@@ -115,7 +115,7 @@ class SyncEngine {
     }
 
     /**
-     * @param string $missingAction what to do with synchronised files that disappeared without Joplix deleting
+     * @param string $missingAction what to do with synchronised files that disappeared without JoplixSync deleting
      *                              them: '' report them, 'delete' delete them on the server, 'restore' download them again
      * @return array{status: string, message?: string, code?: string, pulled: int, pushed: int, deleted_local: int, deleted_remote: int, conflicts: int, rejected: int, missing: int, overwritten: int, encrypted: int, restored: int}
      */
@@ -159,7 +159,7 @@ class SyncEngine {
             $result = ['status' => $complete ? 'done' : 'partial'] + $this->stats;
             if ($complete && $this->stats['missing'] > 0) {
                 $result['code'] = 'missing';
-                $result['message'] = $this->t('%1$s synchronised items are missing from the Nextcloud folder, but Joplix did not delete them. They were not deleted on the server.', [(string)$this->stats['missing']]);
+                $result['message'] = $this->t('%1$s synchronised items are missing from the Nextcloud folder, but JoplixSync did not delete them. They were not deleted on the server.', [(string)$this->stats['missing']]);
             }
             return $result;
         } catch (SyncAbortException $e) {
@@ -194,16 +194,16 @@ class SyncEngine {
         }
         $version = (int)($info['version'] ?? 0);
         if ($version !== self::SUPPORTED_SYNC_VERSION) {
-            throw new SyncAbortException($this->t('Unsupported sync target version %1$s (Joplix supports version %2$s).', [(string)$version, (string)self::SUPPORTED_SYNC_VERSION]), 'badVersion');
+            throw new SyncAbortException($this->t('Unsupported sync target version %1$s (JoplixSync supports version %2$s).', [(string)$version, (string)self::SUPPORTED_SYNC_VERSION]), 'badVersion');
         }
         $e2ee = $info['e2ee'] ?? false;
         if (is_array($e2ee)) {
             $e2ee = $e2ee['value'] ?? false;
         }
         if ($e2ee) {
-            throw new SyncAbortException($this->t('End-to-end encryption is enabled on this Joplin account. Joplix cannot read encrypted notes.'), 'e2ee');
+            throw new SyncAbortException($this->t('End-to-end encryption is enabled on this Joplin account. JoplixSync cannot read encrypted notes.'), 'e2ee');
         }
-        // Keep a copy for the backup. Joplix never writes info.json to the server.
+        // Keep a copy for the backup. JoplixSync never writes info.json to the server.
         try {
             if ($this->folder->nodeExists('info.json')) {
                 $node = $this->folder->get('info.json');
@@ -325,7 +325,7 @@ class SyncEngine {
             $remoteTime = self::toMillis((string)($meta['updated_time'] ?? ''));
         }
         if (($meta['encryption_applied'] ?? '') === '1') {
-            // Encrypted item (left over from a time when E2EE was on): Joplix cannot read it and must not
+            // Encrypted item (left over from a time when E2EE was on): JoplixSync cannot read it and must not
             // replace a readable local copy with ciphertext. Remembered so it is not downloaded every run.
             // Only an item that was synchronised before gets the new time; an unknown one is not recorded,
             // or a missing local file would then count as "missing".
@@ -719,7 +719,7 @@ class SyncEngine {
 
             $title = $body !== '' ? strtok($body, "\n") : $id;
             // The conflict note goes into the notebook of a note that uses the attachment, so it is listed
-            // next to it (Joplix has no separate "Conflicts" view). Conflicts are rare; the scan is acceptable.
+            // next to it (JoplixSync has no separate "Conflicts" view). Conflicts are rare; the scan is acceptable.
             $parentId = '';
             foreach ($this->md as $mdName => $mdNode) {
                 try {
@@ -740,7 +740,7 @@ class SyncEngine {
             $note = $this->t('Attachment conflict: %1$s', [$title]) . "\n\n"
                 . $this->t('The attachment was changed here and on another device. The server version is now in the note; this is the version from Nextcloud:') . "\n\n"
                 . '[' . str_replace(['[', ']'], ['\[', '\]'], $title) . '](:/' . $newId . ')' . "\n\n"
-                . implode("\n", ['id: ' . $noteId, 'parent_id: ' . $parentId,'created_time: ' . $now, 'updated_time: ' . $now, 'is_conflict: 1', 'source: joplix', 'source_application: joplix', 'user_created_time: ' . $now, 'user_updated_time: ' . $now, 'encryption_cipher_text: ', 'encryption_applied: 0', 'markup_language: 1', 'conflict_original_id: ', 'type_: 1']);
+                . implode("\n", ['id: ' . $noteId, 'parent_id: ' . $parentId,'created_time: ' . $now, 'updated_time: ' . $now, 'is_conflict: 1', 'source: joplixsync', 'source_application: joplixsync', 'user_created_time: ' . $now, 'user_updated_time: ' . $now, 'encryption_cipher_text: ', 'encryption_applied: 0', 'markup_language: 1', 'conflict_original_id: ', 'type_: 1']);
             $this->folder->newFile($noteId . '.md', $note);
             $this->md[$noteId . '.md'] = $this->freshFile($this->folder, $noteId . '.md');
             $this->stats['conflicts']++;
@@ -769,7 +769,7 @@ class SyncEngine {
 
     /**
      * Metadata of a serialised Joplin item. Same parser as JoplixModelService, so what the engine uploads
-     * and what Joplix shows agree on id and type_.
+     * and what JoplixSync shows agree on id and type_.
      * @return array<string, string>
      */
     public static function meta(string $content): array {
@@ -800,7 +800,7 @@ class SyncEngine {
             }
             $node = $this->folder->get(self::RESOURCE_DIR);
             if (!$node instanceof Folder) {
-                throw new SyncAbortException($this->t('.resource exists in the Joplix folder but is not a folder.'), 'badFolder');
+                throw new SyncAbortException($this->t('.resource exists in the JoplixSync folder but is not a folder.'), 'badFolder');
             }
             $this->resourceFolder = $node;
         }

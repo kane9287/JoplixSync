@@ -1,10 +1,10 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
-use OCA\Joplix\AppInfo\Application;
-use OCA\Joplix\Sync\JoplinServerClient;
-use OCA\Joplix\Sync\JoplinServerException;
-use OCA\Joplix\Sync\SyncEngine;
+use OCA\JoplixSync\AppInfo\Application;
+use OCA\JoplixSync\Sync\JoplinServerClient;
+use OCA\JoplixSync\Sync\JoplinServerException;
+use OCA\JoplixSync\Sync\SyncEngine;
 use OCP\Files\AppData\IAppDataFactory;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
@@ -31,7 +31,7 @@ use Psr\Log\LoggerInterface;
  * Until 2026.11.81 this was one switch (sync_allow_local) that opened the whole internal network to every
  * user; localHosts() turns it into the list of hosts configured at that time, once.
  *
- * Deletions: JoplixWriteService reports the item files Joplix deleted; they are kept in the user setting
+ * Deletions: JoplixWriteService reports the item files JoplixSync deleted; they are kept in the user setting
  * sync_deleted until the engine has deleted them on the server (see SyncEngine, "Deletions").
  */
 class JoplixSyncService {
@@ -159,7 +159,7 @@ class JoplixSyncService {
     }
 
     /**
-     * Remembers item files Joplix deleted, so the next run deletes them on the server (and only them).
+     * Remembers item files JoplixSync deleted, so the next run deletes them on the server (and only them).
      * @param string[] $names "<id>.md"
      */
     public function noteLocalDeletions(string $uid, array $names): void {
@@ -248,7 +248,7 @@ class JoplixSyncService {
         } catch (\Throwable $e) {
             $code = $e instanceof JoplinServerException ? $e->serverCode() : '';
             $result = ['status' => 'error', 'message' => $e->getMessage(), 'code' => $code];
-            $this->logger->warning('Joplix sync failed for {uid}: {message}', ['app' => self::APP_ID, 'uid' => $uid, 'message' => $e->getMessage(), 'exception' => $e]);
+            $this->logger->warning('JoplixSync sync failed for {uid}: {message}', ['app' => self::APP_ID, 'uid' => $uid, 'message' => $e->getMessage(), 'exception' => $e]);
         } finally {
             if ($client !== null) {
                 $this->storeSession($uid, $client->sessionId());
@@ -311,7 +311,7 @@ class JoplixSyncService {
                 }
                 $rows->closeCursor();
             } catch (\Throwable $e) {
-                $this->logger->warning('Joplix could not convert sync_allow_local: {message}', ['app' => self::APP_ID, 'message' => $e->getMessage()]);
+                $this->logger->warning('JoplixSync could not convert sync_allow_local: {message}', ['app' => self::APP_ID, 'message' => $e->getMessage()]);
             }
         }
         $value = implode(',', array_keys($hosts));
@@ -447,7 +447,7 @@ class JoplixSyncService {
 
     /**
      * Rebuilds the cached index after the engine changed files, so a background run does not leave it
-     * stale until somebody opens Joplix. Labels in the index use the user's language.
+     * stale until somebody opens JoplixSync. Labels in the index use the user's language.
      */
     private function refreshIndex(string $uid, string $path, Folder $folder, IL10N $l): void {
         try {
@@ -457,7 +457,7 @@ class JoplixSyncService {
             }, 20.0);
         } catch (\Throwable $e) {
             // The browser notices the changed files itself and rebuilds then.
-            $this->logger->info('Joplix index refresh after sync failed for {uid}: {message}', ['app' => self::APP_ID, 'uid' => $uid, 'message' => $e->getMessage()]);
+            $this->logger->info('JoplixSync index refresh after sync failed for {uid}: {message}', ['app' => self::APP_ID, 'uid' => $uid, 'message' => $e->getMessage()]);
         }
     }
 

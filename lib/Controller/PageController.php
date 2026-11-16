@@ -1,6 +1,6 @@
 <?php
-namespace OCA\Joplix\Controller;
-use OCA\Joplix\AppInfo\Application;
+namespace OCA\JoplixSync\Controller;
+use OCA\JoplixSync\AppInfo\Application;
 use OCP\AppFramework\Controller; use OCP\AppFramework\Http\TemplateResponse; use OCP\AppFramework\Http\ContentSecurityPolicy; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager;
 class PageController extends Controller {
  private IUserSession $userSession; private IGroupManager $groupManager;

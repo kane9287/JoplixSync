@@ -1,5 +1,5 @@
 <?php
-namespace OCA\Joplix\Sync;
+namespace OCA\JoplixSync\Sync;
 
 /** A condition that stops a sync run and needs the user's attention. */
 class SyncAbortException extends \RuntimeException {

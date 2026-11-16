@@ -1,5 +1,5 @@
 /*
- * Joplix stylesheet.
+ * JoplixSync stylesheet.
  *
  * Conventions (keep them when adding rules):
  * - Every selector starts at #joplix, the wrapper around the app, the overlays and all menus/dialogs that
@@ -13,7 +13,7 @@
  */
 
 /* 1 — base ------------------------------------------------------------------------------------------- */
-#content.app-joplix { overflow: hidden; }
+#content.app-joplixsync { overflow: hidden; }
 #joplix {
   --jp-h: var(--default-clickable-area, 34px);
   --jp-gap: calc(var(--default-grid-baseline, 4px) * 2);

@@ -1,7 +1,7 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
-use OCA\Joplix\AppInfo\Application;
+use OCA\JoplixSync\AppInfo\Application;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\App\IAppManager;
@@ -10,7 +10,7 @@ use OCP\IConfig;
 class JoplixDevUpdateService {
     private const MAX_ZIP_BYTES = 35 * 1024 * 1024;
     // Update source: GitHub releases of this repository. Since 2026.11.82 the repository is a server
-    // setting that only the system administrator can change (occ config:app:set joplix update_repo_url
+    // setting that only the system administrator can change (occ config:app:set joplixsync update_repo_url
     // --value=https://github.com/<owner>/<repo>/releases); before, any Nextcloud admin could point the
     // updater at any GitHub repository from the browser and install its code. Other hosts are rejected by
     // normalizeRepo().
@@ -97,7 +97,7 @@ class JoplixDevUpdateService {
         }
         try {
             if (!flock($lock, LOCK_EX | LOCK_NB)) {
-                throw new \RuntimeException('Ein Joplix-Update laeuft bereits.');
+                throw new \RuntimeException('Ein JoplixSync-Update laeuft bereits.');
             }
             return $this->replaceApp($appDir, $work, $content, $name, $releaseVersion);
         } finally {
@@ -178,7 +178,7 @@ class JoplixDevUpdateService {
                 'version' => $version,
                 'backup' => $backup,
                 'nextcloud_upgrade_completed' => true,
-                'message' => 'Joplix-Update abgeschlossen. Bitte Seite neu laden.',
+                'message' => 'JoplixSync-Update abgeschlossen. Bitte Seite neu laden.',
             ];
         } finally {
             $this->recursiveDelete($stage);
@@ -229,11 +229,11 @@ class JoplixDevUpdateService {
         $xml = $source === '' ? false : @file_get_contents($source . '/appinfo/info.xml');
         $info = ($xml === false || $xml === '') ? false : @simplexml_load_string($xml, \SimpleXMLElement::class, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
         if ($info === false || (string)$info->id !== Application::APP_ID || !preg_match('/^\d+\.\d+\.\d+$/D', (string)$info->version)) {
-            throw new \RuntimeException('ZIP enthaelt keine gueltige Joplix-App.');
+            throw new \RuntimeException('ZIP enthaelt keine gueltige JoplixSync-App.');
         }
         foreach (['appinfo/routes.php', 'lib/AppInfo/Application.php', 'js/app.js', 'templates/main.php'] as $required) {
             if (!is_file($source . '/' . $required)) {
-                throw new \RuntimeException('Unvollstaendiges Joplix-Paket: ' . $required);
+                throw new \RuntimeException('Unvollstaendiges JoplixSync-Paket: ' . $required);
             }
         }
         $nextcloud = $info->dependencies->nextcloud;
@@ -248,15 +248,15 @@ class JoplixDevUpdateService {
 
     private function completeNextcloudAppUpgrade(string $expectedVersion): void {
         if ($expectedVersion === '') {
-            throw new \RuntimeException('Joplix-Version fuer den Nextcloud-App-Abschluss fehlt');
+            throw new \RuntimeException('JoplixSync-Version fuer den Nextcloud-App-Abschluss fehlt');
         }
         $manager = $this->appManager ?? \OC::$server->get(IAppManager::class);
         if (!$manager->upgradeApp(Application::APP_ID)) {
-            throw new \RuntimeException('Nextcloud konnte die Joplix-App-Aktualisierung nicht abschliessen');
+            throw new \RuntimeException('Nextcloud konnte die JoplixSync-App-Aktualisierung nicht abschliessen');
         }
         $installedVersion = (string)$this->config->getAppValue(Application::APP_ID, 'installed_version', '');
         if (version_compare($installedVersion, $expectedVersion, '!=')) {
-            throw new \RuntimeException('Nextcloud meldet nach dem Joplix-Update Version ' . $installedVersion . ' statt ' . $expectedVersion);
+            throw new \RuntimeException('Nextcloud meldet nach dem JoplixSync-Update Version ' . $installedVersion . ' statt ' . $expectedVersion);
         }
     }
 
@@ -387,7 +387,7 @@ class JoplixDevUpdateService {
         }
         $installed = $this->installedVersion();
         if ($this->parseVersion($installed) === null) {
-            throw new \RuntimeException('Installierte Joplix-Version konnte nicht bestimmt werden.');
+            throw new \RuntimeException('Installierte JoplixSync-Version konnte nicht bestimmt werden.');
         }
         $result = $this->remoteReleases($repoUrl, $channel, $installed, $releaseId);
         foreach ($result['releases'] as $release) {
@@ -409,7 +409,7 @@ class JoplixDevUpdateService {
 
     private function detectPackageSource(string $tmpDir): string {
         $candidates = [
-            $tmpDir . '/joplix',
+            $tmpDir . '/joplixsync',
             $tmpDir,
         ];
         foreach ($candidates as $candidate) {
@@ -569,7 +569,7 @@ class JoplixDevUpdateService {
             }
             try {
                 $response = $client->get($url, [
-                    'headers' => ['Accept' => 'application/vnd.github+json, application/octet-stream, */*', 'User-Agent' => 'Joplix-Updater'],
+                    'headers' => ['Accept' => 'application/vnd.github+json, application/octet-stream, */*', 'User-Agent' => 'JoplixSync-Updater'],
                     'allow_redirects' => false,
                     'http_errors' => false,
                     'stream' => true,
@@ -644,7 +644,7 @@ class JoplixDevUpdateService {
             @unlink($tmp);
             return ['valid' => false, 'message' => 'ZIP kann nicht geoeffnet werden'];
         }
-        $info = $zip->getFromName('joplix/appinfo/info.xml');
+        $info = $zip->getFromName('joplixsync/appinfo/info.xml');
         if ($info === false) {
             $info = $zip->getFromName('appinfo/info.xml');
         }
@@ -655,7 +655,7 @@ class JoplixDevUpdateService {
         }
         $meta = $this->parseAppInfoXml($info);
         if (($meta['id'] ?? '') !== Application::APP_ID) {
-            return ['valid' => false, 'message' => 'Keine gueltige Joplix-App'];
+            return ['valid' => false, 'message' => 'Keine gueltige JoplixSync-App'];
         }
         return ['valid' => true, 'version' => (string)($meta['version'] ?? ''), 'message' => 'OK'];
     }

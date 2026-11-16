@@ -1,5 +1,5 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
 /**
  * The item was changed since the client loaded it (its known updated_time no longer matches).

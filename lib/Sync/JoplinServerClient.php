@@ -1,5 +1,5 @@
 <?php
-namespace OCA\Joplix\Sync;
+namespace OCA\JoplixSync\Sync;
 
 use OCP\Http\Client\IClientService;
 use OCP\Http\Client\IResponse;

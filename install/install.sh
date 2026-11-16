@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Joplix One-Step Installer (install or upgrade)
+# JoplixSync One-Step Installer (install or upgrade)
 #
 #   curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
 #   curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
@@ -11,7 +11,7 @@
 
 set -Eeuo pipefail
 
-APP_ID="joplix"
+APP_ID="joplixsync"
 REPO="kane9287/joplix-xsync"
 REPO_API="https://api.github.com/repos/$REPO/releases"
 MAX_ZIP_BYTES=$((35 * 1024 * 1024))
@@ -24,7 +24,7 @@ esac
 
 echo
 echo "=========================================="
-echo "       Joplix One-Step Installer"
+echo "       JoplixSync One-Step Installer"
 echo "=========================================="
 echo
 
@@ -129,9 +129,9 @@ while IFS= read -r row; do
     [[ -d $configured ]] || continue
     parent=$(realpath -e -- "$configured")
     [[ $parent != / ]] || fail "Invalid Nextcloud app path."
-    if [[ -e $parent/joplix || -L $parent/joplix ]]; then
+    if [[ -e $parent/joplixsync || -L $parent/joplixsync ]]; then
         [[ -z $EXISTING_PARENT || $EXISTING_PARENT == "$parent" ]] ||
-            fail "Joplix directories found in more than one app path."
+            fail "JoplixSync directories found in more than one app path."
         EXISTING_PARENT=$parent
     fi
     # New installations go into the first writable app path (for example custom_apps).
@@ -141,13 +141,13 @@ while IFS= read -r row; do
 done < <(jq -c '.[]' <<< "$APP_PATHS")
 APP_PARENT=${EXISTING_PARENT:-$APP_PARENT}
 [[ -n $APP_PARENT ]] || fail "No Nextcloud app directory found."
-APP_DIR="$APP_PARENT/joplix"
-[[ ! -L $APP_DIR ]] || fail "The Joplix directory is a symlink."
+APP_DIR="$APP_PARENT/joplixsync"
+[[ ! -L $APP_DIR ]] || fail "The JoplixSync directory is a symlink."
 
 # Root-owned lock, shared by both shell scripts.
 LOCK_ID=$(printf '%s' "$NC_DIR" | sha256sum)
-exec 9>"/run/lock/joplix-${LOCK_ID%% *}.lock"
-flock -n 9 || fail "A Joplix installation or removal is already running."
+exec 9>"/run/lock/joplixsync-${LOCK_ID%% *}.lock"
+flock -n 9 || fail "A JoplixSync installation or removal is already running."
 
 #
 # Find the newest GitHub release of the chosen channel
@@ -164,15 +164,15 @@ trap cleanup EXIT
 fetch() {
     # fetch <url> <target file> [max-bytes]
     curl -fsSL --proto '=https' --proto-redir '=https' --retry 2 \
-        ${3:+--max-filesize "$3"} -H 'User-Agent: Joplix-Installer' -o "$2" "$1"
+        ${3:+--max-filesize "$3"} -H 'User-Agent: JoplixSync-Installer' -o "$2" "$1"
 }
 
-echo "Looking for the newest Joplix release ($CHANNEL) in $REPO ..."
+echo "Looking for the newest JoplixSync release ($CHANNEL) in $REPO ..."
 fetch "$REPO_API?per_page=50" "$WORK/releases.json" ||
     fail "Could not load the release list from GitHub."
 
 # Channel: stable = regular releases, beta = releases marked as pre-release.
-# The version is taken from the tag (for example joplix-2026.11.67, v2026.11.67, JoplixNC_v2026.11.67-beta).
+# The version is taken from the tag (for example joplixsync-2026.11.67, v2026.11.67, JoplixNC_v2026.11.67-beta).
 # Package: an attached JoplixNC_v<version>[-beta].zip, otherwise the automatic source archive of the tag.
 RELEASE=$(jq -c --argjson beta "$BETA" '
     [ .[]
@@ -191,7 +191,7 @@ RELEASE=$(jq -c --argjson beta "$BETA" '
           zipball_url: (.zipball_url // "") }
     ] | sort_by(.key) | last // empty
 ' "$WORK/releases.json") || fail "The release list from GitHub is invalid."
-[[ -n $RELEASE ]] || fail "No Joplix release found for the '$CHANNEL' channel."
+[[ -n $RELEASE ]] || fail "No JoplixSync release found for the '$CHANNEL' channel."
 
 VERSION=$(jq -r '.version' <<< "$RELEASE")
 TAG=$(jq -r '.tag' <<< "$RELEASE")
@@ -200,13 +200,13 @@ ASSET_URL=$(jq -r '.asset_url' <<< "$RELEASE")
 ASSET_DIGEST=$(jq -r '.asset_digest' <<< "$RELEASE")
 SUMS_URL=$(jq -r '.sums_url' <<< "$RELEASE")
 ZIPBALL_URL=$(jq -r '.zipball_url' <<< "$RELEASE")
-echo "Found: Joplix $VERSION (tag $TAG)"
+echo "Found: JoplixSync $VERSION (tag $TAG)"
 
 INSTALLED=
 if [[ -e $APP_DIR ]]; then
-    [[ -f $APP_DIR/appinfo/info.xml ]] || fail "No valid Joplix installation at $APP_DIR."
+    [[ -f $APP_DIR/appinfo/info.xml ]] || fail "No valid JoplixSync installation at $APP_DIR."
     INSTALLED=$(grep -oPm1 '(?<=<version>)[^<]+' "$APP_DIR/appinfo/info.xml" || true)
-    echo "Installed: Joplix ${INSTALLED:-unknown}"
+    echo "Installed: JoplixSync ${INSTALLED:-unknown}"
     if [[ -n $INSTALLED && $INSTALLED != "$VERSION" &&
           $(printf '%s\n%s\n' "$INSTALLED" "$VERSION" | sort -V | tail -n1) == "$INSTALLED" ]]; then
         fail "The installed version $INSTALLED is newer than the release $VERSION."
@@ -218,7 +218,7 @@ fi
 #
 
 # Stage next to the live app so the swap is a plain rename.
-STAGE=$(mktemp -d "$APP_PARENT/.joplix-install-XXXXXXXX")
+STAGE=$(mktemp -d "$APP_PARENT/.joplixsync-install-XXXXXXXX")
 PACKAGE="$STAGE/package.zip"
 
 if [[ -n $ASSET_URL ]]; then
@@ -270,23 +270,23 @@ with zipfile.ZipFile(source) as archive:
     archive.extractall(destination)
 PY
 
-# Detect the package layout: joplix/ subfolder, flat ZIP, or a single top folder (GitHub source archive).
+# Detect the package layout: joplixsync/ subfolder, flat ZIP, or a single top folder (GitHub source archive).
 SOURCE=
-for candidate in "$STAGE/extracted/joplix" "$STAGE/extracted" "$STAGE/extracted"/*; do
+for candidate in "$STAGE/extracted/joplixsync" "$STAGE/extracted" "$STAGE/extracted"/*; do
     if [[ -d $candidate && ! -L $candidate && -f $candidate/appinfo/info.xml ]]; then
         SOURCE=$candidate
         break
     fi
 done
-[[ -n $SOURCE ]] || fail "The package does not contain a Joplix app (appinfo/info.xml is missing)."
+[[ -n $SOURCE ]] || fail "The package does not contain a JoplixSync app (appinfo/info.xml is missing)."
 
 PKG_ID=$(grep -oPm1 '(?<=<id>)[^<]+' "$SOURCE/appinfo/info.xml" || true)
 PKG_VERSION=$(grep -oPm1 '(?<=<version>)[^<]+' "$SOURCE/appinfo/info.xml" || true)
-[[ $PKG_ID == "$APP_ID" ]] || fail "The package does not contain a valid Joplix app."
+[[ $PKG_ID == "$APP_ID" ]] || fail "The package does not contain a valid JoplixSync app."
 [[ $PKG_VERSION == "$VERSION" ]] ||
     fail "The version in the package ($PKG_VERSION) does not match the release tag ($VERSION). appinfo/info.xml and the tag must agree."
 for required in appinfo/routes.php lib/AppInfo/Application.php js/app.js templates/main.php; do
-    [[ -f $SOURCE/$required ]] || fail "Incomplete Joplix package: $required"
+    [[ -f $SOURCE/$required ]] || fail "Incomplete JoplixSync package: $required"
 done
 
 # Files from the source repository that are not part of the installed app.
@@ -302,10 +302,10 @@ chmod -R u=rwX,go=rX -- "$SOURCE"
 
 BACKUP_DIR=
 if [[ -e $APP_DIR ]]; then
-    BACKUP_ROOT="$APP_PARENT/.joplix-backups"
+    BACKUP_ROOT="$APP_PARENT/.joplixsync-backups"
     [[ ! -L $BACKUP_ROOT ]] || fail "The backup directory is a symlink."
     mkdir -p -- "$BACKUP_ROOT"
-    BACKUP_DIR=$(mktemp -d "$BACKUP_ROOT/joplix-XXXXXXXX")
+    BACKUP_DIR=$(mktemp -d "$BACKUP_ROOT/joplixsync-XXXXXXXX")
     mv -- "$APP_DIR" "$BACKUP_DIR/previous"
     echo "App backup: $BACKUP_DIR/previous"
 fi
@@ -323,7 +323,7 @@ finish_install() {
 }
 
 if ! finish_install; then
-    echo "ERROR: Nextcloud could not activate Joplix $VERSION." >&2
+    echo "ERROR: Nextcloud could not activate JoplixSync $VERSION." >&2
     rm -rf -- "$APP_DIR"
     if [[ -n $BACKUP_DIR ]]; then
         mv -- "$BACKUP_DIR/previous" "$APP_DIR"
@@ -334,7 +334,7 @@ fi
 
 echo
 echo "=========================================="
-echo " Joplix successfully installed"
+echo " JoplixSync successfully installed"
 echo " Version: $VERSION"
 echo "=========================================="
 echo

@@ -1,7 +1,7 @@
 <?php
-namespace OCA\Joplix\Controller;
-use OCA\Joplix\AppInfo\Application; use OCA\Joplix\Service\JoplixDevUpdateService; use OCA\Joplix\Service\JoplixFolders; use OCA\Joplix\Service\JoplixOfficeService; use OCA\Joplix\Service\JoplixIndexService; use OCA\Joplix\Service\JoplixModelService; use OCA\Joplix\Service\JoplixWriteService; use OCA\Joplix\Service\JoplixWorkspaceService; use OCA\Joplix\Service\JoplixSyncService; use OCA\Joplix\Service\JoplixWriteLock;
-use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP\Files\Folder; use OCP\Files\IRootFolder; use OCP\IConfig; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager; use OCP\IL10N; use OCP\Files\AppData\IAppDataFactory; use OCA\Joplix\Service\ConflictException; use OCP\App\IAppManager;
+namespace OCA\JoplixSync\Controller;
+use OCA\JoplixSync\AppInfo\Application; use OCA\JoplixSync\Service\JoplixDevUpdateService; use OCA\JoplixSync\Service\JoplixFolders; use OCA\JoplixSync\Service\JoplixOfficeService; use OCA\JoplixSync\Service\JoplixIndexService; use OCA\JoplixSync\Service\JoplixModelService; use OCA\JoplixSync\Service\JoplixWriteService; use OCA\JoplixSync\Service\JoplixWorkspaceService; use OCA\JoplixSync\Service\JoplixSyncService; use OCA\JoplixSync\Service\JoplixWriteLock;
+use OCP\AppFramework\Controller; use OCP\AppFramework\Http\JSONResponse; use OCP\Files\Folder; use OCP\Files\IRootFolder; use OCP\IConfig; use OCP\IRequest; use OCP\IUserSession; use OCP\IGroupManager; use OCP\IL10N; use OCP\Files\AppData\IAppDataFactory; use OCA\JoplixSync\Service\ConflictException; use OCP\App\IAppManager;
 /**
  * Every endpoint of the browser app. Writes to the Joplin folder go through write(): under the per-user
  * write lock (shared with the sync engine), on a model read inside that lock, followed by an index refresh.
@@ -39,7 +39,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   }catch(\Throwable $e){}
  }
  /**
-  * Office editors Joplix can hand a working copy to, in preference order, with the page that opens a file by id.
+  * Office editors JoplixSync can hand a working copy to, in preference order, with the page that opens a file by id.
   * richdocuments is Nextcloud Office; it covers both the built-in CODE server and a separate Collabora Online.
   * It has no stand-alone editor page any more: /apps/richdocuments/index needs a CSRF token (fails on navigation),
   * and its own "edit online" routes redirect to /f/<id>, i.e. the Files app, whose viewer opens Collabora. That works
@@ -60,7 +60,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   */
  private function err(\Throwable $e,?int $s=null): JSONResponse{
   if($e instanceof \Error){
-   \OCP\Server::get(\Psr\Log\LoggerInterface::class)->error('Joplix: '.$e->getMessage(),['app'=>Application::APP_ID,'exception'=>$e]);
+   \OCP\Server::get(\Psr\Log\LoggerInterface::class)->error('JoplixSync: '.$e->getMessage(),['app'=>Application::APP_ID,'exception'=>$e]);
    return new JSONResponse(['error'=>$this->l->t('An internal error occurred. Details are in the Nextcloud log.')],500);
   }
   $message=$e->getMessage();
@@ -463,7 +463,7 @@ class ApiController extends Controller{ private IRootFolder $rootFolder; private
   */
  public function runSync(): JSONResponse {
      try {
-         // What to do with synchronised files that disappeared without Joplix deleting them: '' report, 'delete', 'restore'.
+         // What to do with synchronised files that disappeared without JoplixSync deleting them: '' report, 'delete', 'restore'.
          $action = (string)$this->request->getParam('missing_action', '');
          if (!in_array($action, ['', 'delete', 'restore'], true)) {
              $action = '';

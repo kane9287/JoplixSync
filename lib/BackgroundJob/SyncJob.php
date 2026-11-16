@@ -1,8 +1,8 @@
 <?php
-namespace OCA\Joplix\BackgroundJob;
+namespace OCA\JoplixSync\BackgroundJob;
 
-use OCA\Joplix\AppInfo\Application;
-use OCA\Joplix\Service\JoplixSyncService;
+use OCA\JoplixSync\AppInfo\Application;
+use OCA\JoplixSync\Service\JoplixSyncService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
 use OCP\IUserManager;
@@ -10,7 +10,7 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Synchronises every user who enabled Joplin Server sync, so the Nextcloud
- * copy stays current even when Joplix is not open in a browser.
+ * copy stays current even when JoplixSync is not open in a browser.
  */
 class SyncJob extends TimedJob {
     private const INTERVAL_SECONDS = 300;
@@ -51,7 +51,7 @@ class SyncJob extends TimedJob {
             try {
                 $this->sync->run((string)$uid, min(self::PER_USER_BUDGET_SECONDS, $remaining), '', false);
             } catch (\Throwable $e) {
-                $this->logger->warning('Joplix background sync failed for {uid}: {message}', ['app' => Application::APP_ID, 'uid' => $uid, 'message' => $e->getMessage()]);
+                $this->logger->warning('JoplixSync background sync failed for {uid}: {message}', ['app' => Application::APP_ID, 'uid' => $uid, 'message' => $e->getMessage()]);
             }
         }
     }

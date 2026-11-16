@@ -1,7 +1,7 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
-use OCA\Joplix\AppInfo\Application;
+use OCA\JoplixSync\AppInfo\Application;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException;
@@ -46,18 +46,18 @@ class JoplixFolders {
         $node = $this->rootFolder->getUserFolder($uid);
         foreach (explode('/', trim($path, '/')) as $segment) {
             if ($segment === '.' || $segment === '..') {
-                throw new \RuntimeException($this->l()->t('The Joplix folder path is not valid: %1$s', [$path]));
+                throw new \RuntimeException($this->l()->t('The JoplixSync folder path is not valid: %1$s', [$path]));
             }
             try {
                 $child = $node->get($segment);
             } catch (NotFoundException $e) {
                 if (!$create) {
-                    throw new \RuntimeException($this->l()->t('The Joplix folder %1$s does not exist. Check the path in the settings.', [$path]));
+                    throw new \RuntimeException($this->l()->t('The JoplixSync folder %1$s does not exist. Check the path in the settings.', [$path]));
                 }
                 $child = $node->newFolder($segment);
             }
             if (!$child instanceof Folder) {
-                throw new \RuntimeException($this->l()->t('The Joplix path is not a folder: %1$s', [$path]));
+                throw new \RuntimeException($this->l()->t('The JoplixSync path is not a folder: %1$s', [$path]));
             }
             $node = $child;
         }

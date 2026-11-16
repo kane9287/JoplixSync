@@ -1,8 +1,8 @@
 <?php
-namespace OCA\Joplix\Service;
+namespace OCA\JoplixSync\Service;
 
 /**
- * Reading Joplin's sync item format, shared by the model (what Joplix shows) and the sync engine (what it
+ * Reading Joplin's sync item format, shared by the model (what JoplixSync shows) and the sync engine (what it
  * uploads), so both agree on what an item's id and type_ are.
  *
  * An item file is "<body>\n\n<key>: <value>\n...". The metadata block is the run of non-blank lines at the

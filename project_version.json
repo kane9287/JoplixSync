@@ -1,14 +1,14 @@
 {
-  "name": "Joplix",
-  "version": "2026.11.82",
+  "name": "JoplixSync",
+  "version": "2026.11.83",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-15",
   "channel": "beta",
-  "base_version": "2026.11.81",
+  "base_version": "2026.11.82",
   "build_date": "2026-11-15",
   "release_date": "2026-11-15",
-  "summary": "Structure clean-up and the remaining review findings: Office edits imported on the server, safer synchronisation deletions, attachments streamed instead of base64.",
+  "summary": "Renamed to JoplixSync (app id joplixsync) for the Nextcloud App Store; settings and sync state of the old joplix app are imported once.",
   "updated": "2026-11-15",
   "notes": "See CHANGELOG.md."
 }

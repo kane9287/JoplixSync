@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Joplix Uninstaller
+# JoplixSync Uninstaller
 #
 #   curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash
 #   curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash -s -- --purge
@@ -10,11 +10,11 @@
 
 set -Eeuo pipefail
 
-APP_ID="joplix"
+APP_ID="joplixsync"
 
 echo
 echo "=========================================="
-echo "          Joplix Uninstaller"
+echo "          JoplixSync Uninstaller"
 echo "=========================================="
 echo
 
@@ -119,9 +119,9 @@ while IFS= read -r row; do
     [[ -d $configured ]] || continue
     parent=$(realpath -e -- "$configured")
     [[ $parent != / ]] || fail "Invalid Nextcloud app path."
-    if [[ -e $parent/joplix || -L $parent/joplix ]]; then
+    if [[ -e $parent/joplixsync || -L $parent/joplixsync ]]; then
         [[ -z $EXISTING_PARENT || $EXISTING_PARENT == "$parent" ]] ||
-            fail "Joplix directories found in more than one app path."
+            fail "JoplixSync directories found in more than one app path."
         EXISTING_PARENT=$parent
     fi
     # New installations go into the first writable app path (for example custom_apps).
@@ -131,26 +131,26 @@ while IFS= read -r row; do
 done < <(jq -c '.[]' <<< "$APP_PATHS")
 APP_PARENT=${EXISTING_PARENT:-$APP_PARENT}
 [[ -n $APP_PARENT ]] || fail "No Nextcloud app directory found."
-APP_DIR="$APP_PARENT/joplix"
-[[ ! -L $APP_DIR ]] || fail "The Joplix directory is a symlink."
+APP_DIR="$APP_PARENT/joplixsync"
+[[ ! -L $APP_DIR ]] || fail "The JoplixSync directory is a symlink."
 
 # Root-owned lock, shared by both shell scripts.
 LOCK_ID=$(printf '%s' "$NC_DIR" | sha256sum)
-exec 9>"/run/lock/joplix-${LOCK_ID%% *}.lock"
-flock -n 9 || fail "A Joplix installation or removal is already running."
+exec 9>"/run/lock/joplixsync-${LOCK_ID%% *}.lock"
+flock -n 9 || fail "A JoplixSync installation or removal is already running."
 
 if [[ ! -e $APP_DIR ]]; then
-    echo "Joplix is not installed."
+    echo "JoplixSync is not installed."
     exit 0
 fi
-[[ -f $APP_DIR/appinfo/info.xml ]] || fail "No valid Joplix installation at $APP_DIR."
+[[ -f $APP_DIR/appinfo/info.xml ]] || fail "No valid JoplixSync installation at $APP_DIR."
 
-BACKUP_ROOT="$APP_PARENT/.joplix-uninstall"
+BACKUP_ROOT="$APP_PARENT/.joplixsync-uninstall"
 [[ ! -L $BACKUP_ROOT ]] || fail "The backup directory is a symlink."
 mkdir -p -- "$BACKUP_ROOT"
-BACKUP_DIR=$(mktemp -d "$BACKUP_ROOT/joplix-XXXXXXXX")
-cp -a -- "$APP_DIR" "$BACKUP_DIR/joplix"
-echo "App backup: $BACKUP_DIR/joplix"
+BACKUP_DIR=$(mktemp -d "$BACKUP_ROOT/joplixsync-XXXXXXXX")
+cp -a -- "$APP_DIR" "$BACKUP_DIR/joplixsync"
+echo "App backup: $BACKUP_DIR/joplixsync"
 
 if [[ ${1:-} == --purge ]]; then
     # Nextcloud manages its own app configuration.
@@ -160,5 +160,5 @@ else
     rm -rf -- "$APP_DIR"
 fi
 [[ ! -e $APP_DIR ]] || fail "Nextcloud did not remove the app directory."
-echo "Joplix removed. User files and app backups were kept."
+echo "JoplixSync removed. User files and app backups were kept."
 

@@ -1,5 +1,5 @@
 <?php
-namespace OCA\Joplix\Sync;
+namespace OCA\JoplixSync\Sync;
 
 /**
  * Error reported by (or while talking to) a Joplin Server.

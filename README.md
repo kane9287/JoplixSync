@@ -60,12 +60,12 @@ Nextcloud administrators can update JoplixSync through its integrated updater an
 JoplixSync can be installed on your own server using the **Easy One-Step Installer**. Run the following command as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash
 ```
 
 The installer handles the required installation steps and provides a quick way to get your own JoplixSync instance up and running.
 
-The installation files and further information are available in the [JoplixSync repository on GitHub](https://github.com/kane9287/joplix-xsync). See [install/README.md](install/README.md) for the beta channel, upgrades and removal.
+The installation files and further information are available in the [JoplixSync repository on GitHub](https://github.com/kane9287/JoplixSync). See [install/README.md](install/README.md) for the beta channel, upgrades and removal.
 
 Whether you use JoplixSync for personal notes, documentation, projects, research, checklists, or everyday organization, it combines the convenience of a modern notes application with the freedom of a self-hosted Nextcloud environment.
 
@@ -77,9 +77,9 @@ Forked from Joplix which was created with ❤️ by Stoneubi from Austria / Tiro
 
 ## Links
 
-- [Website](https://github.com/kane9287/joplix-xsync)
-- [Support](https://github.com/kane9287/joplix-xsync/issues)
-- [Issue tracker](https://github.com/kane9287/joplix-xsync/issues)
-- [Source code](https://github.com/kane9287/joplix-xsync)
-- [Releases](https://github.com/kane9287/joplix-xsync/releases)
+- [Website](https://github.com/kane9287/JoplixSync)
+- [Support](https://github.com/kane9287/JoplixSync/issues)
+- [Issue tracker](https://github.com/kane9287/JoplixSync/issues)
+- [Source code](https://github.com/kane9287/JoplixSync)
+- [Releases](https://github.com/kane9287/JoplixSync/releases)
 - [Original project (Stoneubi/joplix on Codeberg)](https://codeberg.org/Stoneubi/joplix)

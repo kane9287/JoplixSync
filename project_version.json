@@ -1,14 +1,14 @@
 {
   "name": "JoplixSync",
-  "version": "2026.11.83",
+  "version": "2026.11.84",
   "release_type": "beta",
   "created_by": "Stoneubi",
   "date": "2026-11-15",
   "channel": "beta",
-  "base_version": "2026.11.82",
+  "base_version": "2026.11.83",
   "build_date": "2026-11-15",
   "release_date": "2026-11-15",
-  "summary": "Renamed to JoplixSync (app id joplixsync) for the Nextcloud App Store; settings and sync state of the old joplix app are imported once.",
+  "summary": "Follows the GitHub repository rename to kane9287/JoplixSync (installer and in-app updater).",
   "updated": "2026-11-15",
   "notes": "See CHANGELOG.md."
 }

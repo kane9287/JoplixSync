@@ -24,14 +24,14 @@ End-to-end encryption must be switched off on the Joplin account. JoplixSync is 
 - Office-Anhänge können mit einer installierten Office-App bearbeitet werden
 
 Die Ende-zu-Ende-Verschlüsselung muss im Joplin-Konto ausgeschaltet sein. JoplixSync ist ein Fork der Joplix-App von Stoneubi.]]></description>
-    <version>2026.11.83</version>
+    <version>2026.11.84</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Stoneubi</author>
     <namespace>JoplixSync</namespace>
     <category>organization</category>
-    <website>https://github.com/kane9287/joplix-xsync</website>
-    <bugs>https://github.com/kane9287/joplix-xsync/issues</bugs>
-    <repository type="git">https://github.com/kane9287/joplix-xsync.git</repository>
+    <website>https://github.com/kane9287/JoplixSync</website>
+    <bugs>https://github.com/kane9287/JoplixSync/issues</bugs>
+    <repository type="git">https://github.com/kane9287/JoplixSync.git</repository>
     <dependencies><php min-version="8.1"/><nextcloud min-version="32" max-version="35"/></dependencies>
     <background-jobs><job>OCA\JoplixSync\BackgroundJob\SyncJob</job></background-jobs>
     <repair-steps>

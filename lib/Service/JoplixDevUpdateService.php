@@ -14,7 +14,10 @@ class JoplixDevUpdateService {
     // --value=https://github.com/<owner>/<repo>/releases); before, any Nextcloud admin could point the
     // updater at any GitHub repository from the browser and install its code. Other hosts are rejected by
     // normalizeRepo().
-    public const DEFAULT_REPO_URL = 'https://github.com/kane9287/joplix-xsync/releases';
+    public const DEFAULT_REPO_URL = 'https://github.com/kane9287/JoplixSync/releases';
+    // Former names of the default repository (renamed 2026-11-15). GitHub redirects their API, but the
+    // download URLs it returns carry the new name, so a stored old name would reject every release.
+    private const FORMER_REPOS = ['kane9287/joplix-xsync'];
     // Present in a source checkout but not part of the installed app. Removed from every package before
     // activation so a GitHub source archive installs the same files as a packaged JoplixNC_v<version>.zip.
     private const NON_APP_ENTRIES = ['tools', 'docs', 'install', 'assets', '.github', '.gitignore', '.gitattributes', 'project_version.json'];
@@ -496,13 +499,16 @@ class JoplixDevUpdateService {
         }
         $segments = array_values(array_filter(explode('/', $path), fn($v) => $v !== ''));
         if (count($segments) < 2) {
-            throw new \RuntimeException('GitHub-Repository unvollstaendig. Erwartet wird Besitzer/Repository, z.B. kane9287/joplix-xsync');
+            throw new \RuntimeException('GitHub-Repository unvollstaendig. Erwartet wird Besitzer/Repository, z.B. kane9287/JoplixSync');
         }
         $owner = rawurldecode($segments[0]);
         $repo = rawurldecode(preg_replace('/\.git$/i', '', $segments[1]));
         if (!preg_match('/^[a-z0-9_.-]+$/iD', $owner) || !preg_match('/^[a-z0-9_.-]+$/iD', $repo)
             || in_array($owner, ['.', '..'], true) || in_array($repo, ['.', '..'], true)) {
             throw new \RuntimeException('GitHub-Repository enthaelt ungueltige Zeichen');
+        }
+        if (in_array(strtolower($owner . '/' . $repo), self::FORMER_REPOS, true)) {
+            return self::normalizeRepo(self::DEFAULT_REPO_URL);
         }
         return ['owner'=>$owner,'repo'=>$repo,'url'=>'https://github.com/'.$owner.'/'.$repo.'/releases'];
     }

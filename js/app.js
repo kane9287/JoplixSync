@@ -164,7 +164,7 @@ function formatJoplixDateTime(value){
 }
 
 // Update source: GitHub releases. Must match JoplixDevUpdateService::DEFAULT_REPO_URL (PHP).
-const JP_UPDATE_REPO_URL='https://github.com/kane9287/joplix-xsync/releases';
+const JP_UPDATE_REPO_URL='https://github.com/kane9287/JoplixSync/releases';
 function normalizeUpdateRepoUrlInput(value){
   let v=String(value||'').trim();
   if(!v)return JP_UPDATE_REPO_URL;

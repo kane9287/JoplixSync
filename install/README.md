@@ -2,7 +2,7 @@
 
 ## Overview
 
-JoplixSync can be installed, upgraded, or removed directly from the GitHub releases of [kane9287/joplix-xsync](https://github.com/kane9287/joplix-xsync/releases).
+JoplixSync can be installed, upgraded, or removed directly from the GitHub releases of [kane9287/JoplixSync](https://github.com/kane9287/JoplixSync/releases).
 
 The installer selects the newest release of the chosen channel by version. If the release has a `JoplixNC_v<version>.zip` (beta: `JoplixNC_v<version>-beta.zip`) asset, that package is used and its SHA-256 checksum must match the digest GitHub publishes for the asset or a `SHA256SUMS` asset. If no package is attached, the installer uses GitHub’s automatic source archive of the release tag; there is no checksum for it, so the download relies on HTTPS alone.
 
@@ -13,7 +13,7 @@ Both scripts use Nextcloud’s configured `apps_paths`, including `custom_apps` 
 Both variables go after `sudo`, so they reach the script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo NC_DIR=/var/www/nextcloud bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo NC_DIR=/var/www/nextcloud bash
 ```
 
 If several Nextcloud instances are found, the installer lists them and stops; pick one with `NC_DIR`.
@@ -27,7 +27,7 @@ If several Nextcloud instances are found, the installer lists them and stops; pi
 To install the latest stable version of JoplixSync, run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash
 ```
 
 The installer will:
@@ -57,7 +57,7 @@ Example result:
 To install the latest JoplixSync Beta release, explicitly select the Beta channel:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash -s -- beta
 ```
 
 The installer will only consider releases that:
@@ -86,7 +86,7 @@ The One-Step Installer can also be used to upgrade an existing JoplixSync instal
 Run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash
 ```
 
 ## Upgrade to the Latest Beta Version
@@ -94,7 +94,7 @@ curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/
 Run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash -s -- beta
 ```
 
 When an existing JoplixSync installation is detected, the installer will:
@@ -139,7 +139,7 @@ The selected release channel only applies to the current installer run.
 Running:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash
 ```
 
 selects the latest **Stable** release.
@@ -147,7 +147,7 @@ selects the latest **Stable** release.
 Running:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash -s -- beta
 ```
 
 selects the latest **Beta** release.
@@ -163,7 +163,7 @@ The standard uninstaller removes the application while keeping backups.
 ## Run
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/uninstall.sh | sudo bash
 ```
 
 The uninstaller will:
@@ -187,7 +187,7 @@ Uninstall backups are stored under the configured app directory. For example:
 The `--purge` option delegates app removal to Nextcloud’s `occ app:remove joplixsync`. The script keeps app backups and leaves the Nextcloud data directory alone, including users’ `.joplixsync` workspaces and Joplin sync files.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash -s -- --purge
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/uninstall.sh | sudo bash -s -- --purge
 ```
 
 ---
@@ -336,7 +336,7 @@ Older JoplixSync Beta versions may use the previous release-package naming schem
 If an older integrated JoplixSync updater cannot install a current `JoplixNC` release, perform a one-time upgrade using the One-Step Installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
+curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash -s -- beta
 ```
 
 The installer will upgrade the existing installation to the latest Beta release using the current package naming scheme.
@@ -355,13 +355,13 @@ The installer stages the verified package next to the live app. If the upgrade c
 
 ## Repository
 
-https://github.com/kane9287/joplix-xsync
+https://github.com/kane9287/JoplixSync
 
 JoplixSync Xsync is a fork of https://codeberg.org/Stoneubi/joplixsync
 
 ## Releases
 
-https://github.com/kane9287/joplix-xsync/releases
+https://github.com/kane9287/JoplixSync/releases
 
 ---
 

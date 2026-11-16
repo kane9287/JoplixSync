@@ -2,8 +2,8 @@
 #
 # JoplixSync Uninstaller
 #
-#   curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash
-#   curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/uninstall.sh | sudo bash -s -- --purge
+#   curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/uninstall.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/uninstall.sh | sudo bash -s -- --purge
 #
 # Optional environment: NC_DIR (Nextcloud root), WEBUSER (PHP service account).
 # The block from "Require root" up to the lock is shared verbatim with install.sh; keep both in step.

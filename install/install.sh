@@ -2,8 +2,8 @@
 #
 # JoplixSync One-Step Installer (install or upgrade)
 #
-#   curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash
-#   curl -fsSL https://raw.githubusercontent.com/kane9287/joplix-xsync/main/install/install.sh | sudo bash -s -- beta
+#   curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/kane9287/JoplixSync/main/install/install.sh | sudo bash -s -- beta
 #
 # Installs the newest GitHub release of the chosen channel (stable = regular releases, beta = pre-releases).
 # Optional environment: NC_DIR (Nextcloud root), WEBUSER (PHP service account).
@@ -12,7 +12,7 @@
 set -Eeuo pipefail
 
 APP_ID="joplixsync"
-REPO="kane9287/joplix-xsync"
+REPO="kane9287/JoplixSync"
 REPO_API="https://api.github.com/repos/$REPO/releases"
 MAX_ZIP_BYTES=$((35 * 1024 * 1024))
 
@@ -222,7 +222,8 @@ STAGE=$(mktemp -d "$APP_PARENT/.joplixsync-install-XXXXXXXX")
 PACKAGE="$STAGE/package.zip"
 
 if [[ -n $ASSET_URL ]]; then
-    [[ $ASSET_URL == "https://github.com/$REPO/releases/download/"* ]] || fail "Unexpected package URL: $ASSET_URL"
+    # GitHub owner and repository names are case-insensitive, so the check is too.
+    [[ ${ASSET_URL,,} == "https://github.com/${REPO,,}/releases/download/"* ]] || fail "Unexpected package URL: $ASSET_URL"
     echo "Downloading $ASSET_NAME ..."
     fetch "$ASSET_URL" "$PACKAGE" "$MAX_ZIP_BYTES" || fail "Download failed: $ASSET_URL"
     EXPECTED=
@@ -237,7 +238,7 @@ if [[ -n $ASSET_URL ]]; then
     [[ ${ACTUAL%% *} == "${EXPECTED,,}" ]] || fail "SHA-256 checksum of $ASSET_NAME does not match."
     echo "SHA-256 checksum verified."
 else
-    [[ $ZIPBALL_URL == "https://api.github.com/repos/$REPO/zipball/"* ]] || fail "Unexpected source archive URL: $ZIPBALL_URL"
+    [[ ${ZIPBALL_URL,,} == "https://api.github.com/repos/${REPO,,}/zipball/"* ]] || fail "Unexpected source archive URL: $ZIPBALL_URL"
     echo "No JoplixNC package attached to the release. Downloading the source archive of tag $TAG ..."
     echo "Note: there is no checksum for the source archive; the download is protected by HTTPS only."
     fetch "$ZIPBALL_URL" "$PACKAGE" "$MAX_ZIP_BYTES" || fail "Download failed: $ZIPBALL_URL"

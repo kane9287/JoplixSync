@@ -232,7 +232,7 @@ if (is_readable($infoXml)) {
         </div>
         <div class="jp-setting-card jp-setting-card-path">
           <label for="jp-update-repo-url"><strong><?php p($l->t('GitHub address')); ?></strong><span><?php p($l->t('Releases are installed from this repository. It can only be changed on the server: occ config:app:set joplixsync update_repo_url --value=…')); ?></span></label>
-          <div class="jp-path-control"><input id="jp-update-repo-url" value="https://github.com/kane9287/joplix-xsync/releases" readonly autocomplete="off" spellcheck="false"></div>
+          <div class="jp-path-control"><input id="jp-update-repo-url" value="https://github.com/kane9287/JoplixSync/releases" readonly autocomplete="off" spellcheck="false"></div>
         </div>
         <div class="jp-setting-card">
           <label for="jp-update-channel"><strong><?php p($l->t('Release channel')); ?></strong><span><?php p($l->t('Main shows regular GitHub releases; Beta shows pre-releases.')); ?></span></label>

@@ -1,3 +1,7 @@
+# JoplixSync 2026.11.84
+
+- The GitHub repository is now `kane9287/JoplixSync` (before: `kane9287/joplix-xsync`). The installer and the in-app updater rejected every release after the rename ("Unexpected source archive URL"), because GitHub returns download links under the new name. Both now use the new name, compare owner and repository case-insensitively as GitHub does, and the updater treats a stored old address as the new one.
+
 # JoplixSync 2026.11.83
 
 - The app is now called **JoplixSync**, with the app id `joplixsync` (before: Joplix, `joplix`), in preparation for the Nextcloud App Store. Its PHP namespace is `OCA\JoplixSync`, its address `/apps/joplixsync`.
